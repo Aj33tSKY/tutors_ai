@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
-import { createBookingAction, type BookingFormState } from "./actions";
+import { createCheckoutAction, type BookingFormState } from "./actions";
 import type { ExamBoard, StemSubject } from "@/lib/types";
 
 const initialState: BookingFormState = {};
@@ -23,7 +23,7 @@ export function BookingForm({
   boards: ExamBoard[];
   hourlyRate: number;
 }) {
-  const action = createBookingAction.bind(null, tutorId);
+  const action = createCheckoutAction.bind(null, tutorId);
   const [state, formAction, pending] = useActionState(action, initialState);
 
   const today = new Date().toISOString().split("T")[0];
@@ -81,10 +81,10 @@ export function BookingForm({
 
       <Button type="submit" disabled={pending} className="w-full" size="lg" aria-busy={pending}>
         {pending ? <Loader2 className="size-4 animate-spin" /> : <CalendarPlus className="size-4" />}
-        Book · £{hourlyRate}/hr
+        Continue to payment · £{hourlyRate}/hr
       </Button>
       <p className="text-center text-xs text-muted-foreground">
-        1-hour session · billed after signup completes
+        1-hour session · secure checkout via Stripe
       </p>
     </form>
   );

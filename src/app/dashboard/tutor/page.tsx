@@ -24,7 +24,11 @@ export default async function TutorDashboardPage() {
   const now = new Date();
   const upcoming = (bookings ?? []).filter((b) => new Date(b.start_time) >= now && b.status !== "cancelled");
   const completed = (bookings ?? []).filter((b) => b.status === "completed");
-  const earnings = completed.length * ((tutorProfile?.hourly_rate ?? 0) / 100);
+  const paid = (bookings ?? []).filter((b) => b.payment_status === "paid");
+  const earnings = paid.reduce(
+    (sum, b) => sum + (b.amount_gbp_pence ?? tutorProfile?.hourly_rate ?? 0) / 100,
+    0,
+  );
 
   const stats = [
     { label: "Upcoming sessions", value: upcoming.length, icon: Clock },

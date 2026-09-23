@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarPlus } from "lucide-react";
+import { CalendarPlus, CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,7 +14,12 @@ const STATUS_VARIANT: Record<BookingStatus, "default" | "secondary" | "outline">
   cancelled: "outline",
 };
 
-export default async function StudentBookingsPage() {
+export default async function StudentBookingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ checkout?: string }>;
+}) {
+  const { checkout } = await searchParams;
   const { userId } = await getCurrentProfile();
   const supabase = await createClient();
 
@@ -35,6 +40,18 @@ export default async function StudentBookingsPage() {
           </Link>
         </Button>
       </div>
+
+      {checkout === "success" && (
+        <div className="flex items-center gap-2 rounded-sm border border-hairline bg-raised px-4 py-3 text-sm">
+          <CheckCircle2 className="size-4 text-saffron" />
+          Payment received — your booking will appear below within a few seconds.
+        </div>
+      )}
+      {checkout === "cancelled" && (
+        <div className="rounded-sm border border-hairline bg-raised px-4 py-3 text-sm text-muted-foreground">
+          Checkout was cancelled — no payment was taken.
+        </div>
+      )}
 
       {!bookings || bookings.length === 0 ? (
         <Card>
@@ -66,6 +83,7 @@ export default async function StudentBookingsPage() {
                       minute: "2-digit",
                     })}{" "}
                     · {boardLabel(b.exam_board)}
+                    {b.amount_gbp_pence != null && ` · £${(b.amount_gbp_pence / 100).toFixed(2)}`}
                   </p>
                 </div>
                 {b.status === "scheduled" && (

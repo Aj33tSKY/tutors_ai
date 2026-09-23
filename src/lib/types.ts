@@ -11,6 +11,7 @@ export type StemSubject =
   | "Computing";
 
 export type BookingStatus = "scheduled" | "completed" | "cancelled";
+export type PaymentStatus = "pending" | "paid" | "refunded" | "failed";
 
 export interface Profile {
   id: string;
@@ -32,6 +33,8 @@ export interface TutorProfile {
   headline?: string | null;
   years_experience?: number | null;
   sessions_taught?: number | null;
+  stripe_account_id?: string | null;
+  stripe_payouts_enabled?: boolean;
 }
 
 export interface StudentProfile {
@@ -61,6 +64,10 @@ export interface Booking {
   status: BookingStatus;
   webrtc_room_url: string | null;
   created_at: string;
+  payment_status: PaymentStatus;
+  amount_gbp_pence: number | null;
+  stripe_checkout_session_id: string | null;
+  stripe_payment_intent_id: string | null;
 }
 
 export interface SessionAnalytics {

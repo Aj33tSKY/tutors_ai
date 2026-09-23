@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CalendarDays, MessageCircle, Clock, LogOut } from "lucide-react";
+import { LayoutDashboard, CalendarDays, MessageCircle, Clock, Landmark, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Wordmark } from "@/components/marketing/wordmark";
 import type { UserRole } from "@/lib/types";
@@ -25,6 +25,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   tutor: [
     { href: "/dashboard/tutor", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/tutor/availability", label: "Availability", icon: Clock },
+    { href: "/dashboard/tutor/payouts", label: "Payouts", icon: Landmark },
   ],
   admin: [{ href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard }],
 };

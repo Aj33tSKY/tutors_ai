@@ -20,6 +20,10 @@ do $$ begin
   create type booking_status as enum ('scheduled', 'completed', 'cancelled');
 exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create type payment_status as enum ('pending', 'paid', 'refunded', 'failed');
+exception when duplicate_object then null; end $$;
+
 -- ---------------------------------------------------------------------------
 -- Profiles
 -- ---------------------------------------------------------------------------
@@ -72,8 +76,24 @@ create table if not exists bookings (
   status booking_status default 'scheduled',
   webrtc_room_url text,
   created_at timestamptz default now(),
+  -- Stripe: a booking row is only created once payment succeeds (in the
+  -- webhook), so payment_status defaults to 'paid' rather than tracking a
+  -- pending-booking state in this table.
+  payment_status payment_status not null default 'paid',
+  amount_gbp_pence int, -- price snapshot at time of payment, in case rates change later
+  stripe_checkout_session_id text unique,
+  stripe_payment_intent_id text,
   check (end_time > start_time)
 );
+
+-- for databases created before payments existed
+alter table bookings add column if not exists payment_status payment_status not null default 'paid';
+alter table bookings add column if not exists amount_gbp_pence int;
+alter table bookings add column if not exists stripe_checkout_session_id text unique;
+alter table bookings add column if not exists stripe_payment_intent_id text;
+
+alter table tutor_profiles add column if not exists stripe_account_id text;
+alter table tutor_profiles add column if not exists stripe_payouts_enabled boolean not null default false;
 
 create table if not exists session_analytics (
   id uuid primary key default gen_random_uuid(),
