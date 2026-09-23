@@ -190,6 +190,43 @@ create policy "students read their own embeddings"
   using (student_id = auth.uid() or is_linked_parent(student_id) or app_current_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
+-- Revision chatbot: persisted conversations
+-- ---------------------------------------------------------------------------
+create table if not exists chat_conversations (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references profiles(id) on delete cascade,
+  title text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- id is the AI SDK UIMessage id (client- or server-generated), not a uuid.
+create table if not exists chat_messages (
+  id text primary key,
+  conversation_id uuid not null references chat_conversations(id) on delete cascade,
+  student_id uuid not null references profiles(id) on delete cascade,
+  role text not null check (role in ('user', 'assistant', 'system')),
+  message jsonb not null, -- full UIMessage (id, role, parts[]) for exact UI replay
+  created_at timestamptz default now()
+);
+
+create index if not exists chat_conversations_student_idx on chat_conversations (student_id, updated_at desc);
+create index if not exists chat_messages_conversation_idx on chat_messages (conversation_id, created_at);
+-- backs the daily-message-cap lookup in /api/chat
+create index if not exists chat_messages_student_daily_idx on chat_messages (student_id, role, created_at);
+
+alter table chat_conversations enable row level security;
+alter table chat_messages enable row level security;
+
+create policy "students manage their own conversations"
+  on chat_conversations for all to authenticated
+  using (student_id = auth.uid()) with check (student_id = auth.uid());
+
+create policy "students manage their own chat messages"
+  on chat_messages for all to authenticated
+  using (student_id = auth.uid()) with check (student_id = auth.uid());
+
+-- ---------------------------------------------------------------------------
 -- Auth trigger: create a profile row on signup from user_metadata
 -- ---------------------------------------------------------------------------
 create or replace function public.handle_new_user()

@@ -18,24 +18,33 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
 - **Booking** — students book real sessions against seeded tutor availability; bookings are
   written to Postgres and readable from both the student and tutor dashboards.
 - **Dashboards** — role-based shells for student, tutor, parent and admin, all reading live data.
-- **Revision chatbot UI** (`/dashboard/student/chat`) — full `useChat` streaming interface,
-  API route wired to the Vercel AI Gateway (`openai/gpt-5.4-mini`) and grounded in
-  `session_embeddings` for that student.
+- **Revision chatbot** (`/dashboard/student/chat`) — live on the AI Gateway (`openai/gpt-5.4-nano`),
+  grounded in `session_embeddings` for that student, streaming via `useChat`. Conversations
+  persist to Postgres (`chat_conversations` / `chat_messages`) with a sidebar of past chats —
+  nothing is lost on refresh. System prompt is tuned for short, spoken, markdown-free answers.
+
+### Chatbot cost controls
+
+Set at the top of `src/app/api/chat/route.ts`:
+
+| Control | Default | Why |
+| --- | --- | --- |
+| `HISTORY_WINDOW` | last 12 messages | Only the recent window is sent to the model each turn — without this, cost per message grows with the *entire* conversation length, not just that turn. Full history still displays in the UI and is stored in full. |
+| `DAILY_MESSAGE_LIMIT` | 40 user messages/student/day | Checked before any model call, so an over-limit request costs $0. Returns a 429 the client renders as a friendly "resets at midnight" message. |
+| `MAX_OUTPUT_TOKENS` | 600 | Hard ceiling per reply, independent of what the model would otherwise generate. |
+
+These are flat defaults, not tied to the pricing plan yet — see "Next up" below.
 
 ## What's stubbed (needs credentials only you can provide)
 
 | Module | Status | What's needed |
 | --- | --- | --- |
-| Revision chatbot | Code complete, gateway auth verified | **Add a card at vercel.com** → `AI` → billing, to unlock AI Gateway credits (see below) |
 | WebRTC video room (`/session/[id]`) | UI shell only | A LiveKit or Daily.co account + `LIVEKIT_*` / `NEXT_PUBLIC_LIVEKIT_URL` env vars |
 | Live transcription | Not started | Deepgram account + `DEEPGRAM_API_KEY`, wired to the video room's audio track |
 | Post-session LLM summarizer | Not started | Depends on the transcription pipe existing first |
 | Stripe billing / payouts | Not started | `vercel integration add stripe` (Marketplace), then wire booking checkout |
-
-**The AI Gateway is otherwise ready to go** — this project is linked to Vercel and authenticates
-via OIDC automatically, but Vercel currently requires a card on file before it will serve
-requests: visit the link the CLI printed (`vercel.com/[team]/~/ai?modal=add-credit-card`) and the
-chatbot will work immediately, no code changes needed.
+| Chat limits by plan tier | Flat limit only | Once Stripe billing exists, tie `DAILY_MESSAGE_LIMIT` to pay-as-you-go vs subscriber |
+| Tutor DBS document upload | Admin queue UI only, no upload | `@vercel/blob`, private access, form on tutor onboarding |
 
 ## Local development
 
