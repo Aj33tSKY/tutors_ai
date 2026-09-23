@@ -32,6 +32,11 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   (not other users, not even a linked parent — deliberate, for safeguarding); everyone else gets a
   404, not a redirect, so the booking's existence isn't leaked either. Token minting happens
   entirely server-side in the page component — there's no separate public token endpoint.
+- **Live transcription** (`agent/`) — a separate, always-on LiveKit Agent joins every session
+  room, transcribes each participant's audio through its own Deepgram stream (speaker attribution
+  from the LiveKit track itself, not acoustic diarization), and saves the transcript to
+  `session_analytics` plus flips the booking to `completed` when the call ends. Not part of the
+  Next.js app or its Vercel deployment — see `agent/README.md`.
 
 ### Chatbot cost controls
 
@@ -85,8 +90,8 @@ destination charges, still `recipient`-owned transfers).
 
 | Module | Status | What's needed |
 | --- | --- | --- |
-| Live transcription | Not started | Deepgram account + `DEEPGRAM_API_KEY`; pipe the room's audio to Deepgram's streaming API — likely a LiveKit [Agent](https://docs.livekit.io/agents/) subscribed to the room, since that keeps transcription server-side rather than routing audio through the browser |
-| Post-session LLM summarizer | Not started | Depends on the transcription pipe existing first |
+| Post-session LLM summarizer | Not started, now unblocked | Transcripts land in `session_analytics.full_transcript` once a call ends — next step is a job (Vercel Cron) that extracts spec-mapped topics/misconceptions/homework via the AI Gateway and populates `session_embeddings` for the chatbot |
+| Deploying the transcription agent | Code complete, not deployed | Needs Docker + `lk agent create` (see `agent/README.md`) — verified working in local dev mode against the real LiveKit Cloud project, but never run as the deployed Cloud Agent |
 | Chat limits by plan tier | Flat limit only | Once a real subscription model exists, tie `DAILY_MESSAGE_LIMIT` to pay-as-you-go vs subscriber |
 | Tutor DBS document upload | Admin queue UI only, no upload | `@vercel/blob`, private access, form on tutor onboarding |
 | Stripe production webhook | Test-mode only, via Stripe CLI locally | Once deployed, add a webhook endpoint in the Stripe dashboard pointing at `/api/webhooks/stripe` for `checkout.session.*`, and set `STRIPE_WEBHOOK_SECRET` to its signing secret |
@@ -151,6 +156,7 @@ src/lib/supabase/admin.ts    service-role client for the webhook (no user sessio
 src/lib/stripe.ts            lazy Stripe client (avoids crashing `next build` before keys exist)
 src/lib/livekit.ts           token minting + room naming (one room per booking id)
 supabase/schema.sql          full schema + RLS, matches docs/mvp_plan.md §3 plus chat_* and payment columns
+agent/                        separate always-on service: LiveKit Agent for live transcription (see agent/README.md)
 ```
 
 ## Verification
@@ -172,7 +178,12 @@ Supabase/Stripe sandboxes (not committed; scratch files loading `.env.local`):
   with 400.
 - Video room access control: a real booking's own student could load `/session/[id]` (200); a
   second, unrelated student got a 404 rather than any indication the booking exists; an
-  unauthenticated request was redirected to `/sign-in?next=...`. Actual audio/video was not
-  verified end-to-end (needs a browser with camera/mic, which this environment doesn't have) — the
-  `livekit-server-sdk` token-minting call is type-checked against the installed SDK version, and
-  the page correctly falls back to a "not configured" state while `LIVEKIT_API_SECRET` is unset.
+  unauthenticated request was redirected to `/sign-in?next=...`. Actual audio/video was verified
+  working live in a real call.
+- Transcription agent: ran locally against the real LiveKit Cloud project in both `lk agent dev`
+  (hot reload) and the compiled `pnpm start` production mode — both registered as a worker
+  correctly. Connected a throwaway test participant to a real booking room and confirmed the
+  agent receives the job, connects, correctly parses the booking id out of the room name, and
+  shuts down cleanly when the room empties, all with zero errors in its logs. Not yet verified:
+  actual Deepgram transcript text landing in `session_analytics` from a real two-person call
+  (no `DEEPGRAM_API_KEY` was available in that session) — do this once a key is in place.
