@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CalendarDays, MessageCircle, Clock, Landmark, LogOut } from "lucide-react";
+import { LayoutDashboard, Users, MessageCircle, Clock, Landmark, LogOut } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Wordmark } from "@/components/marketing/wordmark";
 import type { UserRole } from "@/lib/types";
@@ -18,12 +18,13 @@ type NavItem = { href: string; label: string; icon: typeof LayoutDashboard };
 export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   student: [
     { href: "/dashboard/student", label: "Overview", icon: LayoutDashboard },
-    { href: "/dashboard/student/bookings", label: "Bookings", icon: CalendarDays },
+    { href: "/dashboard/student/tutors", label: "My tutors", icon: Users },
     { href: "/dashboard/student/chat", label: "Revision AI", icon: MessageCircle },
   ],
   parent: [{ href: "/dashboard/parent", label: "Overview", icon: LayoutDashboard }],
   tutor: [
     { href: "/dashboard/tutor", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard/tutor/students", label: "My students", icon: Users },
     { href: "/dashboard/tutor/availability", label: "Availability", icon: Clock },
     { href: "/dashboard/tutor/payouts", label: "Payouts", icon: Landmark },
   ],

@@ -26,6 +26,29 @@ interface TranscriptLine {
   timestamp: string;
 }
 
+/**
+ * Deepgram emits a FINAL_TRANSCRIPT whenever it detects a natural pause. That
+ * is a transport-level utterance boundary, not necessarily a conversational
+ * turn, so preserve a new line only when the speaker actually changes.
+ */
+function formatTranscript(lines: TranscriptLine[]): string {
+  const turns: TranscriptLine[] = [];
+
+  for (const line of lines) {
+    const previous = turns.at(-1);
+    if (previous?.role === line.role) {
+      previous.text = `${previous.text} ${line.text}`;
+      previous.timestamp = line.timestamp;
+    } else {
+      turns.push({ ...line });
+    }
+  }
+
+  return turns
+    .map((line) => `[${line.role === "tutor" ? "Tutor" : "Student"}] ${line.text}`)
+    .join("\n");
+}
+
 function supabaseAdmin() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -125,9 +148,7 @@ export default defineAgent({
       if (transcript.length === 0) return;
 
       transcript.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-      const fullTranscript = transcript
-        .map((l) => `[${l.role === "tutor" ? "Tutor" : "Student"}] ${l.text}`)
-        .join("\n");
+      const fullTranscript = formatTranscript(transcript);
 
       const { error } = await supabase
         .from("session_analytics")

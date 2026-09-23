@@ -115,7 +115,7 @@ export async function createCheckoutAction(
       end_time: end.toISOString(),
       amount_gbp_pence: String(tutor.hourly_rate),
     },
-    success_url: `${origin}/dashboard/student/bookings?checkout=success`,
+    success_url: `${origin}/dashboard/student?checkout=success`,
     cancel_url: `${origin}/tutors/${tutorId}?checkout=cancelled`,
   });
 

@@ -68,6 +68,7 @@ export interface Booking {
   amount_gbp_pence: number | null;
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
+  lesson_name?: string | null;
 }
 
 export interface SessionAnalytics {
@@ -75,11 +76,13 @@ export interface SessionAnalytics {
   booking_id: string;
   full_transcript: string | null;
   summary_notes: {
+    overview?: string;
     covered_topics?: { spec_point: string; title: string }[];
     misconceptions?: string[];
     homework?: string[];
   } | null;
   talk_ratio: number | null;
+  recording_path?: string | null;
   created_at: string;
 }
 
@@ -89,4 +92,23 @@ export interface SessionEmbedding {
   student_id: string;
   content: string;
   topic: string | null;
+}
+
+export interface DirectConversation {
+  id: string;
+  student_id: string;
+  tutor_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  created_at: string;
 }

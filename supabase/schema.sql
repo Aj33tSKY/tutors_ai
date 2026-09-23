@@ -83,6 +83,7 @@ create table if not exists bookings (
   amount_gbp_pence int, -- price snapshot at time of payment, in case rates change later
   stripe_checkout_session_id text unique,
   stripe_payment_intent_id text,
+  lesson_name text,
   check (end_time > start_time)
 );
 
@@ -91,6 +92,7 @@ alter table bookings add column if not exists payment_status payment_status not 
 alter table bookings add column if not exists amount_gbp_pence int;
 alter table bookings add column if not exists stripe_checkout_session_id text unique;
 alter table bookings add column if not exists stripe_payment_intent_id text;
+alter table bookings add column if not exists lesson_name text;
 
 alter table tutor_profiles add column if not exists stripe_account_id text;
 alter table tutor_profiles add column if not exists stripe_payouts_enabled boolean not null default false;
@@ -101,8 +103,13 @@ create table if not exists session_analytics (
   full_transcript text,
   summary_notes jsonb,
   talk_ratio numeric(3, 2),
+  -- Private object key in the session-recordings Storage bucket, never a
+  -- public or long-lived signed URL. See README for the recording pipeline.
+  recording_path text,
   created_at timestamptz default now()
 );
+
+alter table session_analytics add column if not exists recording_path text;
 
 create table if not exists session_embeddings (
   id uuid primary key default gen_random_uuid(),
@@ -110,7 +117,10 @@ create table if not exists session_embeddings (
   student_id uuid references profiles(id) on delete cascade,
   content text not null,
   topic text,
-  embedding vector(1536)
+  -- 768 dims for google/text-embedding-005 (via AI Gateway) — not OpenAI's
+  -- text-embedding-3-small (1536 dims), which needs paid Gateway credits
+  -- this account doesn't have. See src/app/api/cron/summarize-sessions.
+  embedding vector(768)
 );
 
 create index if not exists session_embeddings_ivfflat
@@ -189,9 +199,11 @@ create policy "participants read their bookings"
   );
 create policy "students create bookings for themselves"
   on bookings for insert to authenticated with check (student_id = auth.uid());
+drop policy if exists "participants update their bookings" on bookings;
 create policy "participants update their bookings"
   on bookings for update to authenticated
-  using (student_id = auth.uid() or tutor_id = auth.uid());
+  using (student_id = (select auth.uid()) or tutor_id = (select auth.uid()))
+  with check (student_id = (select auth.uid()) or tutor_id = (select auth.uid()));
 
 -- session_analytics: same visibility as the parent booking
 create policy "participants read session analytics"
@@ -204,10 +216,138 @@ create policy "participants read session analytics"
     )
   );
 
+-- Recordings live in a *private* Supabase Storage bucket named
+-- `session-recordings`, with object names beginning `<booking-id>/`. Create
+-- that bucket in the Storage dashboard (or API), not by mutating storage
+-- tables directly. The recording worker writes with the service role; this
+-- policy only grants session participants (and linked parents) playback.
+drop policy if exists "session participants read recordings" on storage.objects;
+create policy "session participants read recordings"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'session-recordings'
+    and exists (
+      select 1 from bookings b
+      where b.id::text = (storage.foldername(name))[1]
+        and (
+          b.student_id = (select auth.uid())
+          or b.tutor_id = (select auth.uid())
+          or is_linked_parent(b.student_id)
+          or app_current_role() = 'admin'
+        )
+    )
+  );
+
 -- session_embeddings: student (+ linked parent) only — grounds their own RAG chatbot
 create policy "students read their own embeddings"
   on session_embeddings for select to authenticated
   using (student_id = auth.uid() or is_linked_parent(student_id) or app_current_role() = 'admin');
+
+-- ---------------------------------------------------------------------------
+-- Direct messages: exactly one conversation per student/tutor pair that has
+-- at least one booking. Parents deliberately do not inherit access to DMs.
+-- ---------------------------------------------------------------------------
+create table if not exists direct_conversations (
+  id uuid primary key default gen_random_uuid(),
+  student_id uuid not null references profiles(id) on delete cascade,
+  tutor_id uuid not null references profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (student_id, tutor_id),
+  check (student_id <> tutor_id)
+);
+
+create table if not exists direct_messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references direct_conversations(id) on delete cascade,
+  sender_id uuid not null references profiles(id) on delete cascade,
+  body text not null default '',
+  attachment_path text,
+  attachment_name text,
+  attachment_type text,
+  created_at timestamptz not null default now(),
+  check (char_length(body) <= 4000),
+  check (body <> '' or attachment_path is not null)
+);
+
+create index if not exists direct_conversations_student_idx
+  on direct_conversations (student_id, updated_at desc);
+create index if not exists direct_conversations_tutor_idx
+  on direct_conversations (tutor_id, updated_at desc);
+create index if not exists direct_messages_conversation_idx
+  on direct_messages (conversation_id, created_at);
+
+alter table direct_conversations enable row level security;
+alter table direct_messages enable row level security;
+
+create policy "participants read direct conversations"
+  on direct_conversations for select to authenticated
+  using (student_id = (select auth.uid()) or tutor_id = (select auth.uid()));
+create policy "booking participants create direct conversations"
+  on direct_conversations for insert to authenticated
+  with check (
+    (student_id = (select auth.uid()) or tutor_id = (select auth.uid()))
+    and exists (
+      select 1 from bookings b
+      where b.student_id = direct_conversations.student_id
+        and b.tutor_id = direct_conversations.tutor_id
+    )
+  );
+create policy "participants update direct conversations"
+  on direct_conversations for update to authenticated
+  using (student_id = (select auth.uid()) or tutor_id = (select auth.uid()))
+  with check (student_id = (select auth.uid()) or tutor_id = (select auth.uid()));
+create policy "participants read direct messages"
+  on direct_messages for select to authenticated
+  using (
+    exists (
+      select 1 from direct_conversations c
+      where c.id = conversation_id
+        and (c.student_id = (select auth.uid()) or c.tutor_id = (select auth.uid()))
+    )
+  );
+create policy "participants send direct messages"
+  on direct_messages for insert to authenticated
+  with check (
+    sender_id = (select auth.uid())
+    and exists (
+      select 1 from direct_conversations c
+      where c.id = conversation_id
+        and (c.student_id = (select auth.uid()) or c.tutor_id = (select auth.uid()))
+    )
+  );
+
+-- Enables live inbox refreshes for direct messages. Safe to re-run after the
+-- table has already been added to the publication.
+do $$ begin
+  alter publication supabase_realtime add table direct_messages;
+exception when duplicate_object then null; end $$;
+
+-- Create the private `message-attachments` bucket through Storage's dashboard
+-- or API. Object names must be `<conversation-id>/<sender-id>/<file-name>`.
+drop policy if exists "conversation participants read attachments" on storage.objects;
+create policy "conversation participants read attachments"
+  on storage.objects for select to authenticated
+  using (
+    bucket_id = 'message-attachments'
+    and exists (
+      select 1 from direct_conversations c
+      where c.id::text = (storage.foldername(name))[1]
+        and (c.student_id = (select auth.uid()) or c.tutor_id = (select auth.uid()))
+    )
+  );
+drop policy if exists "conversation participants upload attachments" on storage.objects;
+create policy "conversation participants upload attachments"
+  on storage.objects for insert to authenticated
+  with check (
+    bucket_id = 'message-attachments'
+    and (storage.foldername(name))[2] = (select auth.uid())::text
+    and exists (
+      select 1 from direct_conversations c
+      where c.id::text = (storage.foldername(name))[1]
+        and (c.student_id = (select auth.uid()) or c.tutor_id = (select auth.uid()))
+    )
+  );
 
 -- ---------------------------------------------------------------------------
 -- Revision chatbot: persisted conversations

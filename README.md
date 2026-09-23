@@ -37,6 +37,15 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   from the LiveKit track itself, not acoustic diarization), and saves the transcript to
   `session_analytics` plus flips the booking to `completed` when the call ends. Not part of the
   Next.js app or its Vercel deployment — see `agent/README.md`.
+- **Post-session summarizer** (`src/app/api/cron/summarize-sessions`) — a Vercel Cron job (every 5
+  minutes, `vercel.ts`) finds completed bookings with a transcript but no summary yet, extracts
+  spec-mapped topics/misconceptions/homework via the AI Gateway, computes a talk-time ratio from
+  the transcript directly (no LLM needed for that part), and chunks + embeds the transcript into
+  `session_embeddings` — this is what actually grounds the revision chatbot; before this, that
+  table was always empty. The student dashboard's "Topics covered" card reads this live.
+- **Per-session review** (`/dashboard/student/bookings/[bookingId]`) — each completed booking has
+  its own review with the LLM overview, topics, action points, misconceptions and full transcript.
+  When recording is enabled, the same page plays the session video from a private, short-lived URL.
 
 ### Chatbot cost controls
 
@@ -86,11 +95,27 @@ capabilities together — confirmed by testing the account-creation call directl
 sandbox. The code requests both; it doesn't change what charges are actually made (still
 destination charges, still `recipient`-owned transfers).
 
+### Post-session summarizer notes
+
+Same AI Gateway billing story as the chatbot, twice over: `openai/text-embedding-3-small` — the
+model `session_embeddings.embedding` was originally sized for (`vector(1536)`) — needs paid
+credits this account doesn't have, same as `gpt-5.4-mini` did. Switched to
+`google/text-embedding-005`, which works on the free tier (768 dims), and resized the column to
+`vector(768)` to match (safe — the table was empty). The summary-extraction call itself
+(`generateObject` with `gpt-5.4-nano`) worked on the first try with no billing issue. If credits
+get topped up later, both the embedding model and the column dimension need to change together.
+
+The extraction prompt is deliberately conservative: told not to invent spec point numbers or
+misconceptions/homework that aren't actually evidenced in the transcript, empty arrays over
+guesses. Verified against a real physics tutoring transcript — correctly extracted the exact spec
+point from the plan's own example (`Edexcel Physics 4.2 — Particle Accelerators`), real
+misconceptions, real homework, and a plausible talk ratio; verified separately against a
+low-content test transcript that it returns empty results rather than hallucinating.
+
 ### What's stubbed (needs credentials only you can provide)
 
 | Module | Status | What's needed |
 | --- | --- | --- |
-| Post-session LLM summarizer | Not started, now unblocked | Transcripts land in `session_analytics.full_transcript` once a call ends — next step is a job (Vercel Cron) that extracts spec-mapped topics/misconceptions/homework via the AI Gateway and populates `session_embeddings` for the chatbot |
 | Deploying the transcription agent | Code complete, not deployed | Needs Docker + `lk agent create` (see `agent/README.md`) — verified working in local dev mode against the real LiveKit Cloud project, but never run as the deployed Cloud Agent |
 | Chat limits by plan tier | Flat limit only | Once a real subscription model exists, tie `DAILY_MESSAGE_LIMIT` to pay-as-you-go vs subscriber |
 | Tutor DBS document upload | Admin queue UI only, no upload | `@vercel/blob`, private access, form on tutor onboarding |
@@ -124,6 +149,35 @@ stripe listen --forward-to localhost:3000/api/webhooks/stripe \
 ```
 
 Use Stripe's test card `4242 4242 4242 4242`, any future expiry, any CVC.
+
+Vercel Cron only fires on real deployments, so trigger the summarizer manually while developing:
+
+```bash
+curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/summarize-sessions
+```
+
+### Session recording
+
+Recording is supported by the session review page, but it must be explicitly enabled before a
+call: obtain participant consent, configure LiveKit Egress to write an MP4 to the private
+`session-recordings` Supabase Storage bucket, and save its object key (for example,
+`<booking-id>/session.mp4`) in `session_analytics.recording_path`. The page mints a one-hour
+signed playback URL only after Storage RLS confirms that the current user is a participant, linked
+parent, or admin. It intentionally never stores a public URL. The transcript agent does not start
+recordings itself yet; that needs LiveKit Egress/storage credentials and an agreed retention policy.
+
+### Direct messages and homework attachments
+
+`/dashboard/student/tutors` and `/dashboard/tutor/students` provide one private conversation for
+each tutor–student pair with a shared booking. Messages support images, PDFs, and Word documents
+up to 10 MB. Before deploying, create a **private** `message-attachments` Storage bucket with a
+10 MB limit and restrict its allowed MIME types to the file types accepted by the UI. The SQL RLS
+policies enforce participant-only reads/uploads using paths shaped
+`<conversation-id>/<sender-id>/<file-name>`; parents deliberately do not inherit message access.
+
+This is an MVP messaging store, so make two policy decisions before real student use: a retention
+period for messages/files, and malware scanning for uploaded homework. Neither is implemented by
+the app or supplied automatically by Storage.
 
 ## Database
 
