@@ -33,7 +33,18 @@ Set at the top of `src/app/api/chat/route.ts`:
 | `DAILY_MESSAGE_LIMIT` | 40 user messages/student/day | Checked before any model call, so an over-limit request costs $0. Returns a 429 the client renders as a friendly "resets at midnight" message. |
 | `MAX_OUTPUT_TOKENS` | 600 | Hard ceiling per reply, independent of what the model would otherwise generate. |
 
-These are flat defaults, not tied to the pricing plan yet — see "Next up" below.
+These are flat defaults, not tied to the pricing plan yet (see the table below).
+
+### AI Gateway model & billing notes
+
+- Using `openai/gpt-5.4-nano`, not `gpt-5.4-mini` — `mini` returned "Free tier users do not
+  have access to this model" even after a card was added and the Vercel account moved to Pro.
+  Adding a card ≠ having spendable Gateway credits; that needs an explicit top-up at
+  `vercel.com/[team]/~/ai` → top-up. `nano` works on the free tier and is materially cheaper, so
+  it's the default rather than a fallback — swap the model string back to `mini` in
+  `src/app/api/chat/route.ts` if/when credits are topped up and the stronger model is wanted.
+- Auth to the Gateway is via Vercel OIDC (automatic for a linked project, `vercel link` +
+  `vercel env pull`) — no `AI_GATEWAY_API_KEY` needed for this app.
 
 ## What's stubbed (needs credentials only you can provide)
 
@@ -71,11 +82,23 @@ project). Re-run it after any schema change:
 ## Project structure
 
 ```
-src/app/(marketing)/   public site: landing, /tutors discovery, /tutors/[id], how-it-works, pricing, about
-src/app/(auth)/        sign-in / sign-up + server actions
-src/app/dashboard/     role-based dashboards (student, tutor, parent, admin)
-src/app/session/[id]/  WebRTC room shell (pending LiveKit/Daily integration)
-src/app/api/chat/      RAG chatbot streaming endpoint
-src/lib/supabase/      browser/server/middleware Supabase clients + profile bootstrapping
-supabase/schema.sql    full schema + RLS, matches docs/mvp_plan.md §3
+src/app/(marketing)/         public site: landing, /tutors discovery, /tutors/[id], how-it-works, pricing, about
+src/app/(auth)/              sign-in / sign-up + server actions
+src/app/dashboard/           role-based dashboards (student, tutor, parent, admin)
+src/app/dashboard/student/chat/       /chat redirects to the most recent (or a new) conversation
+src/app/dashboard/student/chat/[id]/  the actual chat UI, sidebar, create/delete conversation actions
+src/app/session/[id]/        WebRTC room shell (pending LiveKit/Daily integration)
+src/app/api/chat/            RAG chatbot streaming endpoint — persistence, windowing, daily cap live here
+src/lib/supabase/            browser/server/proxy Supabase clients + profile bootstrapping
+supabase/schema.sql          full schema + RLS, matches docs/mvp_plan.md §3 plus chat_conversations/chat_messages
 ```
+
+## Verification
+
+Nothing above was taken on faith — see the session's exploratory `node` scripts (not committed;
+run from a `.env.local`-loaded scratch file) for how each piece was checked against the live
+Supabase project: signup → DB trigger → RLS-scoped booking insert/read-back; a second student
+confirmed unable to read another's `chat_messages` rows; the real `/api/chat` route hit with an
+authenticated session cookie end to end (200, streamed reply, both messages persisted, title
+auto-generated); the AI Gateway tested directly with `generateText` before and after the billing
+change described above.
