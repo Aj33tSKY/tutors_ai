@@ -31,7 +31,8 @@ pnpm install
 pnpm approve-builds --all   # once — @livekit/local-inference needs a native build step
 ```
 
-Copy the values already in the main app's `.env.local` into this directory's `.env.local`:
+Needs its own `.env.local` in this directory (not shared with the main app's — see the path bug
+note below for why the location matters), copied from the values already in `../.env.local`:
 
 ```
 LIVEKIT_URL=              # same value as NEXT_PUBLIC_LIVEKIT_URL in ../.env.local
@@ -53,14 +54,34 @@ registers as a worker there, the same as production, just with hot reload. Join 
 from the main app (two browser tabs, student + tutor) and the agent will be dispatched into that
 room automatically.
 
-**Verified so far:** the worker registers with LiveKit Cloud, receives a job when a room is
-created, connects, correctly parses the booking id from the room name, and shuts down cleanly
-when the room empties — confirmed by connecting a throwaway test participant and watching the
-agent's logs, both via `pnpm dev` and the compiled `pnpm start`. Actual Deepgram transcription
-was **not** verified end-to-end in that session (no `DEEPGRAM_API_KEY` was available yet) — the
-Deepgram plugin's own constructor throws a clear error if the key is missing, and that's caught
-per-track rather than crashing the whole agent, so confirm real transcript text lands in
-`session_analytics` once you have a key and a real call with two people talking.
+**Verified end to end** against a real two-person call: the worker registers with LiveKit Cloud,
+receives a job when a room is created, connects, transcribes real speech via Deepgram, correctly
+attributes it to `[Student]`/`[Tutor]`, saves it to `session_analytics.full_transcript`, and flips
+the booking to `completed` on shutdown.
+
+### A path bug worth knowing about
+
+`agent.ts` and `session.ts` each call `process.loadEnvFile()` before importing anything that reads
+`process.env` at import time (see "Why three files" below). Both computed `.env.local`'s path
+relative to their own location in `src/` — one directory too shallow, since `.env.local` lives at
+this package's root, not inside `src/`. `existsSync()` just silently returned false and skipped
+loading; nothing errored until a real job tried to construct the Deepgram or Supabase client,
+minutes into using the app, which made it look like an env-inheritance problem across
+`@livekit/agents`' per-job process fork rather than the one-line path mistake it actually was.
+Caught it by adding temporary diagnostic logging and reading the actual computed path, rather than
+continuing to guess. If you restructure these files, keep the `join(dirname(selfPath), "..",
+".env.local")` one level up.
+
+### Why three files, not one
+
+`agent.ts` — loads env, then hands the framework `session.ts`'s path (a string, not an import).
+`session.ts` — loads env *again* (separate process; see above), then dynamically imports
+`session-impl.ts`. `session-impl.ts` — the actual `defineAgent` logic. The split exists because
+`@livekit/agents-plugin-deepgram` reads `DEEPGRAM_API_KEY` into a module-level default object the
+instant it's imported — a static top-level import is always hoisted above any other code in the
+importing file, so a single-file version would read the env var before it was ever loaded, no
+matter where the `loadEnvFile()` call was written in that file. Dynamic, path-based loading is
+what lets "load env, then import" actually happen in that order.
 
 ## Deploying (LiveKit Cloud Agents)
 

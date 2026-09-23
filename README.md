@@ -180,10 +180,10 @@ Supabase/Stripe sandboxes (not committed; scratch files loading `.env.local`):
   second, unrelated student got a 404 rather than any indication the booking exists; an
   unauthenticated request was redirected to `/sign-in?next=...`. Actual audio/video was verified
   working live in a real call.
-- Transcription agent: ran locally against the real LiveKit Cloud project in both `lk agent dev`
-  (hot reload) and the compiled `pnpm start` production mode — both registered as a worker
-  correctly. Connected a throwaway test participant to a real booking room and confirmed the
-  agent receives the job, connects, correctly parses the booking id out of the room name, and
-  shuts down cleanly when the room empties, all with zero errors in its logs. Not yet verified:
-  actual Deepgram transcript text landing in `session_analytics` from a real two-person call
-  (no `DEEPGRAM_API_KEY` was available in that session) — do this once a key is in place.
+- Transcription agent: verified end to end against a real two-person call — real speech came back
+  as correctly-attributed transcript text in `session_analytics.full_transcript`, and the booking
+  flipped to `completed`. Getting there surfaced a real bug worth knowing about: the agent's
+  `.env.local` path was computed one directory too shallow, so `DEEPGRAM_API_KEY` and the Supabase
+  vars silently never loaded — `existsSync()` just returned false, no error, until a real job
+  tried to construct those clients. See `agent/README.md`'s "A path bug worth knowing about" for
+  the fix and why it was hard to spot (it looked exactly like a fork/env-inheritance problem).
