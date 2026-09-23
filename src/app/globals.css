@@ -1,0 +1,314 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* ---------------------------------------------------------------------------
+   Saffron-derived design system.
+   Palette, type and motion values are lifted from the reference build:
+   warm near-black paper, cream ink, saffron as the single loud accent,
+   rust and violet as support. Hairlines, not shadows. Tight radii, not pills.
+--------------------------------------------------------------------------- */
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-body);
+  --font-mono: var(--font-mono-stack);
+  --font-heading: var(--font-display);
+
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+
+  /* raw brand tokens */
+  --color-ink: var(--ink);
+  --color-raised: var(--raised);
+  --color-hairline: var(--hairline);
+  --color-cream: var(--cream);
+  --color-saffron: var(--saffron);
+  --color-rust: var(--rust);
+  --color-violet: var(--violet);
+
+  /* reference radii: .2 / .3 / .4 / .5rem, plus one oversized card corner */
+  --radius-xs: 0.2rem;
+  --radius-sm: 0.3rem;
+  --radius-md: 0.4rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-4xl: 4.5rem;
+
+  --ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
+
+  /* reference breakpoints */
+  --breakpoint-sm: 650px;
+  --breakpoint-md: 800px;
+  --breakpoint-lg: 1100px;
+  --breakpoint-xl: 1200px;
+  --breakpoint-2xl: 1600px;
+}
+
+:root {
+  /* --- core surfaces, straight from the reference --- */
+  --ink: #150604;
+  --raised: #2f0e09;
+  --hairline: #47140b;
+  --cream: #ece7e0;
+  --saffron: #ffbc09;
+  --rust: #962817;
+  --violet: #ca56ed;
+  --ember-flame: #fa4c06;
+
+  --background: var(--ink);
+  --foreground: var(--cream);
+  --card: var(--raised);
+  --card-foreground: var(--cream);
+  --popover: var(--raised);
+  --popover-foreground: var(--cream);
+
+  /* saffron is the one loud voice — CTAs, active states, key numbers */
+  --primary: var(--saffron);
+  --primary-foreground: var(--ink);
+
+  --secondary: var(--raised);
+  --secondary-foreground: var(--cream);
+
+  --muted: var(--raised);
+  --muted-foreground: #9a918c;
+
+  --accent: var(--violet);
+  --accent-foreground: var(--ink);
+
+  --destructive: #e2564a;
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--saffron);
+
+  --chart-1: var(--saffron);
+  --chart-2: var(--violet);
+  --chart-3: #d4643f;
+  --chart-4: var(--rust);
+  --chart-5: #9a918c;
+
+  --radius: 0.4rem;
+
+  --sidebar: #1d0805;
+  --sidebar-foreground: var(--cream);
+  --sidebar-primary: var(--saffron);
+  --sidebar-primary-foreground: var(--ink);
+  --sidebar-accent: var(--raised);
+  --sidebar-accent-foreground: var(--cream);
+  --sidebar-border: var(--hairline);
+  --sidebar-ring: var(--saffron);
+
+  /* rhythm: reference runs 10rem section padding, 8.5rem gaps */
+  --section-y: clamp(4.5rem, 9vw, 10rem);
+  --gutter: clamp(1.25rem, 4vw, 3rem);
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    @apply font-sans;
+    /* also paints the overscroll canvas, so rubber-banding stays warm black */
+    background-color: var(--ink);
+    scroll-behavior: smooth;
+    /* stop iOS inflating the already-large display type */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply text-foreground antialiased;
+    background:
+      radial-gradient(58vw 52vh at 18% 12%, color-mix(in oklab, var(--rust) 42%, transparent), transparent 72%),
+      radial-gradient(50vw 46vh at 86% 78%, color-mix(in oklab, var(--violet) 20%, transparent), transparent 72%),
+      radial-gradient(44vw 36vh at 52% -6%, color-mix(in oklab, var(--saffron) 15%, transparent), transparent 70%),
+      var(--ink);
+    background-color: transparent;
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-heading;
+    font-weight: 400;
+    letter-spacing: -0.025em;
+    line-height: 0.95;
+    text-wrap: balance;
+  }
+
+  /* One focus ring everywhere, in saffron — visible against warm near-black. */
+  :focus-visible {
+    outline: 2px solid var(--saffron);
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: var(--saffron);
+    color: var(--ink);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+
+@layer components {
+  /* Mono, uppercase, wide-tracked section label — the reference's signature. */
+  .eyebrow {
+    font-family: var(--font-mono-stack);
+    font-size: 0.6875rem;
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+
+  /* Page shell. Reference tops out around 1200px with a wide 1600px variant. */
+  .shell {
+    width: 100%;
+    max-width: 1200px;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  .shell-wide {
+    width: 100%;
+    max-width: 1600px;
+    margin-inline: auto;
+    padding-inline: var(--gutter);
+  }
+
+  .section {
+    padding-block: var(--section-y);
+  }
+
+  /* Hairline rules do the structural work that shadows did before. */
+  .rule {
+    border-top: 1px solid var(--hairline);
+  }
+
+  /* Underline that draws in from the left on hover — reference uses scaleX. */
+  .link-draw {
+    position: relative;
+    display: inline-block;
+  }
+  .link-draw::after {
+    content: "";
+    position: absolute;
+    inset-inline: 0;
+    bottom: -0.15em;
+    height: 1px;
+    background: currentColor;
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 0.5s var(--ease-expo);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .link-draw:hover::after {
+      transform: scaleX(1);
+    }
+  }
+
+  /* Display sizes. Reference peaks near 7.5rem with sub-1 leading. */
+  .display-xl {
+    font-family: var(--font-display);
+    font-size: clamp(2.75rem, 8.5vw, 7.5rem);
+    font-weight: 400;
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+  }
+  .display-lg {
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 5.5vw, 4.9rem);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: -0.03em;
+  }
+  .display-md {
+    font-family: var(--font-display);
+    font-size: clamp(1.75rem, 3.2vw, 2.8rem);
+    font-weight: 400;
+    line-height: 1;
+    letter-spacing: -0.025em;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Very fine grain over the warm black so large fills don't band. */
+  .grain::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+  }
+
+  .marquee-track {
+    animation: marquee 38s linear infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee-track {
+      animation: none !important;
+    }
+  }
+}
+
+@keyframes marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
