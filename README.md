@@ -26,6 +26,12 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   is only ever created by the webhook once payment succeeds, never optimistically. Tutors connect
   a Stripe Express account (`/dashboard/tutor/payouts`) to get paid directly via destination
   charges; until they do, payment settles to the platform and the tutor is paid out manually.
+- **Live video** (`/session/[bookingId]`) — real LiveKit room per booking, using LiveKit's prebuilt
+  `VideoConference` UI (camera/mic, screen share, in-call text chat all included). Access is
+  server-checked before a token is ever minted: only the booking's own student or tutor can join
+  (not other users, not even a linked parent — deliberate, for safeguarding); everyone else gets a
+  404, not a redirect, so the booking's existence isn't leaked either. Token minting happens
+  entirely server-side in the page component — there's no separate public token endpoint.
 
 ### Chatbot cost controls
 
@@ -79,13 +85,21 @@ destination charges, still `recipient`-owned transfers).
 
 | Module | Status | What's needed |
 | --- | --- | --- |
-| WebRTC video room (`/session/[id]`) | UI shell only | A LiveKit or Daily.co account + `LIVEKIT_*` / `NEXT_PUBLIC_LIVEKIT_URL` env vars |
-| Live transcription | Not started | Deepgram account + `DEEPGRAM_API_KEY`, wired to the video room's audio track |
+| Live transcription | Not started | Deepgram account + `DEEPGRAM_API_KEY`; pipe the room's audio to Deepgram's streaming API — likely a LiveKit [Agent](https://docs.livekit.io/agents/) subscribed to the room, since that keeps transcription server-side rather than routing audio through the browser |
 | Post-session LLM summarizer | Not started | Depends on the transcription pipe existing first |
 | Chat limits by plan tier | Flat limit only | Once a real subscription model exists, tie `DAILY_MESSAGE_LIMIT` to pay-as-you-go vs subscriber |
 | Tutor DBS document upload | Admin queue UI only, no upload | `@vercel/blob`, private access, form on tutor onboarding |
 | Stripe production webhook | Test-mode only, via Stripe CLI locally | Once deployed, add a webhook endpoint in the Stripe dashboard pointing at `/api/webhooks/stripe` for `checkout.session.*`, and set `STRIPE_WEBHOOK_SECRET` to its signing secret |
 | Live-mode Stripe | Sandbox/test mode only | `vercel integration resource claim stripe-emerald-arrow` to attach this to a real Stripe account, then go through Stripe's own account activation |
+| In-call whiteboard / KaTeX formula editor | Not started | Plan mentions Excalidraw + KaTeX; LiveKit's data channel (`canPublishData`, already granted) can carry whiteboard sync without another service |
+
+### Video calling notes
+
+LiveKit isn't in the Vercel Marketplace (only Mux — video streaming, not real-time calls), so this
+needed a manual [LiveKit Cloud](https://cloud.livekit.io) project and three env vars:
+`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `NEXT_PUBLIC_LIVEKIT_URL`. Until all three are set,
+`/session/[bookingId]` shows a "video isn't configured yet" state instead of erroring — checked
+via `livekitConfigured()` in `src/lib/livekit.ts`.
 
 ## Local development
 
@@ -128,13 +142,14 @@ src/app/(auth)/              sign-in / sign-up + server actions
 src/app/dashboard/           role-based dashboards (student, tutor, parent, admin)
 src/app/dashboard/student/chat/       /chat redirects to the most recent (or a new) conversation
 src/app/dashboard/student/chat/[id]/  the actual chat UI, sidebar, create/delete conversation actions
-src/app/session/[id]/        WebRTC room shell (pending LiveKit/Daily integration)
+src/app/session/[id]/        live LiveKit video room — server page mints the token, client renders VideoConference
 src/app/api/chat/            RAG chatbot streaming endpoint — persistence, windowing, daily cap live here
 src/app/api/webhooks/stripe/ Checkout fulfillment — the only place a paid booking gets created
 src/app/dashboard/tutor/payouts/  Stripe Connect (v2) onboarding + live payout-status check
 src/lib/supabase/            browser/server/proxy Supabase clients + profile bootstrapping
 src/lib/supabase/admin.ts    service-role client for the webhook (no user session to read cookies from)
 src/lib/stripe.ts            lazy Stripe client (avoids crashing `next build` before keys exist)
+src/lib/livekit.ts           token minting + room naming (one room per booking id)
 supabase/schema.sql          full schema + RLS, matches docs/mvp_plan.md §3 plus chat_* and payment columns
 ```
 
@@ -155,3 +170,9 @@ Supabase/Stripe sandboxes (not committed; scratch files loading `.env.local`):
   webhooks.generateTestHeaderString`) and confirmed it creates exactly one booking — replayed the
   identical event a second time and confirmed no duplicate; a forged signature confirmed rejected
   with 400.
+- Video room access control: a real booking's own student could load `/session/[id]` (200); a
+  second, unrelated student got a 404 rather than any indication the booking exists; an
+  unauthenticated request was redirected to `/sign-in?next=...`. Actual audio/video was not
+  verified end-to-end (needs a browser with camera/mic, which this environment doesn't have) — the
+  `livekit-server-sdk` token-minting call is type-checked against the installed SDK version, and
+  the page correctly falls back to a "not configured" state while `LIVEKIT_API_SECRET` is unset.
