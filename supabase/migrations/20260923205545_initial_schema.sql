@@ -65,21 +65,6 @@ create table if not exists availability (
   check (end_time > start_time)
 );
 
-create table if not exists lesson_requests (
-  id uuid primary key default gen_random_uuid(),
-  student_id uuid not null references profiles(id) on delete cascade,
-  tutor_id uuid not null references tutor_profiles(id) on delete cascade,
-  subject stem_subject,
-  exam_board exam_board,
-  requested_start_time timestamptz not null,
-  requested_end_time timestamptz not null,
-  is_trial boolean not null default false,
-  status text not null default 'pending' check (status in ('pending', 'declined', 'scheduled')),
-  created_at timestamptz not null default now(),
-  responded_at timestamptz,
-  check (requested_end_time > requested_start_time)
-);
-
 create table if not exists bookings (
   id uuid primary key default gen_random_uuid(),
   student_id uuid references profiles(id),
@@ -90,45 +75,27 @@ create table if not exists bookings (
   end_time timestamptz not null,
   status booking_status default 'scheduled',
   webrtc_room_url text,
-  started_at timestamptz,
-  last_joined_at timestamptz,
   created_at timestamptz default now(),
-  -- Confirmed lessons are created by a tutor after accepting a request. Paid
-  -- lessons remain pending until the tutor sends a post-session invoice.
-  payment_status payment_status not null default 'pending',
-  amount_gbp_pence int, -- price snapshot at scheduling time
+  -- Stripe: a booking row is only created once payment succeeds (in the
+  -- webhook), so payment_status defaults to 'paid' rather than tracking a
+  -- pending-booking state in this table.
+  payment_status payment_status not null default 'paid',
+  amount_gbp_pence int, -- price snapshot at time of payment, in case rates change later
   stripe_checkout_session_id text unique,
   stripe_payment_intent_id text,
   lesson_name text,
-  lesson_request_id uuid,
-  is_trial boolean not null default false,
-  recurrence_rule text,
-  recurrence_series_id uuid,
-  stripe_invoice_id text unique,
-  stripe_invoice_url text,
-  invoice_sent_at timestamptz,
   check (end_time > start_time)
 );
 
 -- for databases created before payments existed
-alter table bookings add column if not exists payment_status payment_status not null default 'pending';
+alter table bookings add column if not exists payment_status payment_status not null default 'paid';
 alter table bookings add column if not exists amount_gbp_pence int;
 alter table bookings add column if not exists stripe_checkout_session_id text unique;
 alter table bookings add column if not exists stripe_payment_intent_id text;
 alter table bookings add column if not exists lesson_name text;
-alter table bookings add column if not exists started_at timestamptz;
-alter table bookings add column if not exists last_joined_at timestamptz;
-alter table bookings add column if not exists lesson_request_id uuid references lesson_requests(id) on delete set null;
-alter table bookings add column if not exists is_trial boolean not null default false;
-alter table bookings add column if not exists recurrence_rule text;
-alter table bookings add column if not exists recurrence_series_id uuid;
-alter table bookings add column if not exists stripe_invoice_id text unique;
-alter table bookings add column if not exists stripe_invoice_url text;
-alter table bookings add column if not exists invoice_sent_at timestamptz;
 
 alter table tutor_profiles add column if not exists stripe_account_id text;
 alter table tutor_profiles add column if not exists stripe_payouts_enabled boolean not null default false;
-alter table profiles add column if not exists stripe_customer_id text unique;
 
 create table if not exists session_analytics (
   id uuid primary key default gen_random_uuid(),
@@ -143,45 +110,6 @@ create table if not exists session_analytics (
 );
 
 alter table session_analytics add column if not exists recording_path text;
-
--- Tutor opt-in and individual video segments. Each tutor rejoin produces a
--- separately finalized MP4, and the daily Vercel cron deletes files 90 days
--- after their segment starts.
-create table if not exists session_recording_consents (
-  booking_id uuid primary key references bookings(id) on delete cascade,
-  tutor_id uuid not null references profiles(id) on delete cascade,
-  consented_at timestamptz not null default now(),
-  consent_version integer not null default 1
-);
-alter table session_recording_consents enable row level security;
-revoke all on session_recording_consents from anon, authenticated;
-grant select on session_recording_consents to authenticated;
-grant all on session_recording_consents to service_role;
-
-create table if not exists session_recordings (
-  id uuid primary key default gen_random_uuid(),
-  booking_id uuid not null references bookings(id) on delete cascade,
-  egress_id text unique,
-  storage_path text not null unique,
-  status text not null default 'starting'
-    check (status in ('starting', 'active', 'stopping', 'ready', 'failed', 'expired')),
-  started_at timestamptz not null default now(),
-  ended_at timestamptz,
-  expires_at timestamptz not null default (now() + interval '90 days'),
-  created_at timestamptz not null default now()
-);
-create index if not exists session_recordings_booking_idx
-  on session_recordings (booking_id, started_at);
-create index if not exists session_recordings_expiry_idx
-  on session_recordings (expires_at)
-  where status in ('starting', 'active', 'stopping', 'ready', 'failed');
-create unique index if not exists session_recordings_one_active_per_booking_idx
-  on session_recordings (booking_id)
-  where status in ('starting', 'active');
-alter table session_recordings enable row level security;
-revoke all on session_recordings from anon;
-grant select on session_recordings to authenticated;
-grant all on session_recordings to service_role;
 
 create table if not exists session_embeddings (
   id uuid primary key default gen_random_uuid(),
@@ -200,10 +128,7 @@ create index if not exists session_embeddings_ivfflat
 
 create index if not exists bookings_tutor_time_idx on bookings (tutor_id, start_time);
 create index if not exists bookings_student_time_idx on bookings (student_id, start_time);
-create index if not exists bookings_recurrence_series_idx on bookings (recurrence_series_id, start_time) where recurrence_series_id is not null;
 create index if not exists availability_tutor_idx on availability (tutor_id, day_of_week);
-create index if not exists lesson_requests_tutor_status_idx on lesson_requests (tutor_id, status, created_at desc);
-create index if not exists lesson_requests_student_idx on lesson_requests (student_id, created_at desc);
 
 -- ---------------------------------------------------------------------------
 -- Row Level Security
@@ -212,35 +137,22 @@ alter table profiles enable row level security;
 alter table tutor_profiles enable row level security;
 alter table student_profiles enable row level security;
 alter table availability enable row level security;
-alter table lesson_requests enable row level security;
 alter table bookings enable row level security;
 alter table session_analytics enable row level security;
 alter table session_embeddings enable row level security;
 
-create schema if not exists private;
-revoke all on schema private from public, anon;
-grant usage on schema private to authenticated, service_role;
-
-create or replace function private.app_current_role() returns user_role
+create or replace function public.app_current_role() returns user_role
 language sql stable security definer set search_path = public as $$
   select role from profiles where id = auth.uid()
 $$;
 
-create or replace function private.is_linked_parent(student uuid) returns boolean
+create or replace function public.is_linked_parent(student uuid) returns boolean
 language sql stable security definer set search_path = public as $$
   select exists (
     select 1 from student_profiles sp
     where sp.id = student and sp.parent_id = auth.uid()
   )
 $$;
-revoke all on function private.app_current_role() from public, anon, authenticated, service_role;
-grant execute on function private.app_current_role() to authenticated, service_role;
-revoke all on function private.is_linked_parent(uuid) from public, anon, authenticated, service_role;
-grant execute on function private.is_linked_parent(uuid) to authenticated, service_role;
-alter default privileges for role postgres in schema public
-  revoke execute on functions from public, anon, authenticated, service_role;
-alter default privileges for role postgres in schema private
-  revoke execute on functions from public, anon, authenticated, service_role;
 
 -- profiles: everyone can read public profile fields, only the owner can update
 create policy "profiles are readable by authenticated users"
@@ -265,7 +177,7 @@ create policy "tutors update their own profile"
 -- student_profiles: student, their linked parent, and admins
 create policy "students read their own profile"
   on student_profiles for select to authenticated
-  using (id = auth.uid() or parent_id = auth.uid() or private.app_current_role() = 'admin');
+  using (id = auth.uid() or parent_id = auth.uid() or app_current_role() = 'admin');
 create policy "students manage their own profile"
   on student_profiles for insert to authenticated with check (id = auth.uid());
 create policy "students update their own profile"
@@ -278,37 +190,15 @@ create policy "tutors manage their own availability"
   on availability for all to authenticated
   using (tutor_id = auth.uid()) with check (tutor_id = auth.uid());
 
-create policy "participants read lesson requests"
-  on lesson_requests for select to authenticated
-  using (student_id = (select auth.uid()) or tutor_id = (select auth.uid()));
-create policy "students create their lesson requests"
-  on lesson_requests for insert to authenticated
-  with check (student_id = (select auth.uid()));
-create policy "tutors respond to lesson requests"
-  on lesson_requests for update to authenticated
-  using (tutor_id = (select auth.uid())) with check (tutor_id = (select auth.uid()));
-
 -- bookings: participants (+ linked parent) and admins only
 create policy "participants read their bookings"
   on bookings for select to authenticated
   using (
     student_id = auth.uid() or tutor_id = auth.uid()
-    or private.is_linked_parent(student_id) or private.app_current_role() = 'admin'
+    or is_linked_parent(student_id) or app_current_role() = 'admin'
   );
 create policy "students create bookings for themselves"
   on bookings for insert to authenticated with check (student_id = auth.uid());
-create policy "tutors schedule their lesson requests"
-  on bookings for insert to authenticated
-  with check (
-    tutor_id = (select auth.uid())
-    and exists (
-      select 1 from lesson_requests r
-      where r.id = bookings.lesson_request_id
-        and r.student_id = bookings.student_id
-        and r.tutor_id = (select auth.uid())
-        and r.status = 'pending'
-    )
-  );
 drop policy if exists "participants update their bookings" on bookings;
 create policy "participants update their bookings"
   on bookings for update to authenticated
@@ -322,29 +212,7 @@ create policy "participants read session analytics"
     exists (
       select 1 from bookings b where b.id = booking_id
       and (b.student_id = auth.uid() or b.tutor_id = auth.uid()
-        or private.is_linked_parent(b.student_id) or private.app_current_role() = 'admin')
-    )
-  );
-
-drop policy if exists "participants read recording consent" on session_recording_consents;
-create policy "participants read recording consent"
-  on session_recording_consents for select to authenticated
-  using (
-    exists (
-      select 1 from bookings b where b.id = booking_id
-      and (b.student_id = (select auth.uid()) or b.tutor_id = (select auth.uid())
-        or private.is_linked_parent(b.student_id) or private.app_current_role() = 'admin')
-    )
-  );
-
-drop policy if exists "participants read their session recordings" on session_recordings;
-create policy "participants read their session recordings"
-  on session_recordings for select to authenticated
-  using (
-    exists (
-      select 1 from bookings b where b.id = booking_id
-      and (b.student_id = (select auth.uid()) or b.tutor_id = (select auth.uid())
-        or private.is_linked_parent(b.student_id) or private.app_current_role() = 'admin')
+        or is_linked_parent(b.student_id) or app_current_role() = 'admin')
     )
   );
 
@@ -364,8 +232,8 @@ create policy "session participants read recordings"
         and (
           b.student_id = (select auth.uid())
           or b.tutor_id = (select auth.uid())
-          or private.is_linked_parent(b.student_id)
-          or private.app_current_role() = 'admin'
+          or is_linked_parent(b.student_id)
+          or app_current_role() = 'admin'
         )
     )
   );
@@ -373,7 +241,7 @@ create policy "session participants read recordings"
 -- session_embeddings: student (+ linked parent) only — grounds their own RAG chatbot
 create policy "students read their own embeddings"
   on session_embeddings for select to authenticated
-  using (student_id = auth.uid() or private.is_linked_parent(student_id) or private.app_current_role() = 'admin');
+  using (student_id = auth.uid() or is_linked_parent(student_id) or app_current_role() = 'admin');
 
 -- ---------------------------------------------------------------------------
 -- Direct messages: exactly one conversation per student/tutor pair that has
@@ -415,21 +283,14 @@ alter table direct_messages enable row level security;
 create policy "participants read direct conversations"
   on direct_conversations for select to authenticated
   using (student_id = (select auth.uid()) or tutor_id = (select auth.uid()));
-create policy "lesson participants create direct conversations"
+create policy "booking participants create direct conversations"
   on direct_conversations for insert to authenticated
   with check (
     (student_id = (select auth.uid()) or tutor_id = (select auth.uid()))
-    and (
-      exists (
-        select 1 from bookings b
-        where b.student_id = direct_conversations.student_id
-          and b.tutor_id = direct_conversations.tutor_id
-      )
-      or exists (
-        select 1 from lesson_requests r
-        where r.student_id = direct_conversations.student_id
-          and r.tutor_id = direct_conversations.tutor_id
-      )
+    and exists (
+      select 1 from bookings b
+      where b.student_id = direct_conversations.student_id
+        and b.tutor_id = direct_conversations.tutor_id
     )
   );
 create policy "participants update direct conversations"
@@ -528,7 +389,7 @@ create policy "students manage their own chat messages"
 -- ---------------------------------------------------------------------------
 -- Auth trigger: create a profile row on signup from user_metadata
 -- ---------------------------------------------------------------------------
-create or replace function private.handle_new_user()
+create or replace function public.handle_new_user()
 returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
@@ -546,4 +407,4 @@ $$;
 drop trigger if exists on_auth_user_created on auth.users;
 create trigger on_auth_user_created
   after insert on auth.users
-  for each row execute procedure private.handle_new_user();
+  for each row execute procedure public.handle_new_user();
