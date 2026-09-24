@@ -21,8 +21,7 @@ export default function SignInPage() {
       transition={{ duration: 0.75, ease: [0.19, 1, 0.22, 1] }}
       className="w-full max-w-md"
     >
-      <p className="eyebrow">Sign in</p>
-      <h1 className="display-lg mt-5">Welcome back</h1>
+      <h1 className="display-lg">Welcome back</h1>
       <p className="mt-5 text-muted-foreground">Sign in to your Kindling account.</p>
 
       <form action={formAction} className="mt-10 space-y-5">

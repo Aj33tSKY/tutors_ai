@@ -1,5 +1,8 @@
 import type { VercelConfig } from "@vercel/config/v1";
 
 export const config: VercelConfig = {
-  crons: [{ path: "/api/cron/summarize-sessions", schedule: "*/5 * * * *" }],
+  crons: [
+    { path: "/api/cron/summarize-sessions", schedule: "*/5 * * * *" },
+    { path: "/api/cron/prune-session-recordings", schedule: "15 3 * * *" },
+  ],
 };

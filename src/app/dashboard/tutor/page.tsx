@@ -1,7 +1,9 @@
 import { SessionsPanel } from "@/components/dashboard/sessions-panel";
+import { LessonRequests } from "@/components/dashboard/lesson-requests";
+import { RefreshDashboardOnHistoryNavigation } from "@/components/dashboard/refresh-dashboard-on-history-navigation";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
-import type { Booking, Profile } from "@/lib/types";
+import type { Booking, LessonRequest, Profile } from "@/lib/types";
 
 export default async function TutorDashboardPage() {
   const { userId, profile } = await getCurrentProfile();
@@ -14,7 +16,15 @@ export default async function TutorDashboardPage() {
     .order("start_time", { ascending: false })
     .returns<Booking[]>();
 
-  const studentIds = [...new Set((bookings ?? []).map((booking) => booking.student_id))];
+  const { data: requests } = await supabase
+    .from("lesson_requests")
+    .select("*")
+    .eq("tutor_id", userId)
+    .eq("status", "pending")
+    .order("created_at", { ascending: false })
+    .returns<LessonRequest[]>();
+
+  const studentIds = [...new Set([...(bookings ?? []).map((booking) => booking.student_id), ...(requests ?? []).map((request) => request.student_id)])];
   const { data: students } = studentIds.length
     ? await supabase.from("profiles").select("id, full_name").in("id", studentIds)
     : { data: [] as Pick<Profile, "id" | "full_name">[] };
@@ -22,17 +32,24 @@ export default async function TutorDashboardPage() {
 
   return (
     <div className="mx-auto max-w-6xl space-y-8">
+      <RefreshDashboardOnHistoryNavigation />
       <div>
         <h2 className="display-md">
           Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
         </h2>
         <p className="mt-1 text-sm text-muted-foreground">Your lessons, all in one place.</p>
       </div>
+      <LessonRequests requests={requests ?? []} names={studentNames} />
       <SessionsPanel
         counterpartLabel="Student"
+        canMarkComplete
+        canSendInvoice
+        canCreateSession
+        students={(students ?? []).map((student) => ({ id: student.id, fullName: student.full_name }))}
         sessions={(bookings ?? []).map((booking) => ({
           ...booking,
           counterpartName: studentNames.get(booking.student_id) ?? "Student",
+          counterpartId: booking.student_id,
         }))}
       />
     </div>

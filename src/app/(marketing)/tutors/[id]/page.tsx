@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
 import { BookingForm } from "./booking-form";
-import type { ExamBoard, Profile, StemSubject, TutorProfile } from "@/lib/types";
+import type { Availability, ExamBoard, Profile, StemSubject, TutorProfile } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,11 @@ export default async function TutorProfilePage({
   const p = Array.isArray(tutor.profiles) ? tutor.profiles[0] : tutor.profiles;
   const subjects = tutor.subjects as StemSubject[];
   const boards = tutor.boards as ExamBoard[];
+  const { data: availability } = await supabase
+    .from("availability")
+    .select("*")
+    .eq("tutor_id", tutor.id)
+    .returns<Availability[]>();
 
   const facts = [
     { label: "Rating", value: String(tutor.rating) },
@@ -37,8 +42,7 @@ export default async function TutorProfilePage({
     <div className="shell py-20">
       <div className="grid grid-cols-1 gap-16 lg:grid-cols-[1fr_22rem] lg:gap-20">
         <div>
-          <p className="eyebrow">A-Level tutor</p>
-          <h1 className="display-xl mt-6">{p?.full_name}</h1>
+          <h1 className="display-xl">{p?.full_name}</h1>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
             {tutor.headline}
           </p>
@@ -73,17 +77,17 @@ export default async function TutorProfilePage({
           </div>
         </div>
 
-        <aside className="h-fit border border-hairline bg-raised p-7 lg:sticky lg:top-24">
+        <aside className="h-fit rounded-3xl border border-border/70 bg-card p-7 shadow-md lg:sticky lg:top-24">
           <h2 className="display-md">Book a session</h2>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Choose a subject, exam board, date and time.
+            Choose a subject and one of the tutor&apos;s available slots.
           </p>
           <div className="mt-7">
             <BookingForm
               tutorId={tutor.id}
               subjects={subjects}
               boards={boards}
-              hourlyRate={tutor.hourly_rate / 100}
+              availability={availability ?? []}
             />
           </div>
         </aside>

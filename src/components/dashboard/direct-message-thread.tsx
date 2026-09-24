@@ -112,8 +112,8 @@ export function DirectMessageThread({
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-12rem)] flex-col rounded-sm border border-hairline bg-card">
-      <div className="border-b border-hairline px-5 py-4">
+    <div className="flex min-h-[calc(100vh-12rem)] flex-col rounded-2xl border border-border/70 bg-card shadow-sm">
+      <div className="border-b border-border/70 px-5 py-4">
         <p className="font-medium">{counterpartName}</p>
         <p className="text-xs text-muted-foreground">Direct messages and homework</p>
       </div>
@@ -125,19 +125,26 @@ export function DirectMessageThread({
             const mine = message.sender_id === currentUserId;
             return (
               <div key={message.id} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div className={`max-w-[82%] rounded-md px-3 py-2 text-sm ${mine ? "bg-primary text-primary-foreground" : "bg-raised"}`}>
-                  {message.body && <p className="whitespace-pre-wrap">{message.body}</p>}
-                  {message.attachmentUrl && message.attachment_type?.startsWith("image/") ? (
-                    <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 block">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={message.attachmentUrl} alt={message.attachment_name ?? "Attached image"} className="max-h-72 rounded-sm" />
-                    </a>
-                  ) : message.attachmentUrl ? (
-                    <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 flex items-center gap-2 underline underline-offset-2">
-                      <FileText className="size-4" /> {message.attachment_name ?? "Attachment"}
-                    </a>
-                  ) : null}
-                  <p className={`mt-1 text-[0.65rem] ${mine ? "text-primary-foreground/60" : "text-muted-foreground"}`}>
+                <div className={`max-w-[82%] text-sm ${mine ? "text-right" : "text-left"}`}>
+                  <div className={mine ? "inline-block rounded-2xl bg-secondary px-3.5 py-2.5 text-left" : ""}>
+                    {message.body && <p className="whitespace-pre-wrap leading-relaxed">{message.body}</p>}
+                    {message.attachmentUrl && message.attachment_type?.startsWith("image/") ? (
+                      <a href={message.attachmentUrl} target="_blank" rel="noreferrer" className="mt-2 block">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={message.attachmentUrl} alt={message.attachment_name ?? "Attached image"} className="max-h-72 rounded-xl" />
+                      </a>
+                    ) : message.attachmentUrl ? (
+                      <a
+                        href={message.attachmentUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-2 flex items-center gap-2 underline underline-offset-2"
+                      >
+                        <FileText className="size-4" /> {message.attachment_name ?? "Attachment"}
+                      </a>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 text-[0.65rem] text-muted-foreground">
                     {new Date(message.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
                   </p>
                 </div>
@@ -146,15 +153,15 @@ export function DirectMessageThread({
           })
         )}
       </div>
-      <form onSubmit={sendMessage} className="border-t border-hairline p-4">
+      <form onSubmit={sendMessage} className="border-t border-border/70 p-4">
         {file && (
-          <div className="mb-2 flex items-center justify-between rounded-sm bg-raised px-3 py-2 text-sm">
+          <div className="mb-2 flex items-center justify-between rounded-xl bg-secondary px-3 py-2 text-sm">
             <span className="flex min-w-0 items-center gap-2 truncate"><ImageIcon className="size-4" /> {file.name}</span>
             <button type="button" onClick={() => setFile(null)} aria-label="Remove attachment"><X className="size-4" /></button>
           </div>
         )}
-        <div className="flex items-end gap-2">
-          <label className="cursor-pointer rounded-md p-2 text-muted-foreground hover:bg-raised hover:text-foreground">
+        <div className="flex items-center gap-2">
+          <label className="flex shrink-0 cursor-pointer items-center justify-center rounded-full p-2 text-muted-foreground hover:bg-secondary hover:text-foreground">
             <Paperclip className="size-4" />
             <span className="sr-only">Attach homework</span>
             <input
@@ -164,8 +171,8 @@ export function DirectMessageThread({
               onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </label>
-          <Textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Message ${counterpartName}`} className="min-h-10" maxLength={4000} />
-          <Button type="submit" size="icon" disabled={sending || (!body.trim() && !file)} aria-label="Send message">
+          <Textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Message ${counterpartName}`} className="min-h-10 rounded-2xl py-2.5" maxLength={4000} />
+          <Button type="submit" size="icon" className="rounded-full" disabled={sending || (!body.trim() && !file)} aria-label="Send message">
             <Send className="size-4" />
           </Button>
         </div>

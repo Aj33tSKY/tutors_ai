@@ -1,9 +1,10 @@
 # Kindling transcription agent
 
-A [LiveKit Agent](https://docs.livekit.io/agents/) that joins every tutoring session room as a
-silent participant, transcribes the tutor's and student's audio separately via Deepgram, and
-saves the finished transcript to Supabase (`session_analytics.full_transcript`) when the call
-ends. It also flips the booking's `status` to `completed`.
+A [LiveKit Agent](https://docs.livekit.io/agents/) explicitly dispatched after the tutor joins a
+tutoring room. It transcribes the tutor's and student's audio separately via Deepgram and appends
+the segment to Supabase (`session_analytics.full_transcript`) when the tutor leaves. A room
+disconnect does not complete the booking; the tutor does that explicitly in the dashboard, so a
+late start or reconnect remains possible.
 
 This is a **separate, always-on service** from the Next.js app in `../` — it cannot run on
 Vercel (serverless functions can't hold the persistent connection an agent needs), and it isn't
@@ -11,11 +12,10 @@ part of that app's build.
 
 ## How it finds the right booking
 
-Room names are `booking-<uuid>` (minted in `../src/lib/livekit.ts`). The agent parses the
-booking id straight out of the room name — no separate lookup or dispatch metadata needed. It
-uses automatic dispatch (no `agentName` set), so it joins every room in this LiveKit project;
-since every room in this project *is* a tutoring session, that's correct here; if that ever
-changes, switch to explicit dispatch instead of filtering post-hoc.
+Room names are `booking-<uuid>` (minted in `../src/lib/livekit.ts`). The agent parses the booking
+id from the room name. Explicit dispatch means it joins only after the tutor joins; it shuts down
+when the tutor leaves, even if the student remains in the room. On a tutor rejoin, a fresh job
+continues the existing transcript.
 
 ## Speaker attribution
 
@@ -39,6 +39,7 @@ LIVEKIT_URL=              # same value as NEXT_PUBLIC_LIVEKIT_URL in ../.env.loc
 LIVEKIT_API_KEY=
 LIVEKIT_API_SECRET=
 DEEPGRAM_API_KEY=
+LIVEKIT_AGENT_NAME=kindling-transcription
 NEXT_PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 ```
@@ -50,14 +51,14 @@ pnpm dev   # lk agent dev — hot reload, connects to your real LiveKit Cloud pr
 ```
 
 There's no local LiveKit server in this setup — dev mode connects to the real Cloud project and
-registers as a worker there, the same as production, just with hot reload. Join a real session
-from the main app (two browser tabs, student + tutor) and the agent will be dispatched into that
-room automatically.
+registers as a worker there, the same as production, just with hot reload. Set `LIVEKIT_AGENT_NAME`
+to the same name configured for the Cloud Agent. Configure the app's LiveKit webhook to post
+`participant_joined`, `participant_left`, and `egress_ended` events to
+`/api/webhooks/livekit`; a tutor join triggers explicit dispatch.
 
-**Verified end to end** against a real two-person call: the worker registers with LiveKit Cloud,
-receives a job when a room is created, connects, transcribes real speech via Deepgram, correctly
-attributes it to `[Student]`/`[Tutor]`, saves it to `session_analytics.full_transcript`, and flips
-the booking to `completed` on shutdown.
+The transcription path was previously verified in local dev mode against a real two-person call.
+The explicit-dispatch and tutor-departure lifecycle must be deployed and exercised against the
+LiveKit Cloud webhook before production use.
 
 ### A path bug worth knowing about
 
@@ -95,6 +96,10 @@ brew install livekit-cli
 
 Project is already registered locally (`lk project list` should show `kindling`). First deploy:
 
+Set `LIVEKIT_AGENT_NAME` in the agent and app environments to the same explicit dispatch name.
+The app also needs the private `session-recordings` Supabase Storage bucket's S3 credentials to
+start tutor-consented Egress recordings.
+
 ```bash
 lk agent create
 ```
@@ -114,9 +119,9 @@ Useful commands once deployed: `lk agent status`, `lk agent logs` (tail), `lk ag
 
 ## Why this design, not alternatives
 
-- **A LiveKit Agent, not a webhook + batch job**: transcription needs to observe live audio as
-  it happens; there's no artifact to fetch after the fact unless you set up separate egress
-  recording, which adds storage and another moving piece for no benefit here.
+- **LiveKit Agent plus Egress**: Deepgram needs live audio streams; Egress separately captures
+  tutor-consented video and audio. Both follow tutor presence, while the booking stays scheduled
+  until the tutor explicitly completes it.
 - **Per-track Deepgram streams, not Deepgram's own diarization**: the room already tells us
   exactly who's who per track; acoustic diarization is a worse, guessed version of information
   we already have for free.

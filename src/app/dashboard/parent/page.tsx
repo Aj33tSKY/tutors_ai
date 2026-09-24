@@ -30,7 +30,7 @@ export default async function ParentDashboardPage() {
         </CardHeader>
         <CardContent>
           {!children || children.length === 0 ? (
-            <div className="rounded-sm border border-dashed border-hairline p-8 text-center">
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center">
               <p className="font-medium">No children linked yet</p>
               <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
                 Ask your child to add your email as their parent when they set up their profile,
@@ -44,7 +44,7 @@ export default async function ParentDashboardPage() {
                 return (
                   <li
                     key={c.id}
-                    className="flex items-center justify-between rounded-sm border border-hairline p-4"
+                    className="flex items-center justify-between rounded-xl border border-border p-4"
                   >
                     <div>
                       <p className="font-medium">{(student as Profile | undefined)?.full_name}</p>

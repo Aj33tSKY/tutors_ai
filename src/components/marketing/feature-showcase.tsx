@@ -14,8 +14,7 @@ export function FeatureShowcase() {
 
       <div className="shell section relative">
         <Reveal>
-          <p className="eyebrow text-cream/60">The revision assistant</p>
-          <h2 className="display-lg mt-6 max-w-[16ch]">
+          <h2 className="display-lg max-w-[16ch]">
             It already knows what your tutor taught you
           </h2>
           <p className="mt-8 max-w-xl text-lg leading-relaxed text-cream/70">

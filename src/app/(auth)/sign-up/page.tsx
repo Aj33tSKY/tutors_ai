@@ -40,13 +40,12 @@ function SignUpForm() {
       transition={{ duration: 0.75, ease: [0.19, 1, 0.22, 1] }}
       className="w-full max-w-md"
     >
-      <p className="eyebrow">Create account</p>
-      <h1 className="display-lg mt-5">Join Kindling</h1>
+      <h1 className="display-lg">Join Kindling</h1>
       <p className="mt-5 text-muted-foreground">
         Sign up as a student, parent or tutor — it takes under a minute.
       </p>
 
-      <div role="radiogroup" aria-label="Account type" className="mt-10 grid grid-cols-3 gap-px border border-hairline bg-hairline">
+      <div role="radiogroup" aria-label="Account type" className="mt-10 grid grid-cols-3 gap-3">
         {ROLES.map((r) => (
           <button
             key={r.value}
@@ -55,14 +54,14 @@ function SignUpForm() {
             aria-checked={role === r.value}
             onClick={() => setRole(r.value)}
             className={cn(
-              "flex flex-col items-center gap-2 p-4 text-center transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)]",
+              "flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-colors duration-200",
               role === r.value
-                ? "bg-saffron text-ink"
-                : "bg-background text-muted-foreground hover:bg-raised hover:text-foreground",
+                ? "border-saffron bg-saffron/10 text-saffron"
+                : "border-border bg-card text-muted-foreground hover:border-foreground/20 hover:bg-secondary/50 hover:text-foreground",
             )}
           >
             <r.icon className="size-5" />
-            <span className="font-mono text-[0.6875rem] tracking-[0.08em] uppercase">{r.label}</span>
+            <span className="text-sm font-medium">{r.label}</span>
           </button>
         ))}
       </div>

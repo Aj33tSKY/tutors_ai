@@ -22,8 +22,7 @@ export function HowItWorks() {
   return (
     <section className="section shell">
       <Reveal>
-        <p className="eyebrow">How it works</p>
-        <h2 className="display-lg mt-6 max-w-[16ch]">
+        <h2 className="display-lg max-w-[16ch]">
           From booking to breakthrough
         </h2>
       </Reveal>

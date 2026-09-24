@@ -22,33 +22,34 @@ const STATS = [
 
 export function Hero() {
   return (
-    <section className="relative isolate overflow-hidden border-b border-hairline">
+    <section className="relative isolate overflow-hidden">
       <div aria-hidden className="grain absolute inset-0 -z-10" />
 
-      <div className="shell pt-28 pb-[var(--section-y)] sm:pt-36">
-        <p className="eyebrow">A-Level STEM · AQA / Edexcel / OCR / CIE</p>
-
-        <h1 className="display-xl mt-10 max-w-[13ch]">
+      <div className="shell pt-16 pb-[var(--section-y)] sm:pt-24">
+        <h1 className="display-xl max-w-[13ch]">
           Tutoring that{" "}
           <span className="text-saffron">remembers</span> every lesson.
         </h1>
+        <p className="mt-4 text-sm text-muted-foreground">
+          A-Level STEM · AQA / Edexcel / OCR / CIE
+        </p>
 
-        <div className="mt-16 grid grid-cols-1 gap-14 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-20">
+        <div className="mt-14 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-16">
           <div className="min-w-0 max-w-xl">
             {/* The rotating slot ends its own line on purpose: it reserves the
                 width of the longest subject, and any slack is invisible at a
                 line end rather than showing as a gap mid-sentence. */}
-            <p className="font-heading text-3xl leading-[1.15] sm:text-4xl">
+            <p className="font-heading text-2xl leading-[1.25] sm:text-3xl">
               Book vetted A-Level tutors for
               <br />
               <RotatingSubject />
             </p>
-            <p className="mt-7 text-lg leading-relaxed text-muted-foreground">
+            <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
               Every live session is transcribed, mapped to your exam spec, and turned into a
               revision AI grounded in your own tutor&apos;s words.
             </p>
 
-            <div className="mt-12 flex flex-wrap items-center gap-3">
+            <div className="mt-10 flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
                 <Link href="/tutors">Find your tutor</Link>
               </Button>
@@ -62,24 +63,21 @@ export function Hero() {
         </div>
       </div>
 
-      {/* Stat rail — hairline-divided, mono labels, no cards. */}
-      <div className="shell">
-        <dl className="grid grid-cols-2 border-t border-hairline lg:grid-cols-4">
-          {STATS.map((s, i) => (
-            <div
-              key={s.label}
-              className={`border-hairline py-8 pr-6 ${i % 2 === 1 ? "border-l pl-6" : ""} ${
-                i < 2 ? "border-b lg:border-b-0" : ""
-              } lg:border-l lg:pl-6 lg:first:border-l-0 lg:first:pl-0`}
-            >
-              <dt className="sr-only">{s.label}</dt>
-              <dd>
-                <span className="display-md block text-saffron">{s.value}</span>
-                <span className="eyebrow mt-3 block">{s.label}</span>
-              </dd>
-            </div>
-          ))}
-        </dl>
+      {/* Stat rail — soft cards on a tinted strip. */}
+      <div className="border-y border-border/70 bg-secondary/60">
+        <div className="shell">
+          <dl className="grid grid-cols-2 gap-4 py-10 lg:grid-cols-4">
+            {STATS.map((s) => (
+              <div key={s.label} className="rounded-2xl bg-card p-5 shadow-sm">
+                <dt className="sr-only">{s.label}</dt>
+                <dd>
+                  <span className="display-md block text-saffron">{s.value}</span>
+                  <span className="eyebrow mt-2 block">{s.label}</span>
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       </div>
     </section>
   );
@@ -146,8 +144,8 @@ function RotatingSubject() {
 
 function SessionPanel() {
   return (
-    <div className="w-full min-w-0 max-w-md border border-hairline bg-raised lg:w-[26rem]">
-      <div className="flex items-center justify-between border-b border-hairline px-5 py-4">
+    <div className="w-full min-w-0 max-w-md overflow-hidden rounded-3xl border border-border/70 bg-card shadow-lg lg:w-[26rem]">
+      <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
         <span className="eyebrow flex items-center gap-2 text-foreground">
           <span className="relative flex size-1.5">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-saffron opacity-60" />
@@ -164,13 +162,15 @@ function SessionPanel() {
         <TranscriptLine speaker="Tutor" text="Exactly — let's derive it together." />
       </div>
 
-      <div className="border-t border-hairline px-5 py-5">
-        <p className="eyebrow">Auto-detected spec point</p>
-        <p className="mt-3 font-heading text-lg">Edexcel Physics 4.2 — Particle Accelerators</p>
+      <div className="border-t border-border/70 bg-secondary/50 px-5 py-5">
+        <p className="font-heading text-lg font-semibold">
+          Edexcel Physics 4.2 — Particle Accelerators
+        </p>
+        <p className="mt-1 text-sm text-muted-foreground">Auto-detected spec point</p>
         <div className="mt-4 flex items-center gap-3">
-          <div className="h-px flex-1 bg-hairline">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-hairline">
             <motion.div
-              className="h-px bg-saffron"
+              className="h-full rounded-full bg-saffron"
               initial={{ scaleX: 0 }}
               whileInView={{ scaleX: 0.72 }}
               viewport={{ once: true }}

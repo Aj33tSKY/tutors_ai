@@ -23,8 +23,7 @@ export async function TutorShowcase() {
       <Reveal>
         <div className="flex flex-wrap items-end justify-between gap-8">
           <div>
-            <p className="eyebrow">Meet the tutors</p>
-            <h2 className="display-lg mt-6 max-w-[13ch]">
+            <h2 className="display-lg max-w-[13ch]">
               Vetted specialists,
               <br />
               not generalists
@@ -40,16 +39,16 @@ export async function TutorShowcase() {
         </div>
       </Reveal>
 
-      {/* gap-px over a hairline background draws the grid rules for free */}
-      <ul className="mt-20 grid grid-cols-1 gap-px border border-hairline bg-hairline sm:grid-cols-2 lg:grid-cols-3">
+      {/* gap-px over a border background draws the grid rules for free */}
+      <ul className="mt-20 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm sm:grid-cols-2 lg:grid-cols-3">
         {tutors.map((tutor, i) => {
           const p = Array.isArray(tutor.profiles) ? tutor.profiles[0] : tutor.profiles;
           const subjects = tutor.subjects as StemSubject[];
           return (
-            <Reveal as="li" key={tutor.id} delay={(i % 3) * 0.08} className="bg-background">
+            <Reveal as="li" key={tutor.id} delay={(i % 3) * 0.08} className="bg-card">
               <Link
                 href={`/tutors/${tutor.id}`}
-                className="group flex h-full flex-col p-7 transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:bg-raised"
+                className="group flex h-full flex-col p-7 transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:bg-secondary/50"
               >
                 <div className="flex items-start justify-between gap-4">
                   <h3 className="display-md text-balance">{p?.full_name}</h3>
@@ -60,13 +59,13 @@ export async function TutorShowcase() {
                   {tutor.headline}
                 </p>
 
-                <p className="mt-6 mb-8 font-mono text-[0.6875rem] tracking-[0.08em] text-cream/70 uppercase">
+                <p className="mt-6 mb-8 font-mono text-[0.6875rem] tracking-[0.08em] text-foreground/60 uppercase">
                   {subjects.map(subjectLabel).join(" · ")}
                 </p>
 
                 {/* mt-auto pins the price rail to the card's bottom edge so the
                     row lines up even when names wrap to two lines */}
-                <div className="mt-auto flex items-baseline justify-between border-t border-hairline pt-5">
+                <div className="mt-auto flex items-baseline justify-between border-t border-border/70 pt-5">
                   <span className="eyebrow">
                     {tutor.dbs_verified ? "DBS verified" : "Verification pending"}
                   </span>

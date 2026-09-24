@@ -4,7 +4,7 @@ import { Wordmark } from "@/components/marketing/wordmark";
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col">
-      <div className="border-b border-hairline">
+      <div className="border-b border-border/70">
         <div className="shell flex h-16 items-center">
           <Link href="/" aria-label="Kindling — home">
             <Wordmark />

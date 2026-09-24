@@ -8,8 +8,7 @@ export function CtaSection() {
       <Reveal>
         <div className="flex flex-col items-start gap-12 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="eyebrow">Get started</p>
-            <h2 className="display-xl mt-6 max-w-[11ch]">
+            <h2 className="display-xl max-w-[11ch]">
               A grade that actually <span className="text-saffron">sticks</span>
             </h2>
           </div>

@@ -23,4 +23,9 @@ if (existsSync(envPath)) {
 // build (dist/*.js) — reuse whichever extension this file itself has.
 const sessionPath = join(dirname(selfPath), `session${extname(selfPath)}`);
 
-cli.runApp(new WorkerOptions({ agent: sessionPath }));
+cli.runApp(new WorkerOptions({
+  agent: sessionPath,
+  // A named agent uses explicit dispatch, so the app starts it only after
+  // the tutor joins rather than for any student-created room.
+  agentName: process.env.LIVEKIT_AGENT_NAME,
+}));

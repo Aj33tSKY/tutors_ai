@@ -29,8 +29,7 @@ export default function AboutPage() {
   return (
     <div className="shell section">
       <Reveal>
-        <p className="eyebrow">Safeguarding &amp; compliance</p>
-        <h1 className="display-xl mt-6 max-w-[12ch]">
+        <h1 className="display-xl max-w-[12ch]">
           Built for UK families, from day one
         </h1>
         <p className="mt-10 max-w-xl text-lg leading-relaxed text-muted-foreground">
@@ -39,10 +38,10 @@ export default function AboutPage() {
         </p>
       </Reveal>
 
-      <div className="mt-24 grid grid-cols-1 gap-px border border-hairline bg-hairline sm:grid-cols-2">
+      <div className="mt-24 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm sm:grid-cols-2">
         {POINTS.map((p, i) => (
           // ids are anchor targets for the footer's deep links
-          <Reveal key={p.id} delay={i * 0.06} className="bg-background">
+          <Reveal key={p.id} delay={i * 0.06} className="bg-card">
             <section id={p.id} className="h-full scroll-mt-24 p-9">
               <h2 className="display-md">{p.title}</h2>
               <p className="mt-5 leading-relaxed text-muted-foreground">{p.body}</p>

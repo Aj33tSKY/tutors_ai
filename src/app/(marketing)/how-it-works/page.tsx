@@ -41,8 +41,7 @@ export default function HowItWorksPage() {
   return (
     <div className="shell section">
       <Reveal>
-        <p className="eyebrow">How it works</p>
-        <h1 className="display-xl mt-6 max-w-[10ch]">
+        <h1 className="display-xl max-w-[10ch]">
           Every step, explained
         </h1>
       </Reveal>
@@ -62,7 +61,7 @@ export default function HowItWorksPage() {
       </ol>
 
       <Reveal>
-        <div className="mt-20 flex flex-col items-start justify-between gap-8 border border-hairline bg-raised p-10 sm:flex-row sm:items-center">
+        <div className="mt-20 flex flex-col items-start justify-between gap-8 rounded-3xl border border-border/70 bg-card p-10 shadow-sm sm:flex-row sm:items-center">
           <div>
             <h2 className="display-md">Ready to get started?</h2>
             <p className="mt-3 text-muted-foreground">Book your first session in minutes.</p>

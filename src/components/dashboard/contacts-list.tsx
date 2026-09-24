@@ -25,7 +25,7 @@ export function ContactsList({ title, singular, contacts }: { title: string; sin
         </CardHeader>
         <CardContent>
           {contacts.length === 0 ? (
-            <div className="rounded-sm border border-dashed border-hairline p-8 text-center">
+            <div className="rounded-2xl border border-dashed border-border p-8 text-center">
               <p className="font-medium">No {singular.toLowerCase()}s yet</p>
               <p className="mt-1 text-sm text-muted-foreground">
                 A conversation becomes available as soon as you share a booked lesson.

@@ -5,11 +5,7 @@ export function Testimonials() {
   return (
     <section className="section border-y border-hairline">
       <div className="shell">
-        <Reveal>
-          <p className="eyebrow">Trusted by families &amp; tutors</p>
-        </Reveal>
-
-        <ul className="mt-16 grid grid-cols-1 gap-px bg-hairline md:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-px bg-hairline md:grid-cols-3">
           {TESTIMONIALS.map((t, i) => (
             <Reveal as="li" key={t.name} delay={i * 0.08} className="bg-background">
               <figure className="flex h-full flex-col p-8">

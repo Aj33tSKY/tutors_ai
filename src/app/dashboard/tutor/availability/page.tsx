@@ -79,7 +79,7 @@ export default async function TutorAvailabilityPage() {
               {slots.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between rounded-sm border border-hairline px-4 py-3"
+                  className="flex items-center justify-between rounded-xl border border-border px-4 py-3"
                 >
                   <span className="text-sm font-medium">
                     {DAYS[s.day_of_week]} · {s.start_time.slice(0, 5)}–{s.end_time.slice(0, 5)}

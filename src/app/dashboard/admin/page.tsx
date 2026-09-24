@@ -65,7 +65,7 @@ export default async function AdminDashboardPage() {
                 return (
                   <li
                     key={t.id}
-                    className="flex flex-wrap items-center justify-between gap-3 rounded-sm border border-hairline p-4"
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-4"
                   >
                     <div>
                       <p className="font-medium">{tutorProfile?.full_name}</p>

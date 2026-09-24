@@ -5,10 +5,11 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
-   Saffron-derived design system.
-   Palette, type and motion values are lifted from the reference build:
-   warm near-black paper, cream ink, saffron as the single loud accent,
-   rust and violet as support. Hairlines, not shadows. Tight radii, not pills.
+   Kindling design system — consumer app pass.
+   Light, neutral surfaces; one friendly sans everywhere; soft shadows
+   and generous rounding instead of hairlines and tight radii. Green
+   (#58cc02) is the single brand accent, blue (#1cb0f6) is the quiet
+   secondary, a deep blue is reserved for one deliberate full-bleed block.
 --------------------------------------------------------------------------- */
 
 @theme inline {
@@ -16,7 +17,7 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body);
   --font-mono: var(--font-mono-stack);
-  --font-heading: var(--font-display);
+  --font-heading: var(--font-body);
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -57,19 +58,18 @@
   --color-rust: var(--rust);
   --color-violet: var(--violet);
 
-  /* reference radii: .2 / .3 / .4 / .5rem, plus one oversized card corner */
-  --radius-xs: 0.2rem;
-  --radius-sm: 0.3rem;
-  --radius-md: 0.4rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
-  --radius-2xl: 1rem;
-  --radius-3xl: 1.5rem;
-  --radius-4xl: 4.5rem;
+  /* soft, consumer-app radii — generous rounding throughout */
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 1.5rem;
+  --radius-3xl: 2rem;
+  --radius-4xl: 3rem;
 
   --ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
 
-  /* reference breakpoints */
   --breakpoint-sm: 650px;
   --breakpoint-md: 800px;
   --breakpoint-lg: 1100px;
@@ -78,60 +78,62 @@
 }
 
 :root {
-  /* --- core surfaces, straight from the reference --- */
-  --ink: #150604;
-  --raised: #2f0e09;
-  --hairline: #47140b;
-  --cream: #ece7e0;
-  --saffron: #ffbc09;
-  --rust: #962817;
-  --violet: #ca56ed;
-  --ember-flame: #fa4c06;
+  /* --- core brand tones — green/blue/white palette --- */
+  --ink: #17181a;
+  --raised: #ffffff;
+  --hairline: #e4e4e7;
+  --cream: #fafafa;
+  --saffron: #58cc02;
+  --rust: #1272a0;
+  --violet: #1cb0f6;
+  --ember-flame: #0ea5e9;
 
-  --background: var(--ink);
-  --foreground: var(--cream);
-  --card: var(--raised);
-  --card-foreground: var(--cream);
-  --popover: var(--raised);
-  --popover-foreground: var(--cream);
+  --background: #ffffff;
+  --foreground: var(--ink);
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --popover: #ffffff;
+  --popover-foreground: var(--foreground);
 
-  /* saffron is the one loud voice — CTAs, active states, key numbers */
+  /* green is the one loud voice — CTAs, active states, key numbers.
+     Dark ink text on it clears ~10:1 contrast; white only clears ~2:1. */
   --primary: var(--saffron);
   --primary-foreground: var(--ink);
 
-  --secondary: var(--raised);
-  --secondary-foreground: var(--cream);
+  --secondary: #f2f3f5;
+  --secondary-foreground: var(--foreground);
 
-  --muted: var(--raised);
-  --muted-foreground: #9a918c;
+  --muted: #f2f3f5;
+  --muted-foreground: #6b7280;
 
-  --accent: var(--violet);
-  --accent-foreground: var(--ink);
+  /* neutral by default — brand colour is used deliberately, not on every hover */
+  --accent: #f2f3f5;
+  --accent-foreground: var(--foreground);
 
-  --destructive: #e2564a;
+  --destructive: #dc2626;
   --border: var(--hairline);
-  --input: var(--hairline);
+  --input: #e2e2e6;
   --ring: var(--saffron);
 
   --chart-1: var(--saffron);
   --chart-2: var(--violet);
-  --chart-3: #d4643f;
+  --chart-3: var(--ember-flame);
   --chart-4: var(--rust);
-  --chart-5: #9a918c;
+  --chart-5: #9ca3af;
 
-  --radius: 0.4rem;
+  --radius: 0.75rem;
 
-  --sidebar: #1d0805;
-  --sidebar-foreground: var(--cream);
+  --sidebar: #fafafa;
+  --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--saffron);
   --sidebar-primary-foreground: var(--ink);
-  --sidebar-accent: var(--raised);
-  --sidebar-accent-foreground: var(--cream);
+  --sidebar-accent: var(--saffron);
+  --sidebar-accent-foreground: var(--ink);
   --sidebar-border: var(--hairline);
   --sidebar-ring: var(--saffron);
 
-  /* rhythm: reference runs 10rem section padding, 8.5rem gaps */
-  --section-y: clamp(4.5rem, 9vw, 10rem);
+  /* rhythm: tighter, app-like — not magazine-scale whitespace */
+  --section-y: clamp(3rem, 6vw, 6rem);
   --gutter: clamp(1.25rem, 4vw, 3rem);
 }
 
@@ -142,21 +144,14 @@
 
   html {
     @apply font-sans;
-    /* also paints the overscroll canvas, so rubber-banding stays warm black */
-    background-color: var(--ink);
+    background-color: var(--background);
     scroll-behavior: smooth;
-    /* stop iOS inflating the already-large display type */
     -webkit-text-size-adjust: 100%;
   }
 
   body {
     @apply text-foreground antialiased;
-    background:
-      radial-gradient(58vw 52vh at 18% 12%, color-mix(in oklab, var(--rust) 42%, transparent), transparent 72%),
-      radial-gradient(50vw 46vh at 86% 78%, color-mix(in oklab, var(--violet) 20%, transparent), transparent 72%),
-      radial-gradient(44vw 36vh at 52% -6%, color-mix(in oklab, var(--saffron) 15%, transparent), transparent 70%),
-      var(--ink);
-    background-color: transparent;
+    background: var(--background);
     font-size: 1rem;
     line-height: 1.6;
   }
@@ -166,20 +161,20 @@
   h3,
   h4 {
     @apply font-heading;
-    font-weight: 400;
-    letter-spacing: -0.025em;
-    line-height: 0.95;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
     text-wrap: balance;
   }
 
-  /* One focus ring everywhere, in saffron — visible against warm near-black. */
+  /* One focus ring everywhere, in amber — clearly visible on a light canvas. */
   :focus-visible {
     outline: 2px solid var(--saffron);
     outline-offset: 2px;
   }
 
   ::selection {
-    background: var(--saffron);
+    background: color-mix(in oklab, var(--saffron) 25%, transparent);
     color: var(--ink);
   }
 
@@ -199,18 +194,18 @@
 
 
 @layer components {
-  /* Mono, uppercase, wide-tracked section label — the reference's signature. */
+  /* Small section label — sentence case, no more uppercase mono tracking. */
   .eyebrow {
-    font-family: var(--font-mono-stack);
-    font-size: 0.6875rem;
-    font-weight: 400;
-    line-height: 1;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.2;
+    letter-spacing: -0.005em;
+    text-transform: none;
     color: var(--muted-foreground);
   }
 
-  /* Page shell. Reference tops out around 1200px with a wide 1600px variant. */
+  /* Page shell. */
   .shell {
     width: 100%;
     max-width: 1200px;
@@ -229,12 +224,12 @@
     padding-block: var(--section-y);
   }
 
-  /* Hairline rules do the structural work that shadows did before. */
+  /* Hairline rule for the odd deliberate divider — cards use shadows now. */
   .rule {
     border-top: 1px solid var(--hairline);
   }
 
-  /* Underline that draws in from the left on hover — reference uses scaleX. */
+  /* Underline that draws in from the left on hover. */
   .link-draw {
     position: relative;
     display: inline-block;
@@ -256,27 +251,28 @@
     }
   }
 
-  /* Display sizes. Reference peaks near 7.5rem with sub-1 leading. */
+  /* Friendly, single-family display sizes — a consumer headline scale, not
+     an editorial one. */
   .display-xl {
-    font-family: var(--font-display);
-    font-size: clamp(2.75rem, 8.5vw, 7.5rem);
-    font-weight: 400;
-    line-height: 0.92;
-    letter-spacing: -0.035em;
-  }
-  .display-lg {
-    font-family: var(--font-display);
-    font-size: clamp(2.25rem, 5.5vw, 4.9rem);
-    font-weight: 400;
-    line-height: 0.95;
+    font-family: var(--font-body);
+    font-size: clamp(2.25rem, 4.5vw, 3.75rem);
+    font-weight: 700;
+    line-height: 1.05;
     letter-spacing: -0.03em;
   }
-  .display-md {
-    font-family: var(--font-display);
-    font-size: clamp(1.75rem, 3.2vw, 2.8rem);
-    font-weight: 400;
-    line-height: 1;
+  .display-lg {
+    font-family: var(--font-body);
+    font-size: clamp(1.875rem, 3.2vw, 2.75rem);
+    font-weight: 700;
+    line-height: 1.08;
     letter-spacing: -0.025em;
+  }
+  .display-md {
+    font-family: var(--font-body);
+    font-size: clamp(1.375rem, 2vw, 1.75rem);
+    font-weight: 600;
+    line-height: 1.15;
+    letter-spacing: -0.015em;
   }
 }
 
@@ -285,13 +281,17 @@
     text-wrap: balance;
   }
 
-  /* Very fine grain over the warm black so large fills don't band. */
+  /* A soft warm glow instead of a noise texture — subtle, not editorial. */
   .grain::before {
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.035'/%3E%3C/svg%3E");
+    background: radial-gradient(
+      60% 55% at 50% 0%,
+      color-mix(in oklab, var(--saffron) 7%, transparent),
+      transparent 70%
+    );
   }
 
   .marquee-track {

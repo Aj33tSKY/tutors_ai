@@ -1,18 +1,11 @@
 import type { Metadata, Viewport } from "next";
-import { Funnel_Display, Host_Grotesk, Roboto_Mono } from "next/font/google";
+import { Host_Grotesk, Roboto_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
-// Reference typeface trio. All three are variable, so one axis range each
-// rather than a list of static weights. Axis range comes from the font itself.
-const funnelDisplay = Funnel_Display({
-  variable: "--font-display",
-  subsets: ["latin"],
-  weight: "variable",
-  display: "swap",
-});
-
+// One friendly variable sans for both body copy and headings — mono is kept
+// only for tabular numbers (timers, percentages, prices).
 const hostGrotesk = Host_Grotesk({
   variable: "--font-body",
   subsets: ["latin"],
@@ -37,8 +30,8 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#150604",
-  colorScheme: "dark",
+  themeColor: "#ffffff",
+  colorScheme: "light",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -46,9 +39,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      // `dark` is fixed on: the palette is a single dark scheme, and the class
-      // keeps shadcn's `dark:` variants resolving against it.
-      className={`dark ${funnelDisplay.variable} ${hostGrotesk.variable} ${robotoMono.variable} h-full`}
+      className={`${hostGrotesk.variable} ${robotoMono.variable} h-full`}
     >
       <head>
         <noscript>

@@ -15,28 +15,26 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   board), tutor profiles, how-it-works, pricing, safeguarding/about.
 - **Auth** — real Supabase email/password signup with role selection (student/parent/tutor),
   backed by a DB trigger that creates the `profiles` row and RLS policies scoping every table.
-- **Booking** — students book real sessions against seeded tutor availability; bookings are
-  written to Postgres and readable from both the student and tutor dashboards.
+- **Lesson requests** — students select tutor-published availability; a request sends a formatted
+  DM and creates no booking or charge until its tutor confirms the schedule.
 - **Dashboards** — role-based shells for student, tutor, parent and admin, all reading live data.
 - **Revision chatbot** (`/dashboard/student/chat`) — live on the AI Gateway (`openai/gpt-5.4-nano`),
   grounded in `session_embeddings` for that student, streaming via `useChat`. Conversations
   persist to Postgres (`chat_conversations` / `chat_messages`) with a sidebar of past chats —
   nothing is lost on refresh. System prompt is tuned for short, spoken, markdown-free answers.
-- **Payments** — booking a session goes through real Stripe Checkout (test mode); a booking row
-  is only ever created by the webhook once payment succeeds, never optimistically. Tutors connect
-  a Stripe Express account (`/dashboard/tutor/payouts`) to get paid directly via destination
-  charges; until they do, payment settles to the platform and the tutor is paid out manually.
+- **Payments** — a student's first lesson with a tutor is a free trial. After a tutor marks a
+  paid lesson complete, they send a Stripe invoice; the invoice webhook owns paid/failed state.
 - **Live video** (`/session/[bookingId]`) — real LiveKit room per booking, using LiveKit's prebuilt
   `VideoConference` UI (camera/mic, screen share, in-call text chat all included). Access is
   server-checked before a token is ever minted: only the booking's own student or tutor can join
   (not other users, not even a linked parent — deliberate, for safeguarding); everyone else gets a
   404, not a redirect, so the booking's existence isn't leaked either. Token minting happens
   entirely server-side in the page component — there's no separate public token endpoint.
-- **Live transcription** (`agent/`) — a separate, always-on LiveKit Agent joins every session
-  room, transcribes each participant's audio through its own Deepgram stream (speaker attribution
-  from the LiveKit track itself, not acoustic diarization), and saves the transcript to
-  `session_analytics` plus flips the booking to `completed` when the call ends. Not part of the
-  Next.js app or its Vercel deployment — see `agent/README.md`.
+- **Live transcription** (`agent/`) — an explicitly dispatched LiveKit Agent starts when the tutor
+  joins, transcribes each participant's audio through its own Deepgram stream (speaker attribution
+  from the LiveKit track itself, not acoustic diarization), and appends the transcript segment when
+  the tutor leaves. A student waiting in the room does not keep the agent running. Room departure
+  does not complete the booking; the tutor still marks it complete from their dashboard.
 - **Post-session summarizer** (`src/app/api/cron/summarize-sessions`) — a Vercel Cron job (every 5
   minutes, `vercel.ts`) finds completed bookings with a transcript but no summary yet, extracts
   spec-mapped topics/misconceptions/homework via the AI Gateway, computes a talk-time ratio from
@@ -72,20 +70,16 @@ These are flat defaults, not tied to the pricing plan yet (see the table below).
 
 ### Payments architecture
 
-`src/app/(marketing)/tutors/[id]/actions.ts` (`createCheckoutAction`) creates a Stripe Checkout
-Session and redirects there — it **never** writes a `bookings` row itself. Fulfillment happens
-only in `src/app/api/webhooks/stripe/route.ts`, on `checkout.session.completed` **and**
-`checkout.session.async_payment_succeeded` (gated on `session.payment_status !== 'unpaid'`), per
-Stripe's own guidance: delayed-notification payment methods fire `completed` before the payment
-has actually gone through, so fulfilling on that event alone would grant unpaid bookings and miss
-ones that succeed later. `stripe_checkout_session_id` is unique, so a retried or duplicate webhook
-delivery can't double-book — verified by replaying the same signed event twice and confirming only
-one row exists.
+The tutor-page action creates a `lesson_requests` row and a formatted direct message; it never
+calls Stripe. Tutors set the actual time and an optional weekly run from their portal. Once a paid
+lesson is complete, the tutor's **Send invoice** action creates a Stripe `send_invoice` invoice due
+in seven days. `invoice.paid` and `invoice.payment_failed` update the matching booking in the
+Stripe webhook handler.
 
 Tutor payouts use Stripe's **v2 Accounts API** (`stripe.v2.core.accounts.create`), not the
 deprecated `stripe.accounts.create({ type: 'express' })` v1 pattern. Payout eligibility
-(`transfer_data.destination` on the Checkout Session) is decided with a **live** capability check
-against Stripe on every checkout and every payouts-page load — never from a cached DB flag —
+(`transfer_data.destination` on the Stripe invoice) is decided with a **live** capability check
+against Stripe whenever an invoice is sent and every payouts-page load — never from a cached DB flag —
 because it's a money-movement decision, not just a display concern.
 
 One live-API surprise worth flagging: Stripe's own docs/skill guidance say a marketplace
@@ -116,10 +110,10 @@ low-content test transcript that it returns empty results rather than hallucinat
 
 | Module | Status | What's needed |
 | --- | --- | --- |
-| Deploying the transcription agent | Code complete, not deployed | Needs Docker + `lk agent create` (see `agent/README.md`) — verified working in local dev mode against the real LiveKit Cloud project, but never run as the deployed Cloud Agent |
+| Deploying the transcription agent | Code complete, not deployed | Needs Docker + `lk agent create` (see `agent/README.md`) and a matching `LIVEKIT_AGENT_NAME` in the app and agent environments |
 | Chat limits by plan tier | Flat limit only | Once a real subscription model exists, tie `DAILY_MESSAGE_LIMIT` to pay-as-you-go vs subscriber |
 | Tutor DBS document upload | Admin queue UI only, no upload | `@vercel/blob`, private access, form on tutor onboarding |
-| Stripe production webhook | Test-mode only, via Stripe CLI locally | Once deployed, add a webhook endpoint in the Stripe dashboard pointing at `/api/webhooks/stripe` for `checkout.session.*`, and set `STRIPE_WEBHOOK_SECRET` to its signing secret |
+| Stripe production webhook | Test-mode only, via Stripe CLI locally | Once deployed, add a webhook endpoint in the Stripe dashboard pointing at `/api/webhooks/stripe` for `invoice.paid,invoice.payment_failed`, and set `STRIPE_WEBHOOK_SECRET` to its signing secret |
 | Live-mode Stripe | Sandbox/test mode only | `vercel integration resource claim stripe-emerald-arrow` to attach this to a real Stripe account, then go through Stripe's own account activation |
 | In-call whiteboard / KaTeX formula editor | Not started | Plan mentions Excalidraw + KaTeX; LiveKit's data channel (`canPublishData`, already granted) can carry whiteboard sync without another service |
 
@@ -139,13 +133,13 @@ vercel env pull .env.local   # re-sync if env vars change in the Vercel dashboar
 npm run dev
 ```
 
-To exercise payments locally, run the Stripe CLI listener alongside `npm run dev` — it forwards
+To exercise post-session invoices locally, run the Stripe CLI listener alongside `npm run dev` — it forwards
 real test-mode events to your machine and prints a `whsec_...` signing secret to put in
 `.env.local` as `STRIPE_WEBHOOK_SECRET` (this changes every time you start it):
 
 ```bash
 stripe listen --forward-to localhost:3000/api/webhooks/stripe \
-  --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed
+  --events invoice.paid,invoice.payment_failed
 ```
 
 Use Stripe's test card `4242 4242 4242 4242`, any future expiry, any CVC.
@@ -158,13 +152,22 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/summ
 
 ### Session recording
 
-Recording is supported by the session review page, but it must be explicitly enabled before a
-call: obtain participant consent, configure LiveKit Egress to write an MP4 to the private
-`session-recordings` Supabase Storage bucket, and save its object key (for example,
-`<booking-id>/session.mp4`) in `session_analytics.recording_path`. The page mints a one-hour
-signed playback URL only after Storage RLS confirms that the current user is a participant, linked
-parent, or admin. It intentionally never stores a public URL. The transcript agent does not start
-recordings itself yet; that needs LiveKit Egress/storage credentials and an agreed retention policy.
+The tutor explicitly opts in on the session page. When they join, a signed LiveKit webhook starts
+RoomComposite Egress and writes an MP4 segment to the private `session-recordings` Supabase Storage
+bucket. When the tutor leaves, the webhook stops Egress; rejoining creates another segment, which
+the review page plays in order. A daily cron deletes each segment after 90 days. Playback uses
+short-lived signed URLs and Storage RLS; no public recording URL is stored.
+
+Before enabling this in a deployment:
+
+1. Create a private `session-recordings` bucket in Supabase Storage and generate S3 connection
+   credentials. Set `SUPABASE_STORAGE_S3_ACCESS_KEY_ID`, `SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY`,
+   and `SUPABASE_STORAGE_S3_REGION` in the app environment.
+2. Set `LIVEKIT_AGENT_NAME` in the app and `agent/.env.local` to the Cloud Agent's explicit dispatch
+   name, then deploy the agent with `lk agent create` / `lk agent deploy`.
+3. Configure LiveKit Cloud to POST `participant_joined`, `participant_left`, and `egress_ended`
+   events to `/api/webhooks/livekit`.
+4. Apply the Supabase migration and redeploy the app so the 90-day cleanup cron is active.
 
 ### Direct messages and homework attachments
 
@@ -235,8 +238,8 @@ Supabase/Stripe sandboxes (not committed; scratch files loading `.env.local`):
   unauthenticated request was redirected to `/sign-in?next=...`. Actual audio/video was verified
   working live in a real call.
 - Transcription agent: verified end to end against a real two-person call — real speech came back
-  as correctly-attributed transcript text in `session_analytics.full_transcript`, and the booking
-  flipped to `completed`. Getting there surfaced a real bug worth knowing about: the agent's
+  as correctly-attributed transcript text in `session_analytics.full_transcript`. Getting there
+  surfaced a real bug worth knowing about: the agent's
   `.env.local` path was computed one directory too shallow, so `DEEPGRAM_API_KEY` and the Supabase
   vars silently never loaded — `existsSync()` just returned false, no error, until a real job
   tried to construct those clients. See `agent/README.md`'s "A path bug worth knowing about" for

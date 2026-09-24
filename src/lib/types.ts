@@ -20,6 +20,7 @@ export interface Profile {
   email: string;
   avatar_url: string | null;
   created_at: string;
+  stripe_customer_id?: string | null;
 }
 
 export interface TutorProfile {
@@ -57,18 +58,53 @@ export interface Booking {
   id: string;
   student_id: string;
   tutor_id: string;
-  subject: StemSubject;
-  exam_board: ExamBoard;
+  subject: StemSubject | null;
+  exam_board: ExamBoard | null;
   start_time: string;
   end_time: string;
   status: BookingStatus;
   webrtc_room_url: string | null;
+  started_at?: string | null;
+  last_joined_at?: string | null;
   created_at: string;
   payment_status: PaymentStatus;
   amount_gbp_pence: number | null;
   stripe_checkout_session_id: string | null;
   stripe_payment_intent_id: string | null;
   lesson_name?: string | null;
+  lesson_request_id?: string | null;
+  is_trial?: boolean;
+  recurrence_rule?: string | null;
+  recurrence_series_id?: string | null;
+  stripe_invoice_id?: string | null;
+  stripe_invoice_url?: string | null;
+  invoice_sent_at?: string | null;
+}
+
+export interface SessionRecording {
+  id: string;
+  booking_id: string;
+  egress_id: string | null;
+  storage_path: string;
+  status: "starting" | "active" | "stopping" | "ready" | "failed" | "expired";
+  started_at: string;
+  ended_at: string | null;
+  expires_at: string;
+  created_at: string;
+}
+
+export interface LessonRequest {
+  id: string;
+  student_id: string;
+  tutor_id: string;
+  subject: StemSubject;
+  exam_board: ExamBoard;
+  requested_start_time: string;
+  requested_end_time: string;
+  is_trial: boolean;
+  status: "pending" | "declined" | "scheduled";
+  created_at: string;
+  responded_at: string | null;
 }
 
 export interface SessionAnalytics {

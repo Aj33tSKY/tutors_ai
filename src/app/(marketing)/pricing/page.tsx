@@ -51,8 +51,7 @@ export default function PricingPage() {
   return (
     <div className="shell section">
       <Reveal>
-        <p className="eyebrow">Pricing</p>
-        <h1 className="display-xl mt-6 max-w-[11ch]">
+        <h1 className="display-xl max-w-[11ch]">
           Simple, transparent pricing
         </h1>
         <p className="mt-10 max-w-xl text-lg leading-relaxed text-muted-foreground">
@@ -61,12 +60,12 @@ export default function PricingPage() {
         </p>
       </Reveal>
 
-      <div className="mt-24 grid grid-cols-1 gap-px border border-hairline bg-hairline lg:grid-cols-3">
+      <div className="mt-24 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm lg:grid-cols-3">
         {PLANS.map((plan, i) => (
           <Reveal
             key={plan.name}
             delay={i * 0.08}
-            className={plan.highlighted ? "bg-rust text-cream" : "bg-background"}
+            className={plan.highlighted ? "bg-rust text-cream" : "bg-card"}
           >
             <div className="flex h-full flex-col p-9">
               <h2 className={`eyebrow ${plan.highlighted ? "text-cream/60" : ""}`}>

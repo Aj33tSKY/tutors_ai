@@ -28,13 +28,13 @@ export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
   }, [open]);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-hairline bg-background/85 backdrop-blur-md">
+    <header className="sticky top-0 z-50 border-b border-border/70 bg-background/85 backdrop-blur-md">
       <div className="shell flex h-16 items-center justify-between gap-6">
         <Link href="/" className="shrink-0" aria-label="Kindling — home">
           <Wordmark />
         </Link>
 
-        <nav aria-label="Primary" className="hidden items-center gap-9 lg:flex">
+        <nav aria-label="Primary" className="hidden items-center gap-1 lg:flex">
           {LINKS.map((link) => {
             const active = pathname === link.href;
             return (
@@ -42,8 +42,10 @@ export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
                 key={link.href}
                 href={link.href}
                 aria-current={active ? "page" : undefined}
-                className={`link-draw font-mono text-[0.6875rem] tracking-[0.1em] uppercase transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] ${
-                  active ? "text-saffron" : "text-muted-foreground hover:text-foreground"
+                className={`rounded-full px-3.5 py-2 text-sm font-medium transition-colors duration-200 ${
+                  active
+                    ? "bg-secondary text-foreground"
+                    : "text-muted-foreground hover:bg-black/[0.04] hover:text-foreground"
                 }`}
               >
                 {link.label}
@@ -90,7 +92,7 @@ export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
-            className="overflow-hidden border-t border-hairline bg-background lg:hidden"
+            className="overflow-hidden border-t border-border/70 bg-background lg:hidden"
           >
             <nav aria-label="Primary" className="shell flex flex-col py-2">
               {LINKS.map((link) => (
@@ -98,7 +100,7 @@ export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
                   key={link.href}
                   href={link.href}
                   onClick={() => setOpen(false)}
-                  className="border-b border-hairline py-4 font-heading text-2xl text-foreground last:border-b-0"
+                  className="border-b border-border/70 py-4 font-heading text-2xl font-semibold text-foreground last:border-b-0"
                 >
                   {link.label}
                 </Link>

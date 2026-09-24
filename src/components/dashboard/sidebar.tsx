@@ -51,13 +51,13 @@ export function DashboardNav({
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
             className={cn(
-              "flex items-center gap-3 px-3 py-2.5 text-sm transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)]",
+              "flex items-center gap-3 rounded-full px-3.5 py-2.5 text-sm font-medium transition-colors duration-200",
               active
-                ? "bg-raised text-saffron"
-                : "text-muted-foreground hover:bg-raised hover:text-foreground",
+                ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                : "text-muted-foreground hover:bg-black/[0.04] hover:text-foreground",
             )}
           >
-            <item.icon className="size-4 shrink-0" />
+            <item.icon className="size-[1.1rem] shrink-0" />
             {item.label}
           </Link>
         );
@@ -75,29 +75,39 @@ export function DashboardSidebar({
   fullName: string;
   email: string;
 }) {
+  const initial = fullName.trim().charAt(0).toUpperCase() || "?";
+
   return (
-    <aside className="hidden w-64 shrink-0 flex-col border-r border-hairline bg-sidebar lg:flex">
-      <div className="flex h-16 items-center border-b border-hairline px-5">
+    <aside className="hidden w-72 shrink-0 flex-col border-r border-border/70 bg-sidebar lg:flex">
+      <div className="flex h-16 items-center px-5">
         <Link href="/" aria-label="Kindling — home">
           <Wordmark />
         </Link>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto px-1">
         <DashboardNav role={role} />
       </div>
 
-      <div className="border-t border-hairline p-5">
-        <p className="truncate text-sm">{fullName}</p>
-        <p className="eyebrow mt-1.5 truncate">{email}</p>
-        <form action={signOutAction} className="mt-5">
-          <button
-            type="submit"
-            className="flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.1em] text-muted-foreground uppercase transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:text-saffron"
-          >
-            <LogOut className="size-3.5" /> Sign out
-          </button>
-        </form>
+      <div className="p-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-sm">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-sm font-semibold text-saffron">
+            {initial}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium">{fullName}</p>
+            <p className="truncate text-xs text-muted-foreground">{email}</p>
+          </div>
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              aria-label="Sign out"
+              className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.06] hover:text-foreground"
+            >
+              <LogOut className="size-4" />
+            </button>
+          </form>
+        </div>
       </div>
     </aside>
   );

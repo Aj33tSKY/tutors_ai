@@ -39,12 +39,12 @@ export default async function TutorsPage({
 
   return (
     <div className="shell py-20">
-      <p className="eyebrow">
-        {count} {count === 1 ? "tutor" : "tutors"} available
-      </p>
-      <h1 className="display-lg mt-6 max-w-[13ch]">
+      <h1 className="display-lg max-w-[13ch]">
         Find your <span className="whitespace-nowrap">A-Level</span> tutor
       </h1>
+      <p className="mt-3 text-sm text-muted-foreground">
+        {count} {count === 1 ? "tutor" : "tutors"} available
+      </p>
 
       <div className="mt-20 grid grid-cols-1 gap-12 lg:grid-cols-[13rem_1fr] lg:gap-16">
         <aside className="space-y-10 lg:sticky lg:top-24 lg:self-start">
@@ -74,7 +74,7 @@ export default async function TutorsPage({
         </aside>
 
         {count === 0 ? (
-          <div className="border border-hairline p-12">
+          <div className="rounded-2xl border border-dashed border-border p-12">
             <h2 className="display-md">No tutors match those filters</h2>
             <p className="mt-4 text-muted-foreground">
               Try widening your search — or{" "}
@@ -85,14 +85,14 @@ export default async function TutorsPage({
             </p>
           </div>
         ) : (
-          <ul className="grid grid-cols-1 gap-px border border-hairline bg-hairline sm:grid-cols-2">
+          <ul className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm sm:grid-cols-2">
             {tutors!.map((t) => {
               const p = Array.isArray(t.profiles) ? t.profiles[0] : t.profiles;
               return (
-                <li key={t.id} className="bg-background">
+                <li key={t.id} className="bg-card">
                   <Link
                     href={`/tutors/${t.id}`}
-                    className="flex h-full flex-col p-7 transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:bg-raised"
+                    className="flex h-full flex-col p-7 transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:bg-secondary/50"
                   >
                     <div className="flex items-baseline justify-between gap-4">
                       <h2 className="display-md">{p?.full_name}</h2>
@@ -108,13 +108,13 @@ export default async function TutorsPage({
                     <dl className="mt-6 space-y-2 font-mono text-[0.6875rem] tracking-[0.08em] uppercase">
                       <div className="flex gap-3">
                         <dt className="w-16 shrink-0 text-muted-foreground">Subjects</dt>
-                        <dd className="text-cream/80">
+                        <dd className="text-foreground/70">
                           {(t.subjects as StemSubject[]).map(subjectLabel).join(" · ")}
                         </dd>
                       </div>
                       <div className="flex gap-3">
                         <dt className="w-16 shrink-0 text-muted-foreground">Boards</dt>
-                        <dd className="text-cream/80">{(t.boards as ExamBoard[]).map(boardLabel).join(" · ")}</dd>
+                        <dd className="text-foreground/70">{(t.boards as ExamBoard[]).map(boardLabel).join(" · ")}</dd>
                       </div>
                     </dl>
 

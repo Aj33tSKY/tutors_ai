@@ -71,6 +71,10 @@ function participantRole(participant: RemoteParticipant): "student" | "tutor" {
   }
 }
 
+function isTutor(participant: RemoteParticipant): boolean {
+  return participantRole(participant) === "tutor";
+}
+
 export default defineAgent({
   entry: async (ctx: JobContext) => {
     await ctx.connect(undefined, AutoSubscribe.AUDIO_ONLY);
@@ -83,6 +87,7 @@ export default defineAgent({
 
     const transcript: TranscriptLine[] = [];
     const openStreams = new Map<string, stt.SpeechStream>();
+    const streamTasks = new Map<string, Promise<void>>();
 
     async function transcribeTrack(track: RemoteTrack, participant: RemoteParticipant) {
       const sid = track.sid;
@@ -123,9 +128,13 @@ export default defineAgent({
 
     ctx.room.on(RoomEvent.TrackSubscribed, (track, _publication, participant) => {
       if (track.kind === TrackKind.KIND_AUDIO) {
-        transcribeTrack(track, participant).catch((err) =>
-          console.error("Failed to start transcription for track:", err),
-        );
+        const task = transcribeTrack(track, participant).catch((err) => {
+          console.error("Failed to start transcription for track:", err);
+        });
+        if (track.sid) streamTasks.set(track.sid, task);
+        void task.finally(() => {
+          if (track.sid && streamTasks.get(track.sid) === task) streamTasks.delete(track.sid);
+        });
       }
     });
 
@@ -133,26 +142,40 @@ export default defineAgent({
       if (track.sid) openStreams.get(track.sid)?.close();
     });
 
+    // The tutor controls the lesson lifecycle. When they leave, end this
+    // per-room job even if the student remains connected in the waiting view.
+    ctx.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      if (isTutor(participant)) {
+        for (const stream of openStreams.values()) stream.close();
+        ctx.shutdown("tutor left the session");
+      }
+    });
+
     ctx.addShutdownCallback(async () => {
+      for (const stream of openStreams.values()) stream.close();
+      await Promise.allSettled([...streamTasks.values()]);
       const supabase = supabaseAdmin();
-
-      // Mark the booking done regardless of whether anything was said —
-      // an empty call still happened. Only flips 'scheduled' bookings, so
-      // this never resurrects one a tutor or student already cancelled.
-      await supabase
-        .from("bookings")
-        .update({ status: "completed" })
-        .eq("id", bookingId)
-        .eq("status", "scheduled");
-
       if (transcript.length === 0) return;
 
       transcript.sort((a, b) => a.timestamp.localeCompare(b.timestamp));
       const fullTranscript = formatTranscript(transcript);
 
+      // Leaving a room is not the same as completing a lesson: either person
+      // might briefly reconnect or the tutor may run late. Keep the booking
+      // scheduled until the tutor explicitly completes it, and append a
+      // reconnect's transcript rather than replacing the first attempt.
+      const { data: existing } = await supabase
+        .from("session_analytics")
+        .select("full_transcript")
+        .eq("booking_id", bookingId)
+        .maybeSingle();
+      const combinedTranscript = existing?.full_transcript
+        ? `${existing.full_transcript}\n${fullTranscript}`
+        : fullTranscript;
+
       const { error } = await supabase
         .from("session_analytics")
-        .upsert({ booking_id: bookingId, full_transcript: fullTranscript }, { onConflict: "booking_id" });
+        .upsert({ booking_id: bookingId, full_transcript: combinedTranscript }, { onConflict: "booking_id" });
 
       if (error) {
         console.error(`Failed to save transcript for booking ${bookingId}:`, error);
@@ -160,5 +183,13 @@ export default defineAgent({
         console.log(`Saved transcript for booking ${bookingId} (${transcript.length} lines).`);
       }
     });
+
+    // Explicit dispatch is asynchronous: the tutor can leave between the
+    // webhook firing and this worker connecting. Do not leave a transcription
+    // job attached to a student-only room in that case.
+    const tutorAlreadyPresent = [...ctx.room.remoteParticipants.values()].some(isTutor);
+    if (!tutorAlreadyPresent) {
+      ctx.shutdown("tutor is no longer in the session");
+    }
   },
 });

@@ -18,11 +18,11 @@ export const EXAM_BOARDS: { value: ExamBoard; label: string }[] = [
   { value: "CIE", label: "CIE" },
 ];
 
-export function subjectLabel(s: StemSubject) {
-  return SUBJECTS.find((x) => x.value === s)?.label ?? s;
+export function subjectLabel(s: StemSubject | null | undefined) {
+  return SUBJECTS.find((x) => x.value === s)?.label ?? s ?? "Lesson";
 }
 
 /** "OCR_A" -> "OCR A". Board values are stored as enums; never render them raw. */
-export function boardLabel(b: ExamBoard) {
-  return EXAM_BOARDS.find((x) => x.value === b)?.label ?? String(b).replace(/_/g, " ");
+export function boardLabel(b: ExamBoard | null | undefined) {
+  return EXAM_BOARDS.find((x) => x.value === b)?.label ?? (b ? String(b).replace(/_/g, " ") : "Not specified");
 }

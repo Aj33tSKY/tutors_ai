@@ -6,6 +6,7 @@ import { subjectLabel } from "@/lib/subjects";
 import { Button } from "@/components/ui/button";
 import { createParticipantToken, livekitConfigured, roomNameForBooking } from "@/lib/livekit";
 import { VideoRoom } from "./video-room";
+import { SessionLobby } from "./session-lobby";
 import type { Booking, Profile } from "@/lib/types";
 
 export default async function SessionRoomPage({
@@ -39,8 +40,7 @@ export default async function SessionRoomPage({
   if (booking.status === "cancelled") {
     return (
       <div className="mx-auto flex min-h-screen max-w-2xl flex-col items-center justify-center px-5 text-center">
-        <p className="eyebrow text-saffron">Cancelled</p>
-        <h1 className="display-md mt-4">This session was cancelled</h1>
+        <h1 className="display-md">This session was cancelled</h1>
         <Button asChild className="mt-8">
           <Link href="/dashboard">Back to dashboard</Link>
         </Button>
@@ -54,8 +54,8 @@ export default async function SessionRoomPage({
         <div className="flex size-16 items-center justify-center rounded-full bg-primary/10 text-primary">
           <Video className="size-7" />
         </div>
-        <p className="eyebrow mt-6">{subjectLabel(booking.subject)} session</p>
-        <h1 className="display-md mt-4">Video isn&apos;t configured yet</h1>
+        <h1 className="display-md mt-6">Video isn&apos;t configured yet</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{subjectLabel(booking.subject)} session</p>
         <p className="mt-4 max-w-md text-sm leading-relaxed text-muted-foreground">
           This deployment is missing its LiveKit credentials. Set{" "}
           <code>LIVEKIT_API_KEY</code>, <code>LIVEKIT_API_SECRET</code> and{" "}
@@ -76,19 +76,25 @@ export default async function SessionRoomPage({
     .eq("id", user.id)
     .maybeSingle<Pick<Profile, "full_name">>();
 
-  const token = await createParticipantToken({
-    bookingId: booking.id,
-    identity: user.id,
-    name: profile?.full_name ?? (isTutor ? "Tutor" : "Student"),
-    role: isTutor ? "tutor" : "student",
-  });
+  const { data: recordingConsent } = await supabase
+    .from("session_recording_consents")
+    .select("booking_id")
+    .eq("booking_id", booking.id)
+    .maybeSingle();
 
   return (
-    <VideoRoom
-      token={token}
-      serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
-      roomName={roomNameForBooking(booking.id)}
-      subject={subjectLabel(booking.subject)}
-    />
+    <main className="mx-auto min-h-screen w-full px-3 py-3 sm:px-5 sm:py-5 lg:px-8">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><Button asChild size="sm" variant="ghost"><Link href="/dashboard"><ArrowLeft className="size-4" />Back to dashboard</Link></Button><p className="text-sm text-muted-foreground">{booking.lesson_name || subjectLabel(booking.subject)} · {new Date(booking.start_time).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p></div>
+      {booking.started_at ? <VideoRoom
+        token={await createParticipantToken({ bookingId: booking.id, identity: user.id, name: profile?.full_name ?? (isTutor ? "Tutor" : "Student"), role: isTutor ? "tutor" : "student" })}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
+        roomName={roomNameForBooking(booking.id)}
+        bookingId={booking.id}
+        subject={booking.lesson_name || subjectLabel(booking.subject)}
+        isTutor={isTutor}
+        tutorIdentity={booking.tutor_id}
+        recordingConsented={Boolean(recordingConsent)}
+      /> : <SessionLobby bookingId={booking.id} isTutor={isTutor} />}
+    </main>
   );
 }

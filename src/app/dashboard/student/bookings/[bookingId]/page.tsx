@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
-  ArrowLeft,
   BookOpenCheck,
   CircleAlert,
   ClipboardCheck,
@@ -10,11 +8,11 @@ import {
   Video,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { ReturnToDashboardLink } from "@/components/dashboard/return-to-dashboard-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/server";
-import type { Booking, SessionAnalytics } from "@/lib/types";
+import type { Booking, SessionAnalytics, SessionRecording } from "@/lib/types";
 
 const RECORDINGS_BUCKET = "session-recordings";
 
@@ -36,21 +34,31 @@ export default async function StudentSessionReviewPage({
 
   if (!booking || booking.status !== "completed") notFound();
 
-  const { data: analytics } = await supabase
+  const { data: analytics, error: analyticsError } = await supabase
     .from("session_analytics")
     .select("*")
     .eq("booking_id", booking.id)
     .maybeSingle<SessionAnalytics>();
 
-  // recording_path is an opaque object key, not a durable URL. Storage RLS
-  // verifies the session relationship before issuing this one-hour playback URL.
-  let recordingUrl: string | null = null;
-  if (analytics?.recording_path) {
-    const { data } = await supabase.storage
-      .from(RECORDINGS_BUCKET)
-      .createSignedUrl(analytics.recording_path, 60 * 60);
-    recordingUrl = data?.signedUrl ?? null;
-  }
+  const { data: recordings } = await supabase
+    .from("session_recordings")
+    .select("id, booking_id, egress_id, storage_path, status, started_at, ended_at, expires_at, created_at")
+    .eq("booking_id", booking.id)
+    .order("started_at", { ascending: true })
+    .returns<SessionRecording[]>();
+
+  // Older sessions can still have the single recording_path value.
+  const readyRecordings = recordings?.filter((recording) => recording.status === "ready") ?? [];
+  const hasPendingRecordings = recordings?.some((recording) => ["starting", "active", "stopping"].includes(recording.status)) ?? false;
+  const recordingPaths = readyRecordings.length
+    ? readyRecordings.map((recording) => ({ id: recording.id, path: recording.storage_path, startedAt: recording.started_at }))
+    : analytics?.recording_path
+      ? [{ id: "legacy", path: analytics.recording_path, startedAt: booking.started_at ?? booking.start_time }]
+      : [];
+  const recordingPlayers = await Promise.all(recordingPaths.map(async (recording) => {
+    const { data } = await supabase.storage.from(RECORDINGS_BUCKET).createSignedUrl(recording.path, 60 * 60);
+    return { ...recording, url: data?.signedUrl ?? null };
+  }));
 
   const summary = analytics?.summary_notes;
   const startedAt = new Date(booking.start_time).toLocaleString("en-GB", {
@@ -64,16 +72,11 @@ export default async function StudentSessionReviewPage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <Button asChild variant="ghost" size="sm" className="-ml-2">
-        <Link href="/dashboard/student">
-          <ArrowLeft className="size-4" /> All sessions
-        </Link>
-      </Button>
+      <ReturnToDashboardLink />
 
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="eyebrow text-saffron">Session review</p>
-          <h2 className="display-md mt-2">{subjectLabel(booking.subject)}</h2>
+          <h2 className="display-md">{booking.lesson_name || subjectLabel(booking.subject)}</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {startedAt} · {boardLabel(booking.exam_board)}
           </p>
@@ -88,13 +91,24 @@ export default async function StudentSessionReviewPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {recordingUrl ? (
-            <video controls playsInline preload="metadata" className="aspect-video w-full bg-black">
-              <source src={recordingUrl} type="video/mp4" />
-              Your browser does not support session video playback.
-            </video>
+          {recordingPlayers.length ? (
+            <div className="space-y-5">
+              {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
+              {recordingPlayers.map((recording, index) => (
+                <div key={recording.id}>
+                  <p className="mb-2 text-sm font-medium">{recordingPlayers.length > 1 ? `Recording segment ${index + 1}` : "Session video"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                  {recording.url ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p>}
+                </div>
+              ))}
+            </div>
+          ) : hasPendingRecordings ? (
+            <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
+              <Play className="size-7 text-muted-foreground" />
+              <p className="mt-3 font-medium">Recording is being finalized</p>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">The session video will appear here once LiveKit has finished saving it. Refresh this page shortly.</p>
+            </div>
           ) : (
-            <div className="flex min-h-48 flex-col items-center justify-center rounded-sm border border-dashed border-hairline px-6 text-center">
+            <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
               <Play className="size-7 text-muted-foreground" />
               <p className="mt-3 font-medium">No recording is available</p>
               <p className="mt-1 max-w-md text-sm text-muted-foreground">
@@ -105,8 +119,10 @@ export default async function StudentSessionReviewPage({
         </CardContent>
       </Card>
 
-      {!analytics?.full_transcript ? (
-        <ProcessingState />
+      {analyticsError ? (
+        <ProcessingState title="Session notes are unavailable" description="We couldn't load the session analysis. Please refresh shortly." />
+      ) : !analytics?.full_transcript ? (
+        <ProcessingState title="No transcript was captured" description="This session ended without a saved transcript, so notes cannot be generated. Future sessions need the transcription agent running while the room is in use." />
       ) : !summary ? (
         <ProcessingState />
       ) : (
@@ -155,9 +171,9 @@ export default async function StudentSessionReviewPage({
             items={summary.misconceptions ?? []}
           />
 
-          <details className="rounded-sm border border-hairline bg-card">
-            <summary className="cursor-pointer px-6 py-5 font-heading text-lg">Full transcript</summary>
-            <div className="border-t border-hairline px-6 py-5">
+          <details className="rounded-2xl border border-border bg-card shadow-sm">
+            <summary className="cursor-pointer px-6 py-5 font-heading text-lg font-semibold">Full transcript</summary>
+            <div className="border-t border-border px-6 py-5">
               <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
                 {analytics.full_transcript}
               </p>
@@ -169,13 +185,19 @@ export default async function StudentSessionReviewPage({
   );
 }
 
-function ProcessingState() {
+function ProcessingState({
+  title = "Your session notes are still processing",
+  description = "The transcript and action points usually appear within a few minutes of the session ending.",
+}: {
+  title?: string;
+  description?: string;
+}) {
   return (
     <Card>
       <CardContent className="py-10 text-center">
-        <p className="font-medium">Your session notes are still processing</p>
+        <p className="font-medium">{title}</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          The transcript and action points usually appear within a few minutes of the session ending.
+          {description}
         </p>
       </CardContent>
     </Card>
@@ -206,7 +228,7 @@ function ListCard({
         ) : (
           <ul className="space-y-2">
             {items.map((item) => (
-              <li key={item} className="rounded-sm border border-hairline px-3 py-2 text-sm">
+              <li key={item} className="rounded-xl border border-border px-3 py-2 text-sm">
                 {item}
               </li>
             ))}
