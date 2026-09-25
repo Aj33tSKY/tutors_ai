@@ -9,6 +9,12 @@ on:
 
 permissions:
   contents: read
+  # ci.yml is called as a reusable workflow below, and a called workflow cannot
+  # request more permissions than its caller grants. It reads a pull request's
+  # changed files to decide whether migrations need validating; this workflow
+  # never runs on a pull request, but the grant still has to be here or the
+  # workflow file is rejected.
+  pull-requests: read
 
 concurrency:
   group: staging-deployment
