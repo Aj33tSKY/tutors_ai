@@ -23,8 +23,10 @@ delay=10
 
 for attempt in $(seq 1 "$attempts"); do
   # curl prints 000 itself on a connection failure, so don't append a fallback.
-  status="$(curl -sS -o "$body_file" -w '%{http_code}' --max-time 20 "$health_url" || true)"
+  response="$(curl -sS -o "$body_file" -w '%{http_code} %{redirect_url}' --max-time 20 "$health_url" || true)"
+  status="${response%% *}"
   status="${status:-000}"
+  redirect="${response#* }"
 
   case "$status" in
     200)
@@ -35,6 +37,17 @@ for attempt in $(seq 1 "$attempts"); do
     401|403)
       echo "::error::$health_url returned $status. Configure a reachable STAGING_URL/PRODUCTION_URL or an authenticated protection bypass so the release can be checked."
       exit 1
+      ;;
+    30[1237])
+      # Vercel Deployment Protection answers with a redirect to its SSO endpoint
+      # rather than a 401, so the status code alone does not identify it. Retrying
+      # a protected URL only wastes a minute before failing with a vaguer message.
+      case "$redirect" in
+        *vercel.com/sso*|*vercel.com/login*)
+          echo "::error::$health_url redirected to Vercel's login ($status). Deployment Protection is intercepting the check. Point STAGING_URL/PRODUCTION_URL at a public domain, or add a protection bypass, so the release can be checked."
+          exit 1
+          ;;
+      esac
       ;;
   esac
 
