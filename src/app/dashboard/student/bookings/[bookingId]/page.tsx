@@ -122,7 +122,7 @@ export default async function StudentSessionReviewPage({
       {analyticsError ? (
         <ProcessingState title="Session notes are unavailable" description="We couldn't load the session analysis. Please refresh shortly." />
       ) : !analytics?.full_transcript ? (
-        <ProcessingState title="No transcript was captured" description="This session ended without a saved transcript, so notes cannot be generated. Future sessions need the transcription agent running while the room is in use." />
+        <ProcessingState title="No transcript was captured" description="This session ended without a saved transcript, so notes cannot be generated." />
       ) : !summary ? (
         <ProcessingState />
       ) : (
