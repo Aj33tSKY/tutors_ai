@@ -57,6 +57,28 @@ jobs:
           CRON_SECRET: ci-placeholder-cron-secret
           DEEPGRAM_API_KEY: ci-placeholder-deepgram-key
 
+  workflows:
+    name: Lint GitHub Actions workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # actionlint covers expression typos, bad needs references, unknown action
+      # inputs, and shellcheck over every run block. Pinned by tag, and the
+      # image ships the shellcheck it needs.
+      - name: actionlint
+        run: docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12 -color
+      # actionlint does not check that a reusable workflow's callers grant the
+      # permissions it requests; GitHub only enforces that at run time, which is
+      # how an unrunnable staging.yml reached develop.
+      - name: Verify reusable workflow permissions
+        run: node scripts/ci/verify-workflow-permissions.mjs
+
   migrations:
     name: Validate migrations from a clean local database
     runs-on: ubuntu-latest
