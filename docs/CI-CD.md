@@ -1,6 +1,6 @@
 # CI/CD and environment promotion plan
 
-This runbook describes how changes should move from development to production for the Tutors app. It separates application deployment (Vercel) from database deployment (Supabase), and keeps production changes reviewed and gated.
+This runbook describes how changes should move from development to production for the Tutors app. For the day-to-day version — which branch to start from, where to open a pull request, how to write a migration — see [development-workflow.md](development-workflow.md); this document is the infrastructure behind it. It separates application deployment (Vercel) from database deployment (Supabase), and keeps production changes reviewed and gated.
 
 ## Recommended target workflow
 
