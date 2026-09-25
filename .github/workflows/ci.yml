@@ -8,6 +8,9 @@ on:
 
 permissions:
   contents: read
+  # Reading a pull request's changed files decides whether the database needs
+  # validating on this run.
+  pull-requests: read
 
 concurrency:
   # The deploy workflows call this workflow to verify the exact commit they ship,
@@ -52,22 +55,61 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      # The job always runs so that it always reports a result: a required check
+      # that never runs leaves a pull request pending forever. What it *does* is
+      # conditional instead, which costs a few seconds when there is nothing to
+      # validate rather than a little over two minutes.
+      - name: Decide whether the database needs validating
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          # Releases always validate. Applying a broken migration to a real
+          # database costs far more than two minutes of CI, and this job is the
+          # only thing standing between a bad migration and a deploy.
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "Release build — validating migrations." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          changed="$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')"
+          # Only the paths that can change this job's result. Dev helpers such as
+          # supabase/*.mjs cannot, package-lock.json can because the Supabase CLI
+          # is pinned there, and ci.yml can because it defines the job.
+          if printf '%s\n' "$changed" | grep -qE '^(supabase/(migrations|tests)/|supabase/config\.toml$|package\.json$|package-lock\.json$|\.github/workflows/ci\.yml$)'; then
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "Database, dependency or workflow changes detected — validating migrations." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes under supabase/, no dependency change — skipped migration validation." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        if: steps.scope.outputs.needed == 'true'
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: steps.scope.outputs.needed == 'true'
         with:
           node-version: 24
           cache: npm
       - name: Install the Supabase CLI pinned in package.json
+        if: steps.scope.outputs.needed == 'true'
         run: npm ci
       - name: Start the local services migrations need
         # analytics/vector/studio and the function runtimes play no part in
         # applying SQL, and are the slowest and flakiest containers to boot.
+        if: steps.scope.outputs.needed == 'true'
         run: npx --no-install supabase start -x analytics,vector,studio,imgproxy,inbucket,edge-runtime,functions,realtime
       - name: Apply every migration to an empty database
         # `supabase start` applies them once as a side effect; resetting asserts
         # the same thing deliberately and fails on the offending statement.
+        if: steps.scope.outputs.needed == 'true'
         run: npx --no-install supabase db reset --local --no-seed
       - name: Lint the resulting schema
+        if: steps.scope.outputs.needed == 'true'
         run: npx --no-install supabase db lint --local --level error --fail-on error
       - name: Run the RLS test suite
+        if: steps.scope.outputs.needed == 'true'
         run: npx --no-install supabase test db --local
