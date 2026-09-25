@@ -1,8 +1,11 @@
 # Kindling — UK A-Level STEM Tutoring Platform
 
 For new contributors, start with [the developer workflow](docs/development-workflow.md).
-It explains the single repository, `tutors-dev` / `tutors` deployments,
-database migrations, and the steps still needed before CI/CD is live.
+It explains the single repository, `tutors-dev` / `tutors` deployments and database
+migrations. Staging releases automatically from `develop`; production is a manual,
+confirmed release from `main` and has not been cut yet. The pipeline itself is
+documented in [docs/CI-CD.md](docs/CI-CD.md), and transcription in
+[docs/transcription.md](docs/transcription.md).
 
 Implementation of `docs/mvp_plan.md`: tutor discovery & booking, live WebRTC sessions with
 transcription, post-session analytics, and a RAG revision chatbot — for UK A-Level Maths,
@@ -234,10 +237,9 @@ Supabase/Stripe sandboxes (not committed; scratch files loading `.env.local`):
   second, unrelated student got a 404 rather than any indication the booking exists; an
   unauthenticated request was redirected to `/sign-in?next=...`. Actual audio/video was verified
   working live in a real call.
-- Transcription agent: verified end to end against a real two-person call — real speech came back
-  as correctly-attributed transcript text in `session_analytics.full_transcript`. Getting there
-  surfaced a real bug worth knowing about: the agent's
-  `.env.local` path was computed one directory too shallow, so `DEEPGRAM_API_KEY` and the Supabase
-  vars silently never loaded — `existsSync()` just returned false, no error, until a real job
-  tried to construct those clients. See `agent/README.md`'s "A path bug worth knowing about" for
-  the fix and why it was hard to spot (it looked exactly like a fork/env-inheritance problem).
+- Transcription: verified end to end against a real two-person call on staging — real speech came
+  back as correctly-attributed text in `session_analytics.full_transcript`, roughly three minutes
+  after the tutor left, with `talk_ratio` and `summary_notes` generated from it. The always-on
+  LiveKit agent this used to need has been removed; audio-only per-track egress plus the
+  `transcribe-sessions` cron replaced it. See [docs/transcription.md](docs/transcription.md),
+  including the two failure modes that produce silence rather than an error.
