@@ -1,5 +1,9 @@
 # Kindling — UK A-Level STEM Tutoring Platform
 
+For new contributors, start with [the developer workflow](docs/development-workflow.md).
+It explains the single repository, `tutors-dev` / `tutors` deployments,
+database migrations, and the steps still needed before CI/CD is live.
+
 Implementation of `docs/mvp_plan.md`: tutor discovery & booking, live WebRTC sessions with
 transcription, post-session analytics, and a RAG revision chatbot — for UK A-Level Maths,
 Further Maths, Physics, Chemistry, Biology and Computing.
@@ -30,11 +34,8 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   (not other users, not even a linked parent — deliberate, for safeguarding); everyone else gets a
   404, not a redirect, so the booking's existence isn't leaked either. Token minting happens
   entirely server-side in the page component — there's no separate public token endpoint.
-- **Live transcription** (`agent/`) — an explicitly dispatched LiveKit Agent starts when the tutor
-  joins, transcribes each participant's audio through its own Deepgram stream (speaker attribution
-  from the LiveKit track itself, not acoustic diarization), and appends the transcript segment when
-  the tutor leaves. A student waiting in the room does not keep the agent running. Room departure
-  does not complete the booking; the tutor still marks it complete from their dashboard.
+- **Session transcription** — the LiveKit webhook starts a recording and the app's cron
+  transcribes it in batches with Deepgram. See [transcription setup](docs/transcription.md).
 - **Post-session summarizer** (`src/app/api/cron/summarize-sessions`) — a Vercel Cron job (every 5
   minutes, `vercel.ts`) finds completed bookings with a transcript but no summary yet, extracts
   spec-mapped topics/misconceptions/homework via the AI Gateway, computes a talk-time ratio from
@@ -110,7 +111,7 @@ low-content test transcript that it returns empty results rather than hallucinat
 
 | Module | Status | What's needed |
 | --- | --- | --- |
-| Deploying the transcription agent | Code complete, not deployed | Needs Docker + `lk agent create` (see `agent/README.md`) and a matching `LIVEKIT_AGENT_NAME` in the app and agent environments |
+| Batch transcription | Implemented in the app | Needs `DEEPGRAM_API_KEY` and a signed LiveKit webhook in each Vercel project; see [transcription setup](docs/transcription.md) |
 | Chat limits by plan tier | Flat limit only | Once a real subscription model exists, tie `DAILY_MESSAGE_LIMIT` to pay-as-you-go vs subscriber |
 | Tutor DBS document upload | Admin queue UI only, no upload | `@vercel/blob`, private access, form on tutor onboarding |
 | Stripe production webhook | Test-mode only, via Stripe CLI locally | Once deployed, add a webhook endpoint in the Stripe dashboard pointing at `/api/webhooks/stripe` for `invoice.paid,invoice.payment_failed`, and set `STRIPE_WEBHOOK_SECRET` to its signing secret |
@@ -129,7 +130,8 @@ via `livekitConfigured()` in `src/lib/livekit.ts`.
 
 ```bash
 npm install
-vercel env pull .env.local   # re-sync if env vars change in the Vercel dashboard
+# Get development values for .env.local from the owner. The local Vercel link
+# currently points to tutors, so a blind env pull can fetch production values.
 npm run dev
 ```
 
@@ -163,10 +165,9 @@ Before enabling this in a deployment:
 1. Create a private `session-recordings` bucket in Supabase Storage and generate S3 connection
    credentials. Set `SUPABASE_STORAGE_S3_ACCESS_KEY_ID`, `SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY`,
    and `SUPABASE_STORAGE_S3_REGION` in the app environment.
-2. Set `LIVEKIT_AGENT_NAME` in the app and `agent/.env.local` to the Cloud Agent's explicit dispatch
-   name, then deploy the agent with `lk agent create` / `lk agent deploy`.
-3. Configure LiveKit Cloud to POST `participant_joined`, `participant_left`, and `egress_ended`
-   events to `/api/webhooks/livekit`.
+2. Set `DEEPGRAM_API_KEY` in that Vercel project for batch transcription.
+3. Configure LiveKit Cloud to POST its signed webhook events to `/api/webhooks/livekit`
+   using that environment's API key pair.
 4. Apply the Supabase migration and redeploy the app so the 90-day cleanup cron is active.
 
 ### Direct messages and homework attachments
@@ -184,12 +185,9 @@ the app or supplied automatically by Storage.
 
 ## Database
 
-Schema + RLS policies live in `supabase/schema.sql` (already applied to the linked Supabase
-project). Re-run it after any schema change:
-
-```bash
-# via the Supabase SQL editor, or psql against POSTGRES_URL_NON_POOLING
-```
+Schema changes are released through versioned files in `supabase/migrations/`.
+Create a new migration for each change; never re-run `supabase/schema.sql` or
+edit a cloud database directly. See [the developer workflow](docs/development-workflow.md).
 
 `supabase/seed.mjs` seeds 6 demo tutors (run with `node supabase/seed.mjs`, reads
 `SUPABASE_SERVICE_ROLE_KEY` from `.env.local`). Demo tutor accounts:
@@ -212,8 +210,7 @@ src/lib/supabase/            browser/server/proxy Supabase clients + profile boo
 src/lib/supabase/admin.ts    service-role client for the webhook (no user session to read cookies from)
 src/lib/stripe.ts            lazy Stripe client (avoids crashing `next build` before keys exist)
 src/lib/livekit.ts           token minting + room naming (one room per booking id)
-supabase/schema.sql          full schema + RLS, matches docs/mvp_plan.md §3 plus chat_* and payment columns
-agent/                        separate always-on service: LiveKit Agent for live transcription (see agent/README.md)
+supabase/migrations/          versioned schema and RLS changes deployed by GitHub Actions
 ```
 
 ## Verification

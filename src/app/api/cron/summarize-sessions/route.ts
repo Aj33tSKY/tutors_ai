@@ -1,6 +1,7 @@
 import { embedMany, generateObject } from "ai";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { verifyCronRequest } from "@/lib/cron";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
 import type { Booking, ExamBoard, SessionAnalytics, StemSubject } from "@/lib/types";
 
@@ -71,13 +72,7 @@ function consolidateTranscriptTurns(transcript: string): string {
   return turns.map((turn) => (turn.speaker ? `[${turn.speaker}] ${turn.text}` : turn.text)).join("\n");
 }
 
-function verifyCronRequest(req: Request): boolean {
-  const secret = process.env.CRON_SECRET;
-  if (!secret) return false;
-  return req.headers.get("authorization") === `Bearer ${secret}`;
-}
-
-/** Transcript lines are "[Tutor] ..." / "[Student] ...", written by agent/src/session-impl.ts. */
+/** Transcript lines are "[Tutor] ..." / "[Student] ...", written by the transcribe-sessions cron. */
 function talkRatio(transcript: string): number | null {
   let tutorWords = 0;
   let studentWords = 0;

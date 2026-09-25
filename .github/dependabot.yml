@@ -1,0 +1,28 @@
+version: 2
+updates:
+  # Actions are SHA-pinned in the workflows; Dependabot rewrites the pin and its
+  # trailing version comment together. It does not touch versions embedded in
+  # `run:` strings (the Vercel CLI) — bump those by hand.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      # The Supabase CLI gates every release, so review its bumps on their own.
+      supabase-cli:
+        patterns: ["supabase"]
+      app-dependencies:
+        patterns: ["*"]
+        exclude-patterns: ["supabase"]
+        update-types: [minor, patch]
+

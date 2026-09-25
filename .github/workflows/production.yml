@@ -1,0 +1,159 @@
+name: Deploy production
+
+# Deliberately manual. GitHub Environments — and therefore required-reviewer
+# approval gates — are unavailable on private repositories on the Free plan, so
+# the gate is this: production only deploys when a human runs this workflow and
+# types the confirmation. Nothing deploys to production on a push to main.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type "deploy" to confirm a production release
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    # Gate the release on the same checks pull requests run, against the exact
+    # commit being deployed — a merge result or a direct push is otherwise untested.
+    name: Verify the commit being released
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Migrate production and deploy tutors
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      # Secrets are repo-level and prefixed per environment, because
+      # environment-scoped secrets are ignored on private Free-plan repositories.
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
+      VERCEL_CLI_VERSION: 60.0.1
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Require an explicit confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "deploy" ]; then
+            echo "::error::Type deploy in the confirmation field to release to production."
+            exit 1
+          fi
+
+      - name: Limit production deployments to main
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          if [ "$DEPLOY_REF" != "refs/heads/main" ]; then
+            echo "::error::Production can only be deployed from main."
+            exit 1
+          fi
+
+      # Every fail-closed check runs before the job contacts production at all.
+      - name: Require an explicitly confirmed production baseline
+        env:
+          PRODUCTION_MIGRATIONS_BASELINED: ${{ vars.PRODUCTION_MIGRATIONS_BASELINED }}
+          SUPABASE_BASELINE_VERSION: ${{ vars.PRODUCTION_SUPABASE_BASELINE_VERSION }}
+        run: |
+          if [ "$PRODUCTION_MIGRATIONS_BASELINED" != "true" ]; then
+            echo "::error::Confirm the production schema/migration baseline, then set the repository variable PRODUCTION_MIGRATIONS_BASELINED=true."
+            exit 1
+          fi
+          if [ -z "$SUPABASE_BASELINE_VERSION" ]; then
+            echo "::error::Set PRODUCTION_SUPABASE_BASELINE_VERSION to the last migration verified as already present in production."
+            exit 1
+          fi
+
+      - name: Require the credentials the release needs
+        env:
+          SUPABASE_PROJECT_ID: ${{ vars.PRODUCTION_SUPABASE_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: ${{ vars.PRODUCTION_VERCEL_PROJECT_ID }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+        run: |
+          missing=""
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_PROJECT_ID VERCEL_TOKEN VERCEL_PROJECT_ID VERCEL_ORG_ID; do
+            if [ -z "${!name:-}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then
+            echo "::error::Missing required production secrets/variables:$missing"
+            exit 1
+          fi
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install the Supabase CLI pinned in package.json
+        run: npm ci
+
+      - name: Link Supabase CLI to production
+        env:
+          SUPABASE_PROJECT_ID: ${{ vars.PRODUCTION_SUPABASE_PROJECT_ID }}
+        run: npx --no-install supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Verify remote migration history
+        env:
+          SUPABASE_BASELINE_VERSION: ${{ vars.PRODUCTION_SUPABASE_BASELINE_VERSION }}
+        run: |
+          npx --no-install supabase migration list --linked --output-format json > "$RUNNER_TEMP/production-migrations.json"
+          node scripts/ci/verify-supabase-migration-history.mjs "$RUNNER_TEMP/production-migrations.json"
+
+      - name: Preview production migrations
+        run: npx --no-install supabase db push --linked --dry-run
+
+      - name: Apply production migrations
+        id: migrate
+        run: npx --no-install supabase db push --linked --yes
+
+      - name: Report out-of-band schema drift
+        # Migrations are applied by now, so any remaining difference was made
+        # outside this pipeline. Worth surfacing, not worth failing a live release.
+        continue-on-error: true
+        run: |
+          if ! npx --no-install supabase db diff --linked > "$RUNNER_TEMP/drift.sql"; then
+            echo "::warning::Could not compute the schema diff; skipping the drift report."
+            exit 0
+          fi
+          if [ -s "$RUNNER_TEMP/drift.sql" ]; then
+            echo "::warning::Production schema differs from the checked-in migrations — something changed it outside this pipeline. Reconcile it into a migration."
+            cat "$RUNNER_TEMP/drift.sql"
+          else
+            echo "No out-of-band schema drift detected."
+          fi
+
+      - name: Deploy to Vercel Production
+        id: deploy
+        env:
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.PRODUCTION_VERCEL_PROJECT_ID }}
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          url="$(npx --yes vercel@"$VERCEL_CLI_VERSION" deploy --prod --yes \
+            --scope "$VERCEL_ORG_ID" \
+            --project "$VERCEL_PROJECT_ID" \
+            --token "$VERCEL_TOKEN")"
+          echo "Deployed $url"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Smoke-check the release
+        env:
+          # A stable production domain is checked in preference to the immutable
+          # deployment URL, which Deployment Protection may gate.
+          HEALTH_BASE_URL: ${{ vars.PRODUCTION_URL || steps.deploy.outputs.url }}
+        run: bash scripts/ci/smoke-check-deployment.sh "$HEALTH_BASE_URL"
+
+      - name: Explain how to recover
+        if: failure() && steps.migrate.outcome == 'success'
+        run: |
+          echo "::error::Migrations were applied to production before this failure. The database is ahead of the running app."
+          echo "Prefer a forward fix. To put the previous build back first: vercel rollback --scope <org> --token <token>"

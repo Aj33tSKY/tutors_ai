@@ -1,0 +1,73 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, develop]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # The deploy workflows call this workflow to verify the exact commit they ship,
+  # so key the group on the calling workflow too: a new push to a pull request
+  # must never cancel the CI gate of an in-flight release.
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: App lint, typecheck, and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - name: Generate Next.js route types
+        run: npx next typegen
+      - run: npx tsc --noEmit
+      - name: Build the application
+        # Placeholders only: this job never sees a real environment's secrets.
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder-anon-key
+          SUPABASE_SERVICE_ROLE_KEY: ci-placeholder-service-role-key
+          NEXT_PUBLIC_LIVEKIT_URL: wss://example.livekit.cloud
+          LIVEKIT_API_KEY: ci-placeholder-livekit-key
+          LIVEKIT_API_SECRET: ci-placeholder-livekit-secret
+          STRIPE_SECRET_KEY: sk_test_ci_placeholder
+          STRIPE_WEBHOOK_SECRET: whsec_ci_placeholder
+          CRON_SECRET: ci-placeholder-cron-secret
+          DEEPGRAM_API_KEY: ci-placeholder-deepgram-key
+
+  migrations:
+    name: Validate migrations from a clean local database
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install the Supabase CLI pinned in package.json
+        run: npm ci
+      - name: Start the local services migrations need
+        # analytics/vector/studio and the function runtimes play no part in
+        # applying SQL, and are the slowest and flakiest containers to boot.
+        run: npx --no-install supabase start -x analytics,vector,studio,imgproxy,inbucket,edge-runtime,functions,realtime
+      - name: Apply every migration to an empty database
+        # `supabase start` applies them once as a side effect; resetting asserts
+        # the same thing deliberately and fails on the offending statement.
+        run: npx --no-install supabase db reset --local --no-seed
+      - name: Lint the resulting schema
+        run: npx --no-install supabase db lint --local --level error --fail-on error
+      - name: Run the RLS test suite
+        run: npx --no-install supabase test db --local
