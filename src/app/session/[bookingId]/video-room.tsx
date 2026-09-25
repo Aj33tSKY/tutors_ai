@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { LiveKitRoom, VideoConference, useRoomContext } from "@livekit/components-react";
-import { RoomEvent } from "livekit-client";
+import { ConnectionState, RoomEvent } from "livekit-client";
 import "@livekit/components-styles";
 import { Check, LoaderCircle, Maximize2, Minimize2, Play, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -117,6 +117,12 @@ function TutorPresenceMonitor({
 
   useEffect(() => {
     const updatePresence = () => {
+      // Before the room finishes connecting, remoteParticipants is empty and
+      // says nothing about who is in the call. Treating that as "the tutor
+      // left" would hide the call behind the overlay and cut the student's
+      // devices while they were still connecting.
+      if (room.state !== ConnectionState.Connected) return;
+
       const tutorIsPresent = room.remoteParticipants.has(tutorIdentity);
       setPresent(tutorIsPresent);
       onPresenceChange(tutorIsPresent);
@@ -125,10 +131,20 @@ function TutorPresenceMonitor({
         void room.localParticipant.setCameraEnabled(false);
       }
     };
+
     updatePresence();
+    // Connected and Reconnected matter as much as the participant events: a
+    // tutor who was already in the room when the student joined is populated
+    // during connection and never raises ParticipantConnected, so those two
+    // events alone would leave the student waiting for something that has
+    // already happened.
+    room.on(RoomEvent.Connected, updatePresence);
+    room.on(RoomEvent.Reconnected, updatePresence);
     room.on(RoomEvent.ParticipantConnected, updatePresence);
     room.on(RoomEvent.ParticipantDisconnected, updatePresence);
     return () => {
+      room.off(RoomEvent.Connected, updatePresence);
+      room.off(RoomEvent.Reconnected, updatePresence);
       room.off(RoomEvent.ParticipantConnected, updatePresence);
       room.off(RoomEvent.ParticipantDisconnected, updatePresence);
     };
