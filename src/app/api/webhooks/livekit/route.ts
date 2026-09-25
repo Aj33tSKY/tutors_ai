@@ -98,6 +98,10 @@ async function startTranscriptAudioEgress(
       roomName,
       new DirectFileOutput({
         filepath: storagePath,
+        // Egress writes a sibling <egress-id>.json manifest by default. Nothing
+        // reads it, and this bucket is meant to hold nothing for long, so not
+        // writing it beats deleting it afterwards.
+        disableManifest: true,
         output: { case: "s3", value: storageUpload(TRANSCRIPT_AUDIO_BUCKET) },
       }),
       trackSid,
