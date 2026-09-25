@@ -141,7 +141,35 @@ async function pruneExpiredAudio(admin: ReturnType<typeof createAdminClient>) {
   }
   const expired = data ?? [];
   await discardAudio(admin, expired, "deleted");
-  return expired.length;
+
+  // Belt and braces: delete anything left in the bucket that no longer has a
+  // row pointing at it. Historically egress also wrote a manifest beside each
+  // file, and a run that dies between starting an egress and recording it would
+  // strand its audio here too. The bucket should hold nothing but in-flight
+  // segments, so anything old and unreferenced goes.
+  const orphans: string[] = [];
+  const { data: folders } = await admin.storage.from(TRANSCRIPT_AUDIO_BUCKET).list("", { limit: 100 });
+  for (const folder of folders ?? []) {
+    const { data: objects } = await admin.storage
+      .from(TRANSCRIPT_AUDIO_BUCKET)
+      .list(folder.name, { limit: 100 });
+    for (const object of objects ?? []) {
+      const path = `${folder.name}/${object.name}`;
+      const age = Date.now() - new Date(object.created_at ?? Date.now()).getTime();
+      if (age < MAX_AUDIO_AGE_MS) continue;
+      const { count } = await admin
+        .from("session_transcript_audio")
+        .select("id", { count: "exact", head: true })
+        .eq("storage_path", path);
+      if (!count) orphans.push(path);
+    }
+  }
+  if (orphans.length > 0) {
+    const { error: orphanError } = await admin.storage.from(TRANSCRIPT_AUDIO_BUCKET).remove(orphans);
+    if (orphanError) console.error("transcribe-sessions: could not delete orphaned audio:", orphanError.message);
+  }
+
+  return expired.length + orphans.length;
 }
 
 export async function GET(req: Request) {
