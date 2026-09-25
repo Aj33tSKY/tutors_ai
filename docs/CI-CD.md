@@ -18,9 +18,9 @@ feature branch → pull request → develop/staging → staging checks
 
 For small schema changes, prefer additive, backward-compatible migrations. For a breaking change, use an expand/migrate/contract rollout across separate releases: add the new shape, deploy code that can work with both shapes, migrate data, then remove the old shape in a later release.
 
-## Current known state (check before executing this plan)
+## State observed in this checkout (recheck before setup)
 
-- Repository-side workflows and checks described below are present locally but are not committed or active in GitHub yet.
+- Repository-side workflows and checks are committed on `ci-cd-and-batch-transcription`, but that feature branch has not been merged into `develop` or `main`.
 - Vercel project `tutors` has Production variables configured and is linked to GitHub.
 - Production Supabase migration history currently matches the checked-in migration files. The production database already has a participant-only read policy for the private `session-recordings` bucket.
 - Local `.env.local` is configured for tutors_dev. Never copy its values into production.
@@ -28,7 +28,7 @@ For small schema changes, prefer additive, backward-compatible migrations. For a
 - The project uses imperative SQL migrations under `supabase/migrations/`; no declarative `supabase/schemas/` workflow is configured.
 - Verify these facts again before the first release; the environment may have changed.
 
-The workflows cannot safely deploy until they are committed, the missing `develop` branch and staging Vercel project are created, GitHub Environments/secrets/variables are configured, and the database baseline flags are deliberately enabled.
+The remote `develop` branch exists. The workflows cannot release from it until the feature branch is merged, the staging Vercel project is configured, the repository secrets and variables are configured, and the database baseline flags are deliberately enabled. This checkout does not prove which external dashboard settings have since been completed.
 
 ## Phase 1: Reconcile tutors_dev safely
 
@@ -67,30 +67,42 @@ See [Vercel projects](https://vercel.com/docs/projects), [Git deployments and pr
 
 ### GitHub
 
-1. Protect both `develop` and `main`: require pull requests, passing CI checks, and no force-pushes. Require an additional human approval for production releases via the `production` Environment.
-2. Create GitHub Environments named `staging` and `production`.
-3. Require a human reviewer for the `production` environment.
-4. Add secrets to the matching environment, not to source files or workflow YAML.
+**Why repository secrets rather than Environments.** GitHub Environments — and with them required-reviewer approval gates and environment-scoped secrets — are unavailable on private repositories on the Free plan. This repository is intended to become private, so secrets and variables live at repository level and are **prefixed per environment** instead. Nothing here depends on a paid plan or on the repository staying public.
 
-Expected GitHub Environment secrets and variables (exact names are used by the workflows):
+The approval gate is replaced by making production deployment manual: `production.yml` has no `push` trigger and runs only from `workflow_dispatch`, where the operator must type `deploy` to confirm. For a single maintainer this is equivalent protection with less machinery — an approval gate only adds real safety when the approver is not the author. Revisit Environments when a second person joins.
 
-| Setting | Scope | Purpose |
-| --- | --- | --- |
-| `SUPABASE_ACCESS_TOKEN` | GitHub Actions | Supabase CLI authentication; use a dedicated/least-privilege token where available |
-| `SUPABASE_PROJECT_ID` | Each environment | Supabase project ref for that environment |
-| `SUPABASE_DB_PASSWORD` | Each environment | That project's database password |
-| `SUPABASE_BASELINE_VERSION` | Each environment | Last migration version verified as already represented in that database |
-| `STAGING_MIGRATIONS_BASELINED` | Staging environment variable | Must be `true` only after tutors_dev history/schema is reconciled |
-| `PRODUCTION_MIGRATIONS_BASELINED` | Production environment variable | Must be `true` only after production history/schema is confirmed |
-| `VERCEL_TOKEN` | GitHub Actions | Deploy app through Vercel CLI |
-| `VERCEL_ORG_ID` | GitHub Actions | Vercel team/org identifier |
-| `VERCEL_PROJECT_ID` | Each environment | That environment's Vercel project identifier (`tutors-dev` or `tutors`); read it with `vercel project inspect <name>` |
-| `PRODUCTION_URL` | Production environment variable | Optional. Stable domain the post-deploy smoke check polls; falls back to the immutable deployment URL |
-| `STAGING_URL` | Staging environment variable | Optional. Stable staging domain for the same check |
+1. Protect both `develop` and `main`: require pull requests, passing CI checks, and no force-pushes. Branch protection works on private Free-plan repositories.
+2. Add secrets and variables at repository level (Settings → Secrets and variables → Actions).
 
-`SUPABASE_ACCESS_TOKEN` and `SUPABASE_DB_PASSWORD` are exported at job level in both deploy workflows, because the Supabase CLI reads them from the environment — no secret is passed in a command line where it would appear in the runner's process list. Each deploy job fails with a named list of anything missing before it contacts a remote project.
+Secrets — sensitive, write-only, masked in logs:
 
-Project IDs, baseline versions, and DB passwords should be environment-scoped so a staging job cannot accidentally target production. `staging` must hold the staging Supabase ref/password, baseline-confirmation variable, baseline version, and staging Vercel project ID; `production` must hold the production equivalents. The deployment workflows fail closed until the corresponding baseline-confirmation variable is `true`, and verify that the baseline and prior migrations are recorded remotely. Store Supabase access and Vercel tokens as encrypted GitHub secrets. Do not put service-role keys, Stripe secrets, S3 secrets, or LiveKit secrets in the migration job unless a step explicitly needs them.
+| Secret | Purpose |
+| --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | Supabase CLI authentication; shared by both environments |
+| `VERCEL_TOKEN` | Deploy through the Vercel CLI; shared by both environments |
+| `PRODUCTION_SUPABASE_DB_PASSWORD` | Production database password |
+| `STAGING_SUPABASE_DB_PASSWORD` | tutors_dev database password |
+
+Variables — non-sensitive configuration, visible in the UI:
+
+| Variable | Value |
+| --- | --- |
+| `VERCEL_ORG_ID` | The Vercel team identifier, shared |
+| `PRODUCTION_VERCEL_PROJECT_ID` / `STAGING_VERCEL_PROJECT_ID` | `tutors` and `tutors-dev` project IDs; read with `vercel project inspect <name>` |
+| `PRODUCTION_SUPABASE_PROJECT_ID` / `STAGING_SUPABASE_PROJECT_ID` | Supabase project refs |
+| `PRODUCTION_SUPABASE_BASELINE_VERSION` / `STAGING_SUPABASE_BASELINE_VERSION` | Last migration verified as already present in that database |
+| `PRODUCTION_MIGRATIONS_BASELINED` / `STAGING_MIGRATIONS_BASELINED` | Must be `true` before that environment will deploy |
+| `PRODUCTION_URL` / `STAGING_URL` | Optional stable domain for the post-deploy smoke check |
+
+Set them with the CLI rather than pasting into a browser:
+
+```bash
+gh secret set SUPABASE_ACCESS_TOKEN              # prompts on stdin
+gh secret set PRODUCTION_SUPABASE_DB_PASSWORD
+gh variable set VERCEL_ORG_ID --body team_xxx
+```
+
+The prefixes are what keep the environments apart, so a staging job cannot reach production: `staging.yml` only ever reads `STAGING_*`, and `production.yml` only ever reads `PRODUCTION_*`. Set the two `*_MIGRATIONS_BASELINED` variables last and deliberately — both workflows refuse to run until the one matching their environment is `true`.
 
 ## Phase 3: Add CI and release workflows
 
@@ -113,8 +125,7 @@ Run on pull requests to `develop` and `main`:
 On merge to `develop`:
 
 1. Re-run the full CI suite against the commit being released.
-2. Select the `staging` GitHub Environment.
-3. Confirm the baseline flags and required credentials before touching tutors_dev.
+2. Confirm the baseline flags and required credentials before touching tutors_dev.
 4. Run a migration dry-run against tutors_dev and stop if unexpected migrations appear.
 5. Apply only pending migrations to tutors_dev.
 6. Report any remaining schema drift (`supabase db diff --linked`) as a warning — at that point migrations are applied, so a diff means something changed tutors_dev outside this pipeline. tutors_dev has taken direct SQL fixes before, so expect this to fire until it is reconciled.
@@ -128,8 +139,8 @@ The staging app must use only tutors_dev and staging service integrations.
 
 On an approved promotion to `main`:
 
-1. Re-run the full CI suite against the commit being released.
-2. Require approval for the `production` GitHub Environment.
+1. Run `Deploy production` manually and type `deploy` to confirm. There is no automatic trigger.
+2. Re-run the full CI suite against the commit being released.
 3. Confirm a recent production backup/restore point exists.
 4. Confirm the baseline flags and required credentials before touching production.
 5. Run `supabase migration list` and `supabase db push --dry-run` for the production project. Stop if history diverges or the plan includes anything unexpected.
@@ -141,7 +152,7 @@ On an approved promotion to `main`:
 
 If the migration fails, stop the workflow before deploying the app. Prefer a forward fix for production data/schema changes; only use a rollback when it is known to be safe and tested. When a step fails *after* migrations were applied, the job says so explicitly and prints the `vercel rollback` command, because at that point the database is ahead of the running app.
 
-The repository workflows are in `.github/workflows/ci.yml`, `staging.yml`, and `production.yml`; dependency updates are configured in `.github/dependabot.yml`. The migration-history guard is `scripts/ci/verify-supabase-migration-history.mjs` and the post-deploy check is `scripts/ci/smoke-check-deployment.sh`, which polls the `/api/health` route handler. PR CI runs app lint, Next.js route type generation/typecheck/build, a clean local Supabase migration reset, a schema lint, and the pgTAP RLS suite. Staging is deliberately blocked until the owner reconciles tutors_dev's migration history and confirms its baseline. Production requires the GitHub Environment approval and its own baseline confirmation.
+The repository workflows are in `.github/workflows/ci.yml`, `staging.yml`, and `production.yml`; dependency updates are configured in `.github/dependabot.yml`. The migration-history guard is `scripts/ci/verify-supabase-migration-history.mjs` and the post-deploy check is `scripts/ci/smoke-check-deployment.sh`, which polls the `/api/health` route handler. PR CI runs app lint, Next.js route type generation/typecheck/build, a clean local Supabase migration reset, a schema lint, and the pgTAP RLS suite. Each deployment workflow refuses to run until its own `*_MIGRATIONS_BASELINED` variable is `true`. Production additionally requires a manual run with a typed confirmation.
 
 The migration-history guard refuses to deploy when the remote history is empty, the baseline is unset or absent from either side, a remote version is unknown to the checkout, a remote version is recorded twice, a repository migration at or before the baseline is missing remotely, a pending migration is stamped before the remote head (which `db push` would reject anyway), or any version is not a 14-digit timestamp — the last because every ordering comparison above depends on uniform version length.
 
@@ -163,7 +174,7 @@ Session transcription runs inside the Next.js app (see [transcription.md](transc
 These are deliberate and unresolved, not oversights. Read them before trusting a green pipeline.
 
 - **No application test suite.** There is no app `test` script, so nothing asserts UI or route-handler behaviour. Database authorisation *is* covered (see below), but the Next.js layer is not.
-- **The smoke check proves reachability, not correctness.** It confirms the build boots with real variables and can reach its database. If Vercel Deployment Protection intercepts the request it reports a warning and passes, because it cannot tell a protected deployment from a broken one — set `PRODUCTION_URL`/`STAGING_URL` to a public domain to keep it meaningful.
+- **The smoke check proves reachability, not correctness.** It confirms the build boots with real variables and can reach its database. If Vercel Deployment Protection intercepts the request with HTTP 401/403, the check fails. Set `PRODUCTION_URL`/`STAGING_URL` to a reachable stable domain or add an authenticated protection bypass.
 - **`supabase db diff --linked` reports drift after the push, not before.** Before the push it would flag every pending migration as a difference. This means out-of-band schema edits are surfaced in the release log rather than blocking the release.
 
 ## Database authorisation tests

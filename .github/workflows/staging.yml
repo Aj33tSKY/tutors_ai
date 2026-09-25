@@ -1,5 +1,7 @@
 name: Deploy staging
 
+# Staging deploys automatically on merge to develop — it holds only test data, so
+# it needs no gate. Production is manual; see production.yml.
 on:
   push:
     branches: [develop]
@@ -22,17 +24,16 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: staging
     env:
-      # The Supabase CLI reads both of these from the environment, so every
-      # remote command below is authenticated without secrets in argv.
+      # Secrets are repo-level and prefixed per environment, because
+      # environment-scoped secrets are ignored on private Free-plan repositories.
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
       VERCEL_CLI_VERSION: 60.0.1
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - name: Limit manual staging deployments to develop
+      - name: Limit staging deployments to develop
         env:
           DEPLOY_REF: ${{ github.ref }}
         run: |
@@ -45,22 +46,22 @@ jobs:
       - name: Require an explicitly confirmed staging baseline
         env:
           STAGING_MIGRATIONS_BASELINED: ${{ vars.STAGING_MIGRATIONS_BASELINED }}
-          SUPABASE_BASELINE_VERSION: ${{ vars.SUPABASE_BASELINE_VERSION }}
+          SUPABASE_BASELINE_VERSION: ${{ vars.STAGING_SUPABASE_BASELINE_VERSION }}
         run: |
           if [ "$STAGING_MIGRATIONS_BASELINED" != "true" ]; then
-            echo "::error::Reconcile tutors_dev migration history first, then set the staging environment variable STAGING_MIGRATIONS_BASELINED=true."
+            echo "::error::Reconcile tutors_dev migration history first, then set the repository variable STAGING_MIGRATIONS_BASELINED=true."
             exit 1
           fi
           if [ -z "$SUPABASE_BASELINE_VERSION" ]; then
-            echo "::error::Set SUPABASE_BASELINE_VERSION to the last migration verified as already present in tutors_dev."
+            echo "::error::Set STAGING_SUPABASE_BASELINE_VERSION to the last migration verified as already present in tutors_dev."
             exit 1
           fi
 
       - name: Require the credentials the release needs
         env:
-          SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+          SUPABASE_PROJECT_ID: ${{ vars.STAGING_SUPABASE_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.STAGING_VERCEL_PROJECT_ID }}
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
         run: |
           missing=""
@@ -81,12 +82,12 @@ jobs:
 
       - name: Link Supabase CLI to tutors_dev
         env:
-          SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+          SUPABASE_PROJECT_ID: ${{ vars.STAGING_SUPABASE_PROJECT_ID }}
         run: npx --no-install supabase link --project-ref "$SUPABASE_PROJECT_ID"
 
       - name: Verify remote migration history
         env:
-          SUPABASE_BASELINE_VERSION: ${{ vars.SUPABASE_BASELINE_VERSION }}
+          SUPABASE_BASELINE_VERSION: ${{ vars.STAGING_SUPABASE_BASELINE_VERSION }}
         run: |
           npx --no-install supabase migration list --linked --output-format json > "$RUNNER_TEMP/staging-migrations.json"
           node scripts/ci/verify-supabase-migration-history.mjs "$RUNNER_TEMP/staging-migrations.json"
@@ -117,7 +118,7 @@ jobs:
         id: deploy
         env:
           VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+          VERCEL_PROJECT_ID: ${{ vars.STAGING_VERCEL_PROJECT_ID }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           url="$(npx --yes vercel@"$VERCEL_CLI_VERSION" deploy --prod --yes \

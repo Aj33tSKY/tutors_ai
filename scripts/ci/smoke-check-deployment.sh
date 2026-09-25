@@ -33,11 +33,8 @@ for attempt in $(seq 1 "$attempts"); do
       exit 0
       ;;
     401|403)
-      # Deployment Protection is answering instead of the app. Treat it as
-      # inconclusive rather than red: set PRODUCTION_URL/STAGING_URL to a public
-      # domain, or add a protection bypass, to make this check meaningful.
-      echo "::warning::$health_url returned $status — Deployment Protection is intercepting the smoke check, so it proved nothing."
-      exit 0
+      echo "::error::$health_url returned $status. Configure a reachable STAGING_URL/PRODUCTION_URL or an authenticated protection bypass so the release can be checked."
+      exit 1
       ;;
   esac
 

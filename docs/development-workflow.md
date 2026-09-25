@@ -1,128 +1,61 @@
-# Development workflow
+# Developer workflow: one repository, two live apps
 
-How to make a change to this project and get it in front of real users, safely.
+Start here if you are new to the project. [CI-CD.md](CI-CD.md) has the detailed release and recovery notes.
 
-## What an "environment" actually is
+## The map
 
-The same code runs in three places. The only thing that differs is which credentials it is given.
+| Git branch | What it means | Vercel project | Supabase project |
+| --- | --- | --- | --- |
+| Your `feature/*` branch | Work in progress; a pull request runs checks | No shared release | Use your local database when changing SQL |
+| `develop` | The team's shared development app | `tutors-dev` | `tutors_dev` |
+| `main` | The app used by real customers | `tutors` | `tutors_ai` |
 
-| | Runs where | Branch | Database | Money |
-| --- | --- | --- | --- | --- |
-| **Local** | your laptop, `npm run dev` | whatever you checked out | tutors_dev | Stripe test |
-| **Staging** | `tutors-dev` Vercel project | `develop` | tutors_dev | Stripe test |
-| **Production** | `tutors` Vercel project | `main` | production | Stripe live |
+There is **one GitHub repository**. Branches are versions of its code. Vercel projects are separate copies of the app, each with its own settings and secrets. Supabase projects are separate databases and Auth/Storage services. A Vercel project's **Production** environment means its stable live slot: the Production slot of `tutors-dev` still needs **development** credentials.
 
-### The word "Production" is overloaded
-
-Every Vercel project has a **Production** environment scope, meaning "the live slot of this project". `tutors-dev` has one too. It is *not* your production, and it must hold staging credentials only.
-
-When someone says "push to production" they mean the `tutors` project. When Vercel says "Production environment variables" on `tutors-dev`, it means staging.
-
-### Known overlaps
-
-- Local and staging share the tutors_dev database. Developing locally can overwrite staging data. Do not treat staging data as precious.
-- All environments currently share one LiveKit project, so they share API keys. Splitting this is outstanding work.
-
-## Day-to-day: changing the app
-
-Start from `develop`, never from `main`.
-
-```bash
-git checkout develop
-git pull
-git checkout -b feature/short-description
+```text
+feature branch --PR/checks--> develop --migrate tutors_dev--> deploy tutors-dev
+                                  |
+                                  +--release PR--> main --migrate tutors_ai--> deploy tutors
 ```
 
-Make your change, then run what CI will run, so you find problems in seconds rather than minutes:
+The workflows in this repository run checks on pull requests and deploy after merges. They apply database migrations **before** deploying app code. Vercel's automatic Git deployment is disabled for `develop` and `main` in `vercel.ts` to preserve that order. A green pull request means its checks passed; it does not mean a release succeeded.
+
+## First day on the project
+
+1. Clone the repository and run `npm ci` with Node 24.
+2. Get **development** environment variables from the owner into an ignored `.env.local`. Check that `NEXT_PUBLIC_SUPABASE_URL` is the development project's URL. Never copy production keys. Do not run `vercel env pull .env.local` blindly: the local Vercel link currently points to `tutors`, and a pull from that project could replace your development credentials.
+3. Run `npm run dev` and open `http://localhost:3000`.
+4. For SQL changes, start the local Supabase stack with `npx supabase start`. Your local database is separate from both cloud projects.
+
+Your laptop can use `tutors_dev` for app development if you need shared test data, but that means local actions can change staging data. Use local Supabase for schema work and fake data only. Ask the owner for the development API keys; the service role key stays on the server and must never be committed or put in a `NEXT_PUBLIC_` variable.
+
+## Make a change
 
 ```bash
-npm run dev                  # try it for real
-npm run lint
-npx next typegen && npx tsc --noEmit
+git switch develop
+git pull origin develop
+git switch -c feature/short-description
 ```
 
-Then open a pull request **into `develop`**:
+Make the change and run the app locally. Push your feature branch and open a pull request **into `develop`**. After review and green checks, merge it. Watch the **Deploy staging** GitHub Action, then use the `tutors-dev` URL to check the actual behavior. If that Action fails, staging has not been released even if the pull request passed.
 
-```bash
-git push -u origin feature/short-description
-gh pr create --base develop
-```
+For a database change, create a file with `npx supabase migration new describe_change`, write the SQL, and commit the file. Apply it to your **local** database with `npx supabase db reset --local --no-seed`. If changing RLS or Storage policies, update the matching SQL checks in `supabase/tests/`. Do not edit the cloud databases through Supabase Studio or the SQL editor. Already merged migration files are historical records; change the schema with a new migration.
 
-CI runs automatically. Once it is green and reviewed, merge. Merging to `develop` deploys to staging: migrations are applied to tutors_dev first, then the app deploys, then a health check runs.
+Use additive database changes when possible. The old app briefly runs against the new schema while Vercel deploys. Removing or renaming a column in the same release can break it.
 
-Check your change on the staging URL before going further.
+## Release to customers
 
-## Day-to-day: changing the database
+Once `tutors-dev` has been checked, open a pull request **from `develop` into `main`**. Merging does not deploy. Run the **Deploy production** Action yourself and type `deploy` to confirm; it then checks the merged commit, applies migrations to `tutors_ai`, deploys `tutors`, and checks `/api/health`. Verify a real user flow after it succeeds. For an urgent fix, branch from `main`, use a pull request into `main`, then bring that fix back into `develop`.
 
-This is the part that goes wrong most often, so it has its own rules.
+## Owner setup before the first release
 
-```bash
-npx supabase migration new describe_your_change
-```
+The workflow files currently live on the `ci-cd-and-batch-transcription` feature branch, not `main` or `develop`. The remote `develop` branch exists. The repository does not prove which settings have been completed in external dashboards, so check these in order:
 
-That creates a timestamped file in `supabase/migrations/`. Write your SQL there, then prove it applies to an empty database:
+1. Review and merge the pipeline branch into `develop`, then promote it to `main` once staging works. GitHub Actions cannot run a workflow from an unmerged branch for those targets.
+2. Reconcile `tutors_dev`'s existing schema and migration history **before** enabling staging deployment. The one-off script `scripts/ops/reconcile-tutors-dev.sh` describes the previously observed state; review its assumptions against the live project and its backup before running it. Do not run `db reset` on a cloud project. Record the confirmed baseline version in the repository variable `STAGING_SUPABASE_BASELINE_VERSION` and set `STAGING_MIGRATIONS_BASELINED=true` only after reconciliation.
+3. Check production migration history separately. Record its confirmed baseline version in the repository variable `PRODUCTION_SUPABASE_BASELINE_VERSION` and set `PRODUCTION_MIGRATIONS_BASELINED=true` only after confirming it.
+4. Connect both Vercel projects to this one GitHub repository. Set `tutors`'s Production Branch to `main` and `tutors-dev`'s to `develop`. Give each project's Production slot only its matching Supabase URL/keys, Stripe mode, LiveKit, Storage, Deepgram, webhook, and cron values. Configure separate Auth redirect URLs and service webhooks for each stable domain. Confirm Vercel Git deployment of `main` and `develop` is disabled so GitHub Actions controls release order.
+5. Add the repository secrets and variables listed in [CI-CD.md](CI-CD.md#github). They are **repository-level and prefixed** (`PRODUCTION_*`, `STAGING_*`) rather than held in GitHub Environments, because Environments and their secrets are ignored on private repositories on the Free plan. Protect both Git branches with pull requests and required CI checks — branch protection is unaffected by that limitation. Production has no automatic trigger and no approval rule; the gate is that a human runs the workflow and types the confirmation.
+6. Use a reachable stable URL for each Action's `STAGING_URL` / `PRODUCTION_URL`, and confirm `/api/health` returns 200 after release. A protected URL needs an authenticated smoke check; an HTTP 401/403 is a failed check, not proof that the app works.
 
-```bash
-npx supabase db reset --local --no-seed
-npm run test:db
-```
-
-If you touched RLS or storage policies, **add or update a test in `supabase/tests/`**. Those tests are the only thing standing between a typo and a student reading another student's lesson.
-
-Three rules that matter more than they look:
-
-1. **Never edit the SQL in the Supabase dashboard.** The repository is the source of truth. A dashboard edit makes the database disagree with the migration history, and deployment then refuses to run until someone reconciles it by hand.
-2. **Never edit a migration that has already merged.** It has already run in other databases. Write a new migration that changes what the old one did.
-3. **Prefer additive changes.** Migrations run *before* the new app deploys, so for a moment the old app is talking to the new schema. Adding a nullable column is safe. Renaming or dropping one breaks the running app. To remove something: add the new shape, ship code that uses it, migrate the data, and drop the old shape in a *later* release.
-
-## Promoting staging to production
-
-Production is a pull request from `develop` into `main`:
-
-```bash
-gh pr create --base main --head develop --title "Release: <what's in it>"
-```
-
-CI re-runs against that exact commit — passing once on a feature branch is not enough, because the merge result is code no one has built before. After merge:
-
-1. The production workflow waits for a human to approve the `production` GitHub Environment.
-2. It verifies the migration history matches the repository, and refuses if it does not.
-3. It applies migrations to the production database.
-4. Only then does it deploy the app.
-5. It polls `/api/health` and reports any schema drift.
-
-That order is the whole point: the database is always ready before the code that needs it arrives.
-
-If something breaks after release, **prefer a forward fix**. Rolling back code is easy; rolling back a migration usually is not.
-
-## Fixing something urgently
-
-A production hotfix still goes through `main` via a pull request — the approval gate and migration checks are what keep an urgent change from becoming an outage. Branch from `main`, PR into `main`, then merge `main` back into `develop` so staging does not drift behind.
-
-## Quick reference
-
-| Task | Command |
-| --- | --- |
-| Start a feature | `git checkout develop && git pull && git checkout -b feature/x` |
-| Run locally | `npm run dev` |
-| Check like CI does | `npm run lint && npx tsc --noEmit` |
-| New migration | `npx supabase migration new name` |
-| Test migrations from scratch | `npx supabase db reset --local --no-seed` |
-| Run RLS tests | `npm run test:db` |
-| Ship to staging | PR into `develop` |
-| Ship to production | PR from `develop` into `main` |
-
-On macOS, `npm run test:db` may fail to pull its Docker image. Prefix it:
-
-```bash
-PATH="/Applications/Docker.app/Contents/Resources/bin:$PATH" npm run test:db
-```
-
-## Before this workflow actually works
-
-Setup still outstanding, tracked in [CI-CD.md](CI-CD.md):
-
-- `tutors-dev` has no environment variables yet, so staging cannot run.
-- tutors_dev's migration history is not reconciled, and staging deploys deliberately refuse to run until `STAGING_MIGRATIONS_BASELINED=true`.
-- The `staging` and `production` GitHub Environments and their secrets do not exist yet, and the `production` environment has no required reviewer — so the approval step described above is not enforcing anything.
-- `main` has no branch protection, so it is currently possible to push straight to production without a pull request.
+The exact GitHub variable and secret names are in [CI-CD.md](CI-CD.md#github). Keep production credentials away from feature branches and developers' local files.
