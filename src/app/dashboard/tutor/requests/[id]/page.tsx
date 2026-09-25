@@ -10,8 +10,9 @@ import { boardLabel, subjectLabel } from "@/lib/subjects";
 import type { LessonRequest, Profile } from "@/lib/types";
 import { scheduleLessonRequestAction } from "../../request-actions";
 
-export default async function ScheduleRequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string }> }) {
-  const [{ id }, { error }] = await Promise.all([params, searchParams]);
+export default async function ScheduleRequestPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ error?: string; at?: string }> }) {
+  const [{ id }, { error, at }] = await Promise.all([params, searchParams]);
+  const clashAt = at && !Number.isNaN(new Date(at).getTime()) ? new Date(at) : null;
   const { userId } = await getCurrentProfile();
   const supabase = await createClient();
   const { data: request } = await supabase.from("lesson_requests").select("*").eq("id", id).eq("tutor_id", userId).maybeSingle<LessonRequest>();
@@ -26,7 +27,7 @@ export default async function ScheduleRequestPage({ params, searchParams }: { pa
       <div className="space-y-1.5"><Label htmlFor="lesson_name">Lesson name (optional)</Label><Input id="lesson_name" name="lesson_name" placeholder={subjectLabel(request.subject)} /></div>
       <div className="space-y-1.5"><Label htmlFor="start_time">Actual first session</Label><Input id="start_time" name="start_time" type="datetime-local" defaultValue={defaultDateTime} required /></div>
       <div className="space-y-1.5"><Label htmlFor="recurrence_count">Schedule</Label><select id="recurrence_count" name="recurrence_count" defaultValue="1" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="1">One session</option><option value="4">Weekly for 4 sessions</option><option value="8">Weekly for 8 sessions</option><option value="12">Weekly for 12 sessions</option></select><p className="text-xs text-muted-foreground">Recurring sessions are created weekly now; each completed paid session can be invoiced separately.</p></div>
-      {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error === "conflict" ? "That schedule overlaps an existing session." : "We couldn’t save this schedule. Please check the time and try again."}</p>}
+      {error && <p className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{error === "conflict" ? (clashAt ? `That clashes with an existing session on ${clashAt.toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}. Pick another time.` : "That schedule overlaps an existing session.") : "We couldn’t save this schedule. Please check the time and try again."}</p>}
       <Button type="submit">Confirm and message student</Button>
     </form></CardContent></Card>
   </div>;
