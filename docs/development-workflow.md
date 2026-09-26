@@ -94,4 +94,6 @@ As a new contributor you should not need to configure anything. You need Docker 
 - **`STRIPE_WEBHOOK_SECRET` on `tutors-dev`**, so Stripe webhooks fail on staging.
 - **An application test suite.** Database authorisation is covered by `supabase/tests/`; the Next.js layer is not.
 
+Before the first paying student there is a separate checklist — Stripe live mode, a second LiveKit project, Auth redirect URLs and the data-protection questions. See [Before taking real payments](CI-CD.md#before-taking-real-payments). Everything on it is safe to defer now and unsafe to defer past launch.
+
 Full detail, including every secret and variable name, is in [CI-CD.md](CI-CD.md). Keep production credentials out of feature branches and local files.
