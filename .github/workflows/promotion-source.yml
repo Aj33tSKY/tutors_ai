@@ -1,0 +1,39 @@
+name: Promotion source
+
+# Branch protection can require checks and reviews on main, but it cannot say
+# where a pull request is allowed to come from. Without that, anything can be
+# merged straight into main — which is how Dependabot's pull requests, which
+# defaulted to the repository's default branch, reached production's branch
+# without ever running on staging.
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  source:
+    name: Pull requests into main come from develop
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the source branch
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          case "$HEAD_REF" in
+            develop)
+              echo "Promotion from develop."
+              ;;
+            hotfix/*)
+              # Deliberately allowed: an urgent fix should not have to wait for
+              # a staging cycle. It does still need merging back afterwards.
+              echo "::warning::Hotfix branch $HEAD_REF is going straight into main, skipping staging. Merge main back into develop once it is released, or the branches will diverge."
+              ;;
+            *)
+              echo "::error::Pull requests into main must come from develop, or from a hotfix/* branch. This one is from $HEAD_REF."
+              echo "Open it against develop instead: it will deploy to staging on merge, and reach main with the next promotion. Dependency updates belong here too — that is what target-branch in .github/dependabot.yml is for."
+              exit 1
+              ;;
+          esac
