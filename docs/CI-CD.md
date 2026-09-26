@@ -120,6 +120,8 @@ Run on pull requests to `main`:
 
 `ci.yml` also declares `workflow_call`, so both deploy workflows run it as a required `verify` job against the commit being released.
 
+The existing workflow lint job also runs `scripts/ci/verify-migration-immutability.mjs` on pull requests. It compares every SQL migration in the PR's base commit with the checked-out merge result using Git object IDs. Existing paths, contents, and file modes must be unchanged; new migrations are allowed. The comparison runs independently of the conditional database validation, and missing Git history fails the check.
+
 #### Why the migration check is sometimes quick
 
 Validating migrations costs about two minutes, most of it booting Supabase containers, and the result cannot change unless something under `supabase/migrations/`, `supabase/tests/`, `supabase/config.toml` or the pinned Supabase CLI changed. So the job's *steps* are conditional:
@@ -153,7 +155,7 @@ The staging app must use only tutors_dev and staging service integrations.
 
 On an approved promotion to `main`:
 
-1. Run `Deploy production` manually and type `deploy` to confirm. There is no automatic trigger.
+1. Run `Deploy production` manually and type `deploy` to confirm. There is no automatic trigger. Preflight requires a successful `staging.yml` run on `main` for the exact dispatched commit, including its deployment and health check. Missing success or an API error blocks production before it touches Supabase or Vercel. If staging is still running, wait and dispatch again; the production run does not wait automatically.
 2. Re-run the full CI suite against the commit being released.
 3. Confirm a recent production backup/restore point exists.
 4. Confirm the baseline flags and required credentials before touching production.

@@ -67,11 +67,20 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Compare migration blobs with the PR's base commit, including files
+          # deleted or renamed in the merge result.
+          fetch-depth: 0
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Preserve existing migration files
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: node scripts/ci/verify-migration-immutability.mjs "$BASE_SHA"
       # actionlint covers expression typos, bad needs references, unknown action
       # inputs, and shellcheck over every run block. Pinned by tag, and the
       # image ships the shellcheck it needs.

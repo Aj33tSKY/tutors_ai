@@ -33,6 +33,8 @@ jobs:
     name: Check the release is allowed
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      actions: read
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
@@ -54,6 +56,25 @@ jobs:
             echo "::error::Production can only be deployed from main."
             exit 1
           fi
+
+      - name: Require a successful staging release of this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RELEASE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          staging_runs="$(gh api --paginate \
+            "repos/$REPO/actions/workflows/staging.yml/runs?branch=main&head_sha=$RELEASE_SHA&status=success&per_page=100" \
+            --jq '.workflow_runs[] | select(.head_branch == "main" and .conclusion == "success" and (.event == "push" or .event == "workflow_dispatch")) | .html_url')"
+          if [ -z "$staging_runs" ]; then
+            echo "::error::Commit $RELEASE_SHA has no successful Deploy staging run. Wait for staging to pass, check the app there, then dispatch production again."
+            exit 1
+          fi
+          echo "Successful staging release for $RELEASE_SHA:"
+          echo "$staging_runs"
+          echo "Staging release verified for $RELEASE_SHA:" >> "$GITHUB_STEP_SUMMARY"
+          echo "$staging_runs" >> "$GITHUB_STEP_SUMMARY"
 
       # Every fail-closed check runs before the job contacts production at all.
       - name: Require an explicitly confirmed production baseline
