@@ -42,6 +42,10 @@ jobs:
       - name: Generate Next.js route types
         run: npx next typegen
       - run: npx tsc --noEmit
+      # The manifest is what the production parity check trusts, so it has to
+      # keep matching the code or it quietly stops covering a variable.
+      - name: Check the environment manifest matches the code
+        run: node scripts/ci/verify-env-manifest.mjs
       - name: Build the application
         # Placeholders only: this job never sees a real environment's secrets.
         run: npm run build

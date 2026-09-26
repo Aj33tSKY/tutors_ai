@@ -1,0 +1,103 @@
+{
+  "$comment": [
+    "The declared shape of this app's runtime configuration. Names and purposes only —",
+    "never values, so this file is safe in Git and safe to read in a pull request.",
+    "",
+    "Two checks keep it honest, because a manifest nobody verifies goes stale and then",
+    "lies:",
+    "  scripts/ci/verify-env-manifest.mjs  every PR: this file matches what src/ reads",
+    "  scripts/ci/verify-env-parity.mjs    before a production release: both Vercel",
+    "                                      projects define every required name",
+    "",
+    "The point is that staging and production should differ only in credentials and",
+    "which resources they address, never in which variables exist. A variable present",
+    "in one project and missing from the other is drift, and it fails at runtime in",
+    "whichever environment is missing it — usually the one nobody is watching."
+  ],
+  "variables": [
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_URL",
+      "required": true,
+      "secret": false,
+      "purpose": "Supabase project REST endpoint. Differs per environment."
+    },
+    {
+      "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+      "required": true,
+      "secret": false,
+      "purpose": "Browser-safe Supabase key; RLS is what protects the data behind it."
+    },
+    {
+      "name": "SUPABASE_SERVICE_ROLE_KEY",
+      "required": true,
+      "secret": true,
+      "purpose": "Bypasses RLS. Server-side only: webhooks, crons, the health probe."
+    },
+    {
+      "name": "SUPABASE_STORAGE_S3_ACCESS_KEY_ID",
+      "required": true,
+      "secret": true,
+      "purpose": "LiveKit Egress writes recordings and transcript audio over Supabase Storage's S3 API."
+    },
+    {
+      "name": "SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY",
+      "required": true,
+      "secret": true,
+      "purpose": "Pairs with the S3 access key id."
+    },
+    {
+      "name": "SUPABASE_STORAGE_S3_REGION",
+      "required": true,
+      "secret": false,
+      "purpose": "Storage region for the S3 endpoint. Defaults to us-east-1 in code if unset, which is usually wrong."
+    },
+    {
+      "name": "NEXT_PUBLIC_LIVEKIT_URL",
+      "required": true,
+      "secret": false,
+      "purpose": "LiveKit project websocket URL, also the host the server SDK derives."
+    },
+    {
+      "name": "LIVEKIT_API_KEY",
+      "required": true,
+      "secret": true,
+      "purpose": "Mints room tokens, starts egress, verifies webhook signatures."
+    },
+    {
+      "name": "LIVEKIT_API_SECRET",
+      "required": true,
+      "secret": true,
+      "purpose": "Pairs with the LiveKit API key. Can mint a token for any room in its project."
+    },
+    {
+      "name": "DEEPGRAM_API_KEY",
+      "required": true,
+      "secret": true,
+      "purpose": "Prerecorded transcription of each participant's audio."
+    },
+    {
+      "name": "DEEPGRAM_MODEL",
+      "required": false,
+      "secret": false,
+      "purpose": "Overrides the default nova-3 model, so a model rename needs no redeploy."
+    },
+    {
+      "name": "STRIPE_SECRET_KEY",
+      "required": true,
+      "secret": true,
+      "purpose": "Invoicing. Test mode on staging, live mode on production."
+    },
+    {
+      "name": "STRIPE_WEBHOOK_SECRET",
+      "required": true,
+      "secret": true,
+      "purpose": "Verifies Stripe webhook signatures. Belongs to one endpoint, so it differs per environment."
+    },
+    {
+      "name": "CRON_SECRET",
+      "required": true,
+      "secret": true,
+      "purpose": "Bearer token Vercel Cron presents to the cron routes. Must differ per environment."
+    }
+  ]
+}
