@@ -45,6 +45,17 @@ Use additive database changes when possible. The old app briefly runs against th
 
 CI only validates migrations when your change could affect the result, so on an app-only pull request that check finishes in seconds and says so in its run summary. That is expected, not a check that failed to run. Anything touching `supabase/migrations/`, `supabase/tests/`, `supabase/config.toml` or the pinned Supabase CLI validates in full.
 
+## What may reach main
+
+Only two kinds of pull request:
+
+- **`develop` → `main`**, a promotion. The normal route; everything on `develop` has already run on staging.
+- **`hotfix/*` → `main`**, for something urgent that cannot wait for a staging cycle. Merge `main` back into `develop` afterwards, or the branches diverge.
+
+The **Promotion source** Action enforces this — a pull request into `main` from anything else fails. Branch protection can require checks and reviews but cannot say where a pull request may come from, so this covers that gap.
+
+It matters for dependency updates in particular: **Dependabot reads `.github/dependabot.yml` from the default branch only.** Changing `target-branch` on `develop` has no effect until that change is promoted to `main`.
+
 ## Which merge button to use
 
 This matters more than it looks, and it is not enforceable in GitHub settings — merge methods are repository-wide, so the repository cannot require one for `main` and another for `develop`.
