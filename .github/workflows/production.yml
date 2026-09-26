@@ -26,29 +26,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  verify:
-    # Gate the release on the same checks pull requests run, against the exact
-    # commit being deployed — a merge result or a direct push is otherwise untested.
-    name: Verify the commit being released
-    uses: ./.github/workflows/ci.yml
-    with:
-      # Never skip the database check for a production release.
-      migration_validation: always
-
-  deploy:
-    name: Migrate production and deploy tutors
-    needs: verify
+  preflight:
+    # These checks cost seconds and need no checkout. Running them before the
+    # verification suite means a missing variable fails in about ten seconds
+    # rather than after four minutes of CI, which is how it failed the first time.
+    name: Check the release is allowed
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     env:
-      # Secrets are repo-level and prefixed per environment, because
-      # environment-scoped secrets are ignored on private Free-plan repositories.
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
-      VERCEL_CLI_VERSION: 60.0.1
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
       - name: Require an explicit confirmation
         env:
           CONFIRM: ${{ inputs.confirm }}
@@ -97,6 +85,34 @@ jobs:
             echo "::error::Missing required production secrets/variables:$missing"
             exit 1
           fi
+
+  verify:
+    # Gate the release on the same checks pull requests run, against the exact
+    # commit being deployed — a merge result or a direct push is otherwise untested.
+    name: Verify the commit being released
+    needs: preflight
+    uses: ./.github/workflows/ci.yml
+    with:
+      # Never skip the database check for a production release.
+      migration_validation: always
+
+  deploy:
+    name: Migrate production and deploy tutors
+    needs: [preflight, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # Writes the release tag at the end. Job-level permissions replace the
+      # workflow-level grant, so this job gets contents and nothing else.
+      contents: write
+    env:
+      # Secrets are repo-level and prefixed per environment, because
+      # environment-scoped secrets are ignored on private Free-plan repositories.
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
+      VERCEL_CLI_VERSION: 60.0.1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -160,6 +176,24 @@ jobs:
           # deployment URL, which Deployment Protection may gate.
           HEALTH_BASE_URL: ${{ vars.PRODUCTION_URL || steps.deploy.outputs.url }}
         run: bash scripts/ci/smoke-check-deployment.sh "$HEALTH_BASE_URL"
+
+      - name: Record what was released
+        # Production ships whatever main was at the moment of dispatch, so
+        # nothing else records which commit went live. This tag is what makes
+        # "what was running at the time?" answerable during an incident. It runs
+        # after the smoke check, so a tag always marks a verified release.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="production-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          if gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+               -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null 2>&1; then
+            echo "Tagged $GITHUB_SHA as $tag"
+            echo "Released \`$tag\` — $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            # The release itself already succeeded; losing the tag must not fail it.
+            echo "::warning::Could not create the tag $tag. The release succeeded regardless."
+          fi
 
       - name: Explain how to recover
         if: failure() && steps.migrate.outcome == 'success'

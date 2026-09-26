@@ -2,8 +2,9 @@
 
 For new contributors, start with [the developer workflow](docs/development-workflow.md).
 It explains the single repository, `tutors-dev` / `tutors` deployments and database
-migrations. Staging releases automatically from `develop`; production is a manual,
-confirmed release from `main` and has not been cut yet. The pipeline itself is
+migrations. There is one long-lived branch: staging releases automatically on every
+merge to `main`, and production releases the same commits only when a human
+dispatches it. The pipeline itself is
 documented in [docs/CI-CD.md](docs/CI-CD.md), and transcription in
 [docs/transcription.md](docs/transcription.md).
 

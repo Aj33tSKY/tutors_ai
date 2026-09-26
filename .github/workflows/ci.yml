@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-    branches: [main, develop]
+    branches: [main]
   workflow_call:
     inputs:
       migration_validation:
@@ -75,7 +75,7 @@ jobs:
         run: docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12 -color
       # actionlint does not check that a reusable workflow's callers grant the
       # permissions it requests; GitHub only enforces that at run time, which is
-      # how an unrunnable staging.yml reached develop.
+      # how an unrunnable staging.yml once reached the default branch.
       - name: Verify reusable workflow permissions
         run: node scripts/ci/verify-workflow-permissions.mjs
 
