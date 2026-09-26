@@ -50,6 +50,17 @@ This format is a contract. `talkRatio` and `consolidateTranscriptTurns` in `src/
 - A two-minute settle window after the last segment ends lets a reconnecting tutor publish a new track before transcription runs.
 - A tutor who leaves and rejoins produces new tracks. Their transcript is **appended**, matching the rule that leaving a room is not the same as completing a lesson.
 
+## Traps
+
+Both of these produce silence rather than an error, and both have already happened.
+
+- **A `track_published` payload carries only the participant's sid, name and identity — no metadata.** The role therefore comes from the booking (`identity` against `tutor_id` / `student_id`), never from token metadata. An earlier version read metadata here, which meant every event was discarded and no session could ever produce a transcript. The webhook still returned 200 throughout.
+- **A wrong webhook path also returns 200.** Next.js answers an unknown POST path with a page, so LiveKit records a successful delivery and never retries. If no `session_transcript_audio` rows appear at all, check the configured URL includes `/api/webhooks/livekit` before suspecting the handler.
+
+## Retention
+
+Egress is told `disableManifest: true`, because it otherwise writes an `<egress-id>.json` beside every file that nothing reads. `transcribeBooking` deletes the audio as soon as the transcript is written, and `pruneExpiredAudio` removes both expired segments and anything in the bucket older than 24 hours with no row pointing at it. The intended invariant is that the bucket holds nothing but in-flight segments.
+
 ## Operational requirements
 
 | Requirement | Where |
@@ -61,6 +72,19 @@ This format is a contract. `talkRatio` and `consolidateTranscriptTurns` in `src/
 | `SUPABASE_STORAGE_S3_*` credentials | Already required by video recording; egress writes both buckets |
 
 `LIVEKIT_AGENT_NAME` is no longer used by anything and can be removed from both environments.
+
+## Verified
+
+A real two-person lesson on staging produced:
+
+```
+[Tutor] Okay. Test. ... This is Priya, the tutor speaking ...
+[Student] Cool. This is the student, the demo student speaking now.
+```
+
+Correct attribution, correct interleaving, audio deleted on success, one attempt, and `talk_ratio` plus `summary_notes` generated downstream — which also confirms the summariser still parses the format.
+
+Timing, so the wait is not mistaken for a failure: the tutor left at 22:02:18 and the transcript was written at 22:05:28. Roughly **three minutes** — a two-minute settle window, then the next five-minute cron tick. The booking page distinguishes "being prepared" from "none captured" for exactly this reason.
 
 ## What this replaced
 

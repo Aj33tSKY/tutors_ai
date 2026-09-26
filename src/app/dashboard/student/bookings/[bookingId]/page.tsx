@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { ReturnToDashboardLink } from "@/components/dashboard/return-to-dashboard-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Booking, SessionAnalytics, SessionRecording } from "@/lib/types";
 
@@ -59,6 +60,20 @@ export default async function StudentSessionReviewPage({
     const { data } = await supabase.storage.from(RECORDINGS_BUCKET).createSignedUrl(recording.path, 60 * 60);
     return { ...recording, url: data?.signedUrl ?? null };
   }));
+
+  // Transcript audio is deliberately unreadable by every user, including this
+  // lesson's own participants, so its status cannot be read with the caller's
+  // client. Whether transcription is still running is not sensitive though, and
+  // the booking above was already authorised under RLS, so read just the status
+  // with the service role scoped to that booking.
+  const { data: transcriptAudio } = await createAdminClient()
+    .from("session_transcript_audio")
+    .select("status")
+    .eq("booking_id", booking.id);
+  // "ready" means the audio was captured but the transcribe cron has not run yet.
+  const transcriptPending = (transcriptAudio ?? []).some((segment) =>
+    ["starting", "active", "ready"].includes(segment.status),
+  );
 
   const summary = analytics?.summary_notes;
   const startedAt = new Date(booking.start_time).toLocaleString("en-GB", {
@@ -122,7 +137,14 @@ export default async function StudentSessionReviewPage({
       {analyticsError ? (
         <ProcessingState title="Session notes are unavailable" description="We couldn't load the session analysis. Please refresh shortly." />
       ) : !analytics?.full_transcript ? (
-        <ProcessingState title="No transcript was captured" description="This session ended without a saved transcript, so notes cannot be generated. Future sessions need the transcription agent running while the room is in use." />
+        transcriptPending ? (
+          <ProcessingState
+            title="Transcript is being prepared"
+            description="This lesson's audio was captured and is being transcribed. It usually appears within a few minutes of the session ending."
+          />
+        ) : (
+          <ProcessingState title="No transcript was captured" description="This session ended without a saved transcript, so notes cannot be generated." />
+        )
       ) : !summary ? (
         <ProcessingState />
       ) : (

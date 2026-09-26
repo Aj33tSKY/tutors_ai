@@ -20,15 +20,6 @@ function livekitHost() {
   return url.replace(/^wss:/, "https:").replace(/^ws:/, "http:");
 }
 
-function roleFromMetadata(metadata: string | undefined) {
-  try {
-    const parsed = JSON.parse(metadata ?? "{}") as { role?: string };
-    return parsed.role;
-  } catch {
-    return undefined;
-  }
-}
-
 function bookingIdFromRoom(roomName: string | undefined) {
   const match = roomName?.match(/^booking-([0-9a-f-]{36})$/i);
   return match?.[1] ?? null;
@@ -107,6 +98,10 @@ async function startTranscriptAudioEgress(
       roomName,
       new DirectFileOutput({
         filepath: storagePath,
+        // Egress writes a sibling <egress-id>.json manifest by default. Nothing
+        // reads it, and this bucket is meant to hold nothing for long, so not
+        // writing it beats deleting it afterwards.
+        disableManifest: true,
         output: { case: "s3", value: storageUpload(TRANSCRIPT_AUDIO_BUCKET) },
       }),
       trackSid,
@@ -295,17 +290,24 @@ export async function POST(request: Request) {
       const roomName = event.room?.name;
       const bookingId = bookingIdFromRoom(roomName);
       const identity = event.participant?.identity;
-      const role = roleFromMetadata(event.participant?.metadata);
       if (!roomName || !bookingId || !identity) return new Response("ok");
-      if (role !== "student" && role !== "tutor") return new Response("ok");
 
       const admin = createAdminClient();
       const { data: booking } = await admin
         .from("bookings")
-        .select("id, tutor_id, status")
+        .select("id, tutor_id, student_id, status")
         .eq("id", bookingId)
         .maybeSingle();
       if (!booking || booking.status !== "scheduled") return new Response("ok");
+
+      // A track_published payload carries only the participant's sid, name and
+      // identity — no metadata — so the role cannot be read from the token here.
+      // The booking is the authoritative source anyway, and unlike metadata it
+      // cannot be omitted or spoofed.
+      const role =
+        identity === booking.tutor_id ? "tutor" : identity === booking.student_id ? "student" : null;
+      if (!role) return new Response("ok");
+
       if (!(await tutorIsPresent(roomName, booking.tutor_id))) return new Response("ok");
 
       await startTranscriptAudioEgress(bookingId, roomName, track.sid, role, identity);
@@ -315,7 +317,6 @@ export async function POST(request: Request) {
     if (event.event !== "participant_joined" && event.event !== "participant_left") {
       return new Response("ok");
     }
-    if (roleFromMetadata(event.participant?.metadata) !== "tutor") return new Response("ok");
 
     const roomName = event.room?.name;
     const bookingId = bookingIdFromRoom(roomName);
@@ -327,6 +328,9 @@ export async function POST(request: Request) {
       .select("id, tutor_id, status")
       .eq("id", bookingId)
       .maybeSingle();
+    // Comparing identity against the booking is what establishes this is the
+    // tutor. Token metadata is not consulted: it is absent from some webhook
+    // payloads, and the booking is authoritative regardless.
     if (!booking || booking.tutor_id !== event.participant?.identity) {
       return new Response("ok");
     }
