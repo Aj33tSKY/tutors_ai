@@ -181,6 +181,27 @@ Session transcription runs inside the Next.js app (see [transcription.md](transc
 
 `LIVEKIT_AGENT_NAME` is no longer read by anything and can be removed from both environments.
 
+## Configuration parity
+
+Staging and production run identical code and identical repository configuration. They differ only in credentials and which resources those credentials address. Anything else that differs between them is drift, and drift fails at runtime in whichever environment is missing something — usually the one nobody is watching.
+
+Three things keep that true:
+
+**Configuration lives in the repository.** `vercel.ts` holds the framework preset, the cron schedules and the `git.deploymentEnabled` setting that stops Vercel racing ahead of migrations. Both Vercel projects build from the same file, so none of it can differ between them. Prefer adding deployment behaviour there over setting it per project in the dashboard.
+
+**A non-secret manifest declares what the app needs.** `config/required-env.json` lists every variable by name, whether it is required, whether it is secret, and what it is for. Names and purposes only — no values, so it is safe in Git and safe to read in a pull request.
+
+**Two checks keep the manifest honest and the projects aligned.**
+
+| Check | When | What it proves |
+| --- | --- | --- |
+| `verify-env-manifest.mjs` | Every pull request | The manifest matches what `src/` actually reads, in both directions |
+| `verify-env-parity.mjs` | Before every production release | Both Vercel projects define every required name, and neither has a variable the other lacks |
+
+The manifest check matters more than it looks. A manifest nobody verifies drifts from the code, and the parity check trusts it — so a variable missing from the manifest is a variable nobody checks in either project.
+
+The parity check reads **names only**. Values are meant to differ and are never fetched, so nothing secret passes through it. A required name missing from either project fails the release. A name present in one project and not the other is a warning, since a genuinely environment-specific extra is legitimate; optional variables never warn.
+
 ## Known gaps
 
 These are deliberate and unresolved, not oversights. Read them before trusting a green pipeline.
@@ -193,6 +214,7 @@ These are deliberate and unresolved, not oversights. Read them before trusting a
 - **`supabase db diff --linked` reports drift after the push, not before.** Before the push it would flag every pending migration as a difference. This means out-of-band schema edits are surfaced in the release log rather than blocking the release.
 
 ## Database authorisation tests
+
 
 RLS is this app's security boundary, so it is tested with pgTAP under `supabase/tests/`. CI runs the suite on a clean database on every pull request and before every release, after migrations have been applied and the schema linted.
 

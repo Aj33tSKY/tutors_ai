@@ -86,6 +86,24 @@ jobs:
             exit 1
           fi
 
+  config-parity:
+    # Runs alongside verify rather than inside preflight: it needs a checkout and
+    # downloads the Vercel CLI, and preflight's value is failing in seconds.
+    name: Both projects have the expected configuration
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Compare configuration shape, not values
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+          PRODUCTION_VERCEL_PROJECT_ID: ${{ vars.PRODUCTION_VERCEL_PROJECT_ID }}
+          STAGING_VERCEL_PROJECT_ID: ${{ vars.STAGING_VERCEL_PROJECT_ID }}
+          VERCEL_CLI_VERSION: 60.0.1
+        run: node scripts/ci/verify-env-parity.mjs
+
   verify:
     # Gate the release on the same checks pull requests run, against the exact
     # commit being deployed — a merge result or a direct push is otherwise untested.
@@ -98,7 +116,7 @@ jobs:
 
   deploy:
     name: Migrate production and deploy tutors
-    needs: [preflight, verify]
+    needs: [preflight, config-parity, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
