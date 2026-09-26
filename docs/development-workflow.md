@@ -45,6 +45,19 @@ Use additive database changes when possible. The old app briefly runs against th
 
 CI only validates migrations when your change could affect the result, so on an app-only pull request that check finishes in seconds and says so in its run summary. That is expected, not a check that failed to run. Anything touching `supabase/migrations/`, `supabase/tests/`, `supabase/config.toml` or the pinned Supabase CLI validates in full.
 
+## Which merge button to use
+
+This matters more than it looks, and it is not enforceable in GitHub settings — merge methods are repository-wide, so the repository cannot require one for `main` and another for `develop`.
+
+| Pull request | Use | Why |
+| --- | --- | --- |
+| feature → `develop` | **Squash and merge** | Keeps `develop` readable: one commit per change |
+| `develop` → `main` | **Create a merge commit** | Keeps `main` a descendant of `develop` |
+
+Squashing a promotion is the one that causes damage. It creates a commit on `main` that is absent from `develop`'s history, so the two branches diverge even though their content is identical — and recovering means resolving conflicts or force-pushing a branch.
+
+The **Branch parity** Action checks this after every push to either branch and fails if they have diverged, naming the likely cause and the fix. If it goes red, fix it before doing anything else; the longer the branches stay forked, the more painful the merge.
+
 ## Release to customers
 
 Once `tutors-dev` has been checked, open a pull request **from `develop` into `main`**. Merging does not deploy. Run the **Deploy production** Action yourself and type `deploy` to confirm; it then checks the merged commit, applies migrations to `tutors_ai`, deploys `tutors`, and checks `/api/health`. Verify a real user flow after it succeeds. For an urgent fix, branch from `main`, use a pull request into `main`, then bring that fix back into `develop`.
