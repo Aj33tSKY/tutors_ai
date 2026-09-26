@@ -1,10 +1,11 @@
 name: Deploy staging
 
-# Staging deploys automatically on merge to develop — it holds only test data, so
-# it needs no gate. Production is manual; see production.yml.
+# Staging deploys automatically on every merge to main — it holds only test data,
+# so it needs no gate. Production releases the same commits, but only when a
+# human dispatches it; see production.yml.
 on:
   push:
-    branches: [develop]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -31,12 +32,12 @@ jobs:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
     steps:
-      - name: Limit staging deployments to develop
+      - name: Limit staging deployments to main
         env:
           DEPLOY_REF: ${{ github.ref }}
         run: |
-          if [ "$DEPLOY_REF" != "refs/heads/develop" ]; then
-            echo "::error::Staging can only be deployed from develop."
+          if [ "$DEPLOY_REF" != "refs/heads/main" ]; then
+            echo "::error::Staging can only be deployed from main."
             exit 1
           fi
 

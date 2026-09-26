@@ -5,36 +5,36 @@ This runbook describes how changes should move from development to production fo
 ## Recommended target workflow
 
 ```text
-feature branch → pull request → develop/staging → staging checks
-                                         ↓ reviewed promotion PR
-                                      main → production approval
-                                             migration → Vercel deploy → smoke test
+feature branch → pull request → main → migrate tutors_dev → deploy tutors-dev
+                                   │
+                                   └─ manual dispatch → migrate tutors_ai → deploy tutors → tag
 ```
 
-- `feature/*`: individual changes; pull requests run checks and migration tests.
-- `develop`: shared staging line, connected to the tutors_dev Supabase project and the separate `tutors-dev` Vercel project, with a stable staging domain.
-- `main`: production source. A GitHub Actions production job re-runs the pull-request checks against the exact commit being released, applies reviewed migrations, then deploys the app to Vercel. `vercel.ts` sets `git.deploymentEnabled` to `false` for `main` and `develop` so Vercel cannot auto-deploy either branch from Git and race ahead of its database migration; leave the matching dashboard setting off as well.
+- `feature/*`: individual changes; pull requests run checks and, when relevant, migration tests.
+- `main`: the only long-lived branch. Every merge deploys to staging automatically. Production releases the same commits, but only when a human dispatches `Deploy production` and types the confirmation, and the released commit is then tagged.
+- `vercel.ts` sets `git.deploymentEnabled` to `false` for `main`, so Vercel cannot deploy it from Git and race ahead of its migrations. Leave the matching dashboard setting off as well.
+
+A single long-lived branch is deliberate. Two of them diverge — a squashed promotion, or anything merged straight into `main`, leaves each branch holding commits the other lacks — and it also means staging inherits `main`'s branch protection rather than deploying from an unprotected branch.
 - Keep production and staging data, API keys, storage, LiveKit, and Stripe environments separate. Staging must contain only fake or anonymised data.
 
 For small schema changes, prefer additive, backward-compatible migrations. For a breaking change, use an expand/migrate/contract rollout across separate releases: add the new shape, deploy code that can work with both shapes, migrate data, then remove the old shape in a later release.
 
 ## Current state
 
-Staging is live and has been exercised end to end: a merge to `develop` applies migrations to tutors_dev, deploys `tutors-dev`, and passes its health check. A real two-person lesson has produced a correctly attributed transcript.
+Both environments release through the pipeline. A merge to `main` applies migrations to tutors_dev, deploys `tutors-dev`, and passes its health check; production has been released the same way and is live. A real two-person lesson has produced a correctly attributed transcript.
 
 | | Status |
 | --- | --- |
 | `main` | Protected: pull requests required, both CI checks required, admins included, no force pushes |
-| `develop` | **Not protected.** Anyone with write access can push straight to it |
-| Staging app | `tutors-dev` at https://tutors-dev.vercel.app — deploys automatically on merge to `develop` |
-| Production app | `tutors` at https://tutors-livid.vercel.app — **never deployed by this pipeline yet** |
+| Staging app | `tutors-dev` at https://tutors-dev.vercel.app — deploys automatically on merge to `main` |
+| Production app | `tutors` at https://tutors-livid.vercel.app — released by manual dispatch, tagged `production-<date>-<run>` |
 | tutors_dev database | Reconciled, baseline `20260924143844`, all 12 migrations applied |
 | Production database | History matches the repository; `PRODUCTION_MIGRATIONS_BASELINED` deliberately still unset |
 | Secrets / variables | All four secrets and ten variables set at repository level |
 
 Two things are configured deliberately and should not be "fixed":
 
-- **`tutors-dev` has no Git connection.** Deployments come from GitHub Actions, and `vercel.ts` disables Git deployment of `main` and `develop` anyway, so connecting it would only add duplicate preview builds needing their own variables.
+- **`tutors-dev` has no Git connection.** Deployments come from GitHub Actions, and `vercel.ts` disables Git deployment of `main` anyway, so connecting it would only add duplicate preview builds needing their own variables.
 - **`PRODUCTION_MIGRATIONS_BASELINED` is unset**, so production releases fail closed. Setting it is the deliberate act of confirming production's history — see the production release steps.
 
 Local `.env.local` points at tutors_dev. Never copy its values into production. The project uses imperative SQL migrations under `supabase/migrations/`; there is no declarative `supabase/schemas/` workflow.
@@ -55,9 +55,9 @@ The method generalises: dump both schemas and diff them, fix only what is genuin
 
 1. Keep the existing `tutors` Vercel project for production, with `main` as its Production Branch.
 2. The second Vercel project, `tutors-dev`, exists and is configured: staging variables set, stable domain `tutors-dev.vercel.app`. It has **no Git connection on purpose** — Actions deploys it with `vercel deploy --prod --project`, so a Git connection would only add duplicate previews. Its framework preset comes from `vercel.ts`, not the dashboard.
-3. Set `develop` as the staging project's Production Branch. In that project, its **Production** environment variables must point only to tutors_dev and staging services. “Production” here means the live deployment slot of the staging Vercel project; it must not contain production credentials.
-4. Assign a stable domain to the staging project's `develop` branch, such as `staging.<your-domain>`. The project's stable `.vercel.app` domain can be used if you do not have a custom domain. Configure tutors_dev Auth redirect/site URLs to allow this staging domain.
-5. For migration-before-deploy ordering, GitHub Actions applies staging migrations and then deploys to the staging project's production slot with Vercel CLI (`vercel deploy --prod --project <staging-project-id>`). Automatic Git deployment of `main` and `develop` is already disabled in `vercel.ts` for every project built from this repository, so Vercel cannot race ahead of migration jobs; confirm the dashboard agrees. Keep PR checks and ephemeral previews separate; if enabled, their Preview variables must never point to production.
+3. The staging project's **Production** environment variables must point only to tutors_dev and staging services. “Production” here means the live deployment slot of the staging Vercel project; it must not contain production credentials. Its Production Branch setting is moot, since Actions deploys it explicitly and Git deployment is disabled.
+4. Assign a stable domain to the staging project, such as `staging.<your-domain>`. The project's stable `.vercel.app` domain can be used if you do not have a custom domain. Configure tutors_dev Auth redirect/site URLs to allow this staging domain.
+5. For migration-before-deploy ordering, GitHub Actions applies staging migrations and then deploys to the staging project's production slot with Vercel CLI (`vercel deploy --prod --project <staging-project-id>`). Automatic Git deployment of `main` is already disabled in `vercel.ts` for every project built from this repository, so Vercel cannot race ahead of migration jobs; confirm the dashboard agrees. Keep PR checks and ephemeral previews separate; if enabled, their Preview variables must never point to production.
 6. Keep the production project's variables scoped to Production. The staging project should have its own copies of every required variable, populated with tutors_dev, staging LiveKit, Stripe test-mode, and staging Storage values.
 7. Use separate LiveKit credentials/webhooks and Stripe test-mode credentials for staging. Point the staging LiveKit webhook at the stable staging domain. Never put server secrets in `NEXT_PUBLIC_*` variables.
 
@@ -69,7 +69,7 @@ See [Vercel projects](https://vercel.com/docs/projects), [Git deployments and pr
 
 The approval gate is replaced by making production deployment manual: `production.yml` has no `push` trigger and runs only from `workflow_dispatch`, where the operator must type `deploy` to confirm. For a single maintainer this is equivalent protection with less machinery — an approval gate only adds real safety when the approver is not the author. Revisit Environments when a second person joins.
 
-1. Protect both `develop` and `main`: require pull requests, passing CI checks, and no force-pushes. Branch protection works on private Free-plan repositories.
+1. Protect `main`: require pull requests, passing CI checks, and no force-pushes. Because staging deploys from `main` too, that protection covers both environments. Branch protection works on private Free-plan repositories.
 2. Add secrets and variables at repository level (Settings → Secrets and variables → Actions).
 
 Secrets — sensitive, write-only, masked in logs:
@@ -108,7 +108,7 @@ Keep workflow definitions in `.github/workflows/`. The Supabase CLI is pinned as
 
 ### Pull request checks
 
-Run on pull requests to `develop` and `main`:
+Run on pull requests to `main`:
 
 1. Install the locked Node dependencies.
 2. Run lint, Next.js route type generation, typecheck and production build. There is still no app-level test script; database authorisation is covered separately below.
@@ -134,14 +134,14 @@ Anything unscopeable — a force push, a new branch, an unrecognised event — v
 
 ### Staging release
 
-On merge to `develop`:
+On merge to `main`:
 
 1. Re-run the full CI suite against the commit being released.
 2. Confirm the baseline flags and required credentials before touching tutors_dev.
 4. Run a migration dry-run against tutors_dev and stop if unexpected migrations appear.
 5. Apply only pending migrations to tutors_dev.
 6. Report any remaining schema drift (`supabase db diff --linked`) as a warning — at that point migrations are applied, so a diff means something changed tutors_dev outside this pipeline. tutors_dev has taken direct SQL fixes before, so expect this to fire until it is reconciled.
-7. Deploy the app to the `tutors-dev` Vercel project's Production slot using that project's ID. Its stable domain should continue to track the latest successful `develop` deployment.
+7. Deploy the app to the `tutors-dev` Vercel project's Production slot using that project's ID. Its stable domain tracks the latest successful staging deployment.
 8. Poll `/api/health` on the new deployment to confirm it boots with staging variables and can reach tutors_dev.
 9. Run staging smoke tests by hand: sign-in, create/reschedule/cancel a session, join/leave, recording and transcript playback, DM upload, and invoice workflow as applicable.
 
@@ -188,7 +188,6 @@ These are deliberate and unresolved, not oversights. Read them before trusting a
 - **No application test suite.** There is no app `test` script, so nothing asserts UI or route-handler behaviour. Database authorisation *is* covered (see below), but the Next.js layer is not.
 - **The smoke check proves reachability, not correctness.** It confirms the build boots with real variables and can reach its database. If Vercel Deployment Protection intercepts the request with HTTP 401/403, the check fails. Set `PRODUCTION_URL`/`STAGING_URL` to a reachable stable domain or add an authenticated protection bypass.
 - **Staging shares one LiveKit project with production.** `kindling` serves both, so they share API keys, and a key that can mint tokens for any room in that project can join a live lesson. Splitting it into a second project is the largest outstanding isolation gap.
-- **`develop` has no branch protection**, so a migration can reach staging without review. Staging validating migrations on every push that touches them is what covers this.
 - **`STRIPE_WEBHOOK_SECRET` is not set on `tutors-dev`**, so Stripe webhooks fail on staging until a test-mode endpoint is created for the staging domain.
 - **Production has never been deployed by this pipeline.** Its first release applies every pending migration and puts `/api/health` live for the first time; until then that endpoint 404s there.
 - **`supabase db diff --linked` reports drift after the push, not before.** Before the push it would flag every pending migration as a difference. This means out-of-band schema edits are surfaced in the release log rather than blocking the release.
@@ -255,7 +254,7 @@ Use separate resources/secrets per environment. Never copy production recordings
 
 - Decide whether tutors_dev test data may be deleted; approve any reset/rebuild or a preservation/baselining strategy.
 - Create or rotate Supabase, GitHub, Vercel, LiveKit, Stripe, and SMTP credentials; enter secrets in the appropriate dashboards.
-- Create the `develop` branch and finish configuring the `tutors-dev` Vercel project; set GitHub branch protection, environment reviewers and baseline variables, Vercel project IDs/domains/environment variables, and provider webhooks in their accounts (or explicitly authorize account changes if tools support them).
+- Configure the Vercel projects, GitHub branch protection, baseline variables, project IDs, domains, environment variables and provider webhooks in their accounts (or explicitly authorise account changes if tools support them).
 - Decide and perform the tutors_dev baseline/rebuild after a backup; only then set `STAGING_MIGRATIONS_BASELINED=true` and its verified `SUPABASE_BASELINE_VERSION`. Production's currently observed baseline is `20260924184118`; re-check it before setting `PRODUCTION_MIGRATIONS_BASELINED=true`.
 - Approve production releases and verify user-facing production behavior.
 - Decide business-sensitive retention, billing, access, and rollback policies.
@@ -269,11 +268,10 @@ Staging is done. These remain before production can be released:
 1. **Create a second LiveKit project** for production, move its URL, key and secret into the production Vercel project, and point each project's webhook at its own `/api/webhooks/livekit`. Until then staging and production share credentials that control live video rooms.
 2. **Add `STRIPE_WEBHOOK_SECRET` to `tutors-dev`** from a Stripe test-mode endpoint for the staging domain.
 3. **Re-check production's migration history** against the repository, then set `PRODUCTION_MIGRATIONS_BASELINED=true`. Its observed baseline is `20260924184118`; confirm it rather than trusting that number.
-4. **Confirm a production backup exists**, then open a promotion pull request from `develop` into `main`.
+4. **Confirm a production backup exists** before a release that applies migrations.
 5. **Release manually**: `gh workflow run "Deploy production" --ref main -f confirm=deploy`. Exercise it on a small additive migration before relying on it for a risky one.
 
 Worth considering rather than required:
 
-- Branch protection on `develop`, once more than one person commits.
 - An app-level test suite; database authorisation is covered but the Next.js layer is not.
-- `actionlint` in CI. Two workflow-level breakages have reached `develop` because nothing validates the deploy workflows until they run.
+- Richer application test coverage; database authorisation is covered but the Next.js layer is not.

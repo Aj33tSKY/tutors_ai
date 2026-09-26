@@ -1,14 +1,10 @@
 version: 2
-# Every update targets develop, not the default branch. A dependency change that
-# lands on main first bypasses staging entirely, and — because releases are
-# squashed onto main — it also leaves main and develop diverged.
 updates:
   # Actions are SHA-pinned in the workflows; Dependabot rewrites the pin and its
   # trailing version comment together. It does not touch versions embedded in
   # `run:` strings (the Vercel CLI) — bump those by hand.
   - package-ecosystem: github-actions
     directory: /
-    target-branch: develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
@@ -18,7 +14,6 @@ updates:
 
   - package-ecosystem: npm
     directory: /
-    target-branch: develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 5

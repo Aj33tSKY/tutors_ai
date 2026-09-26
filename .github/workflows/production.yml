@@ -101,6 +101,10 @@ jobs:
     needs: [preflight, verify]
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      # Writes the release tag at the end. Job-level permissions replace the
+      # workflow-level grant, so this job gets contents and nothing else.
+      contents: write
     env:
       # Secrets are repo-level and prefixed per environment, because
       # environment-scoped secrets are ignored on private Free-plan repositories.
@@ -172,6 +176,24 @@ jobs:
           # deployment URL, which Deployment Protection may gate.
           HEALTH_BASE_URL: ${{ vars.PRODUCTION_URL || steps.deploy.outputs.url }}
         run: bash scripts/ci/smoke-check-deployment.sh "$HEALTH_BASE_URL"
+
+      - name: Record what was released
+        # Production ships whatever main was at the moment of dispatch, so
+        # nothing else records which commit went live. This tag is what makes
+        # "what was running at the time?" answerable during an incident. It runs
+        # after the smoke check, so a tag always marks a verified release.
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="production-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          if gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+               -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null 2>&1; then
+            echo "Tagged $GITHUB_SHA as $tag"
+            echo "Released \`$tag\` — $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            # The release itself already succeeded; losing the tag must not fail it.
+            echo "::warning::Could not create the tag $tag. The release succeeded regardless."
+          fi
 
       - name: Explain how to recover
         if: failure() && steps.migrate.outcome == 'success'

@@ -11,7 +11,6 @@ export const config: VercelConfig = {
   git: {
     deploymentEnabled: {
       main: false,
-      develop: false,
     },
   },
   crons: [
