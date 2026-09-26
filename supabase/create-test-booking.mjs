@@ -39,7 +39,7 @@ if (!student) {
 
 const { data: tutor } = await supabase
   .from("tutor_profiles")
-  .select("id, subjects, boards")
+  .select("id, subjects, boards, hourly_rate")
   .limit(1)
   .single();
 
@@ -59,6 +59,9 @@ const { data: booking, error } = await supabase
     end_time: end.toISOString(),
     status: "scheduled",
     payment_status: "paid",
+    // Without a price the session shows a Send invoice button that can never
+    // work, because sendSessionInvoiceAction requires amount_gbp_pence.
+    amount_gbp_pence: tutor.hourly_rate,
   })
   .select()
   .single();

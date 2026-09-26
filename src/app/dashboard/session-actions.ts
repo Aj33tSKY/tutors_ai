@@ -219,19 +219,35 @@ export async function cancelSessionAction(
 
 const PLATFORM_FEE_RATE = 0.15;
 
-export async function sendSessionInvoiceAction(formData: FormData) {
+export type SendSessionInvoiceActionState = { error?: string; success?: boolean };
+
+export async function sendSessionInvoiceAction(
+  _previous: SendSessionInvoiceActionState,
+  formData: FormData,
+): Promise<SendSessionInvoiceActionState> {
   const bookingId = z.string().uuid().safeParse(formData.get("booking_id"));
-  if (!bookingId.success || !process.env.STRIPE_SECRET_KEY) return;
+  if (!bookingId.success) return { error: "We couldn’t identify that session." };
+  if (!process.env.STRIPE_SECRET_KEY) return { error: "Invoicing is not configured for this environment." };
+
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
+  if (!user) return { error: "Please sign in again before sending an invoice." };
+
   const { data: booking } = await supabase.from("bookings").select("*").eq("id", bookingId.data).maybeSingle<Booking>();
-  if (!booking || booking.tutor_id !== user.id || booking.status !== "completed" || booking.is_trial || booking.stripe_invoice_id || !booking.amount_gbp_pence) return;
+  // Each condition gets its own message. Collapsing them into one silent return
+  // made a button that could never work look like a button that was broken.
+  if (!booking || booking.tutor_id !== user.id) return { error: "That session is not yours to invoice." };
+  if (booking.status !== "completed") return { error: "Mark the session complete before invoicing it." };
+  if (booking.is_trial) return { error: "This session was a free trial, so there is nothing to invoice." };
+  if (booking.stripe_invoice_id) return { error: "An invoice has already been sent for this session." };
+  if (!booking.amount_gbp_pence) {
+    return { error: "This session has no price recorded, so it cannot be invoiced. Set the tutor's hourly rate and rebook, or invoice the student directly." };
+  }
   const [{ data: student }, { data: tutor }] = await Promise.all([
     supabase.from("profiles").select("id, full_name, email, stripe_customer_id, auto_charge_enabled").eq("id", booking.student_id).maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "stripe_customer_id" | "auto_charge_enabled">>(),
     supabase.from("tutor_profiles").select("id, stripe_account_id").eq("id", booking.tutor_id).maybeSingle<Pick<TutorProfile, "id" | "stripe_account_id">>(),
   ]);
-  if (!student) return;
+  if (!student) return { error: "We couldn’t find the student for this session." };
   const stripe = getStripe();
   let customerId = student.stripe_customer_id ?? null;
   if (!customerId) {
@@ -268,7 +284,13 @@ export async function sendSessionInvoiceAction(formData: FormData) {
   await stripe.invoiceItems.create({ customer: customerId, invoice: invoice.id, currency: "gbp", amount: booking.amount_gbp_pence, description: `${subjectLabel(booking.subject)} lesson · ${new Date(booking.start_time).toLocaleDateString("en-GB")}`, metadata: { booking_id: booking.id } });
   const finalized = await stripe.invoices.finalizeInvoice(invoice.id);
   const sent = await stripe.invoices.sendInvoice(finalized.id);
-  await supabase.from("bookings").update({ stripe_invoice_id: sent.id, stripe_invoice_url: sent.hosted_invoice_url, invoice_sent_at: new Date().toISOString(), payment_status: "pending" }).eq("id", booking.id);
+  const { error: saveError } = await supabase.from("bookings").update({ stripe_invoice_id: sent.id, stripe_invoice_url: sent.hosted_invoice_url, invoice_sent_at: new Date().toISOString(), payment_status: "pending" }).eq("id", booking.id);
+  if (saveError) {
+    // The invoice is already with the student, so do not imply it failed.
+    console.error(`Invoice ${sent.id} sent but not recorded on booking ${booking.id}:`, saveError.message);
+    return { error: "The invoice was sent, but we could not record it against this session. Refresh before sending another." };
+  }
   revalidatePath("/dashboard/tutor");
   revalidatePath("/dashboard/student");
+  return { success: true };
 }

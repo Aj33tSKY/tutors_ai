@@ -30,6 +30,10 @@ export async function scheduleLessonRequestAction(requestId: string, formData: F
   const lessonName = String(formData.get("lesson_name")).trim().slice(0, 120) || null;
   if (Number.isNaN(start.getTime()) || start <= new Date()) redirect(`/dashboard/tutor/requests/${requestId}?error=time`);
   const { data: tutor } = await supabase.from("tutor_profiles").select("hourly_rate").eq("id", request.tutor_id).maybeSingle();
+  // Falling back to null here created bookings that could never be invoiced —
+  // the Send invoice button appeared and did nothing. The database now rejects
+  // them outright, so say what is wrong instead of failing on a constraint.
+  if (!tutor?.hourly_rate) redirect(`/dashboard/tutor/requests/${requestId}?error=rate`);
 
   // Each proposed session occupies one hour, weekly from the chosen start.
   const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -74,7 +78,7 @@ export async function scheduleLessonRequestAction(requestId: string, formData: F
       end_time: sessionEnd.toISOString(),
       status: "scheduled",
       payment_status: request.is_trial && index === 0 ? "paid" : "pending",
-      amount_gbp_pence: tutor?.hourly_rate ?? null,
+      amount_gbp_pence: tutor.hourly_rate,
       lesson_name: lessonName,
       lesson_request_id: request.id,
       is_trial: request.is_trial && index === 0,
