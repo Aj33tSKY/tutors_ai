@@ -244,7 +244,7 @@ export async function sendSessionInvoiceAction(
     return { error: "This session has no price recorded, so it cannot be invoiced. Set the tutor's hourly rate and rebook, or invoice the student directly." };
   }
   const [{ data: student }, { data: tutor }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email, stripe_customer_id").eq("id", booking.student_id).maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "stripe_customer_id">>(),
+    supabase.from("profiles").select("id, full_name, email, stripe_customer_id, auto_charge_enabled").eq("id", booking.student_id).maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "stripe_customer_id" | "auto_charge_enabled">>(),
     supabase.from("tutor_profiles").select("id, stripe_account_id").eq("id", booking.tutor_id).maybeSingle<Pick<TutorProfile, "id" | "stripe_account_id">>(),
   ]);
   if (!student) return { error: "We couldn’t find the student for this session." };
@@ -260,11 +260,23 @@ export async function sendSessionInvoiceAction(
     const account = await stripe.v2.core.accounts.retrieve(tutor.stripe_account_id, { include: ["configuration.recipient"] });
     payoutReady = account.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers?.status === "active";
   }
+  // Charge automatically only when the student opted in *and* Stripe still holds
+  // a default payment method for them. Trusting the flag alone would promise
+  // automatic payment and silently not collect.
+  let chargeAutomatically = false;
+  if (student.auto_charge_enabled) {
+    const customer = await stripe.customers.retrieve(customerId);
+    chargeAutomatically = Boolean(!customer.deleted && customer.invoice_settings?.default_payment_method);
+  }
+
   const invoice = await stripe.invoices.create({
     customer: customerId,
-    collection_method: "send_invoice",
-    days_until_due: 7,
-    auto_advance: false,
+    // send_invoice emails a link and waits. charge_automatically attempts the
+    // saved method as soon as the invoice finalizes, which needs auto_advance so
+    // Stripe progresses it rather than leaving it draft.
+    ...(chargeAutomatically
+      ? { collection_method: "charge_automatically" as const, auto_advance: true }
+      : { collection_method: "send_invoice" as const, days_until_due: 7, auto_advance: false }),
     description: `${subjectLabel(booking.subject)} lesson`,
     metadata: { booking_id: booking.id },
     ...(payoutReady ? { transfer_data: { destination: tutor!.stripe_account_id! }, application_fee_amount: Math.round(booking.amount_gbp_pence * PLATFORM_FEE_RATE) } : {}),

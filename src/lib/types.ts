@@ -21,6 +21,7 @@ export interface Profile {
   avatar_url: string | null;
   created_at: string;
   stripe_customer_id?: string | null;
+  auto_charge_enabled?: boolean;
 }
 
 export interface TutorProfile {
