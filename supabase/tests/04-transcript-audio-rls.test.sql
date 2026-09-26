@@ -22,11 +22,11 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('aaaaaaaa-0000-0000-0000-000000000001', 'student@test.local', '{"role":"student","full_name":"Student"}'),
   ('bbbbbbbb-0000-0000-0000-000000000002', 'tutor@test.local',   '{"role":"tutor","full_name":"Tutor"}');
 
-insert into public.bookings (id, student_id, tutor_id, subject, exam_board, start_time, end_time)
+insert into public.bookings (id, student_id, tutor_id, subject, exam_board, start_time, end_time, amount_gbp_pence)
 values ('0000000a-0000-0000-0000-00000000000a',
         'aaaaaaaa-0000-0000-0000-000000000001',
         'bbbbbbbb-0000-0000-0000-000000000002',
-        'Mathematics', 'AQA', now(), now() + interval '1 hour');
+        'Mathematics', 'AQA', now(), now() + interval '1 hour', 4200);
 
 insert into public.session_transcript_audio
   (booking_id, participant_identity, role, track_sid, storage_path, status)

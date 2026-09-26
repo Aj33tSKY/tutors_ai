@@ -25,11 +25,11 @@ insert into public.student_profiles (id, parent_id)
 values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000003')
 on conflict (id) do update set parent_id = excluded.parent_id;
 
-insert into public.bookings (id, student_id, tutor_id, subject, exam_board, start_time, end_time)
+insert into public.bookings (id, student_id, tutor_id, subject, exam_board, start_time, end_time, amount_gbp_pence)
 values ('0000000a-0000-0000-0000-00000000000a',
         'aaaaaaaa-0000-0000-0000-000000000001',
         'bbbbbbbb-0000-0000-0000-000000000002',
-        'Mathematics', 'AQA', now(), now() + interval '1 hour');
+        'Mathematics', 'AQA', now(), now() + interval '1 hour', 4200);
 
 insert into public.session_recordings (booking_id, storage_path, status)
 values ('0000000a-0000-0000-0000-00000000000a',

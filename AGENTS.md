@@ -13,6 +13,8 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - [docs/development-workflow.md](docs/development-workflow.md) — which branch to start from, how to open a pull request, how to write a migration. Read this first.
 - [docs/CI-CD.md](docs/CI-CD.md) — the pipeline itself, environment configuration, and what is still outstanding.
 - [docs/transcription.md](docs/transcription.md) — how session transcripts are produced.
+- [docs/testing-plan.md](docs/testing-plan.md) — proposed application and database upgrade coverage, repeatable fixtures, and defects found during design.
+- [docs/backlog.md](docs/backlog.md) — known work deliberately not done yet, and why.
 - [docs/mvp_plan.md](docs/mvp_plan.md) — product scope.
 
 ## Things that have already caught someone out
