@@ -31,6 +31,8 @@ Both environments release through the pipeline. A merge to `main` applies migrat
 | tutors_dev database | Reconciled, baseline `20260924143844`, all 12 migrations applied |
 | Production database | History matches the repository; `PRODUCTION_MIGRATIONS_BASELINED` deliberately still unset |
 | Secrets / variables | All four secrets and ten variables set at repository level |
+| Stripe | `acct_1UJIY5LiD2YF2ndY` ("New business"), **test mode only** — both projects use it, with a separate webhook secret each |
+| LiveKit | One project, `kindling`, shared by every environment — see the go-live checklist |
 
 Two things are configured deliberately and should not be "fixed":
 
@@ -202,6 +204,50 @@ The manifest check matters more than it looks. A manifest nobody verifies drifts
 
 The parity check reads **names only**. Values are meant to differ and are never fetched, so nothing secret passes through it. A required name missing from either project fails the release. A name present in one project and not the other is a warning, since a genuinely environment-specific extra is legitimate; optional variables never warn.
 
+## Before taking real payments
+
+Everything below is deliberately deferred. Each is safe to leave while the platform has no real students, and each becomes a live problem the day it does. Work through this before the first paying user, not after.
+
+### Stripe
+
+The account is `acct_1UJIY5LiD2YF2ndY` ("New business"), reachable at `https://dashboard.stripe.com/acct_1UJIY5LiD2YF2ndY`. It is **test mode only** — the business is not yet verified, so no charge has ever been real.
+
+- [ ] Verify the business, which is what unlocks live mode.
+- [ ] Create live-mode keys and set `STRIPE_SECRET_KEY` on `tutors` only. Staging stays in test mode permanently.
+- [ ] Create a **live-mode** webhook endpoint for `https://tutors-livid.vercel.app/api/webhooks/stripe` and set its `STRIPE_WEBHOOK_SECRET` on `tutors`. Test-mode and live-mode endpoints are separate objects with separate secrets; the test one keeps working and keeps being irrelevant.
+- [ ] Switch to a **restricted key** (`rk_`) rather than a secret key. It needs write on Customers, Invoices, Invoice Items and Connected accounts, and nothing else. Deferred until now because the blast radius of a leaked test key is nil.
+- [ ] Confirm a real invoice reaches `paid`, end to end, before announcing anything.
+
+The failure this guards against is quiet: production running test keys accepts invoices, sends payment links and **charges nobody**, with no error anywhere.
+
+### LiveKit
+
+One project, `kindling`, currently serves local development, staging and production.
+
+- [ ] Create a second LiveKit project so production has its own credentials.
+- [ ] Point each environment's `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `NEXT_PUBLIC_LIVEKIT_URL` at its own project, and give each its own webhook pointing at that environment's `/api/webhooks/livekit`.
+
+A LiveKit API key can mint an access token for **any room in its project**. While one project serves both, anyone holding staging's credentials can join a live production lesson between a tutor and a child. That is the most serious outstanding gap, and it is about ten minutes of work.
+
+### Supabase Auth
+
+- [ ] Set each project's Site URL and redirect allow-list. tutors_dev had neither, so confirmation and password-reset links fell back to `localhost`. Check production has them too, or real users' confirmation emails point at a dead link.
+
+### Data protection
+
+Students are UK secondary-school pupils, so many are minors, and sessions are recorded and transcribed.
+
+- [ ] Establish the lawful basis for recording and transcription, and whether consent is the right one. Consent can be withdrawn, which reintroduces the conditional path the pipeline currently assumes away.
+- [ ] A DPIA is likely mandatory: children's data plus systematic monitoring.
+- [ ] Review who consents. The tutor currently ticks the recording box; the data subject is the student and their parent.
+
+This is a decision for someone qualified, not an engineering task, but it gates launch rather than following it.
+
+### Process
+
+- [ ] Require at least one approving review on `main` once a second person can merge. It is currently zero, because you cannot approve your own pull request.
+- [ ] Consider restricting the repository to merge commits only at the same point, when discipline stops being something one person can hold.
+
 ## Known gaps
 
 These are deliberate and unresolved, not oversights. Read them before trusting a green pipeline.
@@ -215,6 +261,7 @@ These are deliberate and unresolved, not oversights. Read them before trusting a
 
 ## Database authorisation tests
 
+The proposed application smoke and populated database upgrade suites are designed in [testing-plan.md](testing-plan.md). That document is a plan, not a statement of implemented coverage; it also records source-review findings that need regression tests.
 
 RLS is this app's security boundary, so it is tested with pgTAP under `supabase/tests/`. CI runs the suite on a clean database on every pull request and before every release, after migrations have been applied and the schema linted.
 
