@@ -21,12 +21,12 @@ on conflict (id) do update set parent_id = excluded.parent_id;
 insert into public.student_profiles (id) values ('dddddddd-0000-0000-0000-000000000004')
 on conflict (id) do nothing;
 
-insert into public.bookings (id, student_id, tutor_id, subject, exam_board, start_time, end_time)
+insert into public.bookings (id, student_id, tutor_id, subject, exam_board, start_time, end_time, amount_gbp_pence)
 values (
   '0000000a-0000-0000-0000-00000000000a',
   'aaaaaaaa-0000-0000-0000-000000000001',
   'bbbbbbbb-0000-0000-0000-000000000002',
-  'Mathematics', 'AQA', now(), now() + interval '1 hour'
+  'Mathematics', 'AQA', now(), now() + interval '1 hour', 4200
 );
 
 create or replace function pg_temp.act_as(user_id uuid) returns void language plpgsql as $$
@@ -61,18 +61,18 @@ select is((select count(*) from public.bookings)::int, 0, 'an unrelated student 
 
 -- Writes
 select throws_ok(
-  $$ insert into public.bookings (student_id, tutor_id, subject, exam_board, start_time, end_time)
+  $$ insert into public.bookings (student_id, tutor_id, subject, exam_board, start_time, end_time, amount_gbp_pence)
      values ('aaaaaaaa-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002',
-             'Physics', 'AQA', now(), now() + interval '1 hour') $$,
+             'Physics', 'AQA', now(), now() + interval '1 hour', 4200) $$,
   '42501',
   null,
   'a stranger cannot book a lesson in another student''s name'
 );
 
 select lives_ok(
-  $$ insert into public.bookings (student_id, tutor_id, subject, exam_board, start_time, end_time)
+  $$ insert into public.bookings (student_id, tutor_id, subject, exam_board, start_time, end_time, amount_gbp_pence)
      values ('dddddddd-0000-0000-0000-000000000004', 'bbbbbbbb-0000-0000-0000-000000000002',
-             'Physics', 'AQA', now(), now() + interval '1 hour') $$,
+             'Physics', 'AQA', now(), now() + interval '1 hour', 4200) $$,
   'a student can book a lesson for themselves'
 );
 
