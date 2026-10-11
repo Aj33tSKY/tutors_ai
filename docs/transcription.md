@@ -1,36 +1,34 @@
 # Session transcription
 
-Transcripts are produced **after** a lesson, from short-lived audio recorded during it. There is no always-on service involved.
+Transcripts are produced **after** a lesson, from the same recording a student can play back. There is no always-on service involved, and there is no separate video recording — audio only.
 
 ```text
-tutor joins ──► track_published (per microphone) ──► audio-only track egress
-                                                          │
+tutor joins ──► one stereo Egress job for the whole call
+                   (tutor's track → left channel, student's → right)
 tutor leaves ──► egress stopped ──► egress_ended ──► status: ready
                                                           │
                      transcribe-sessions cron (every 5 min)
                                                           │
-          Deepgram prerecorded ──► interleave ──► session_analytics.full_transcript
+          Deepgram prerecorded, multichannel ──► session_analytics.full_transcript
                                                           │
-                                              audio deleted immediately
+                                   recording is kept — it is the playable one
 ```
 
 ## Why it is built this way
 
-**One egress per microphone track, not one per room.** Each file contains exactly one speaker, so attribution is a property of *which file* the words came from. The alternative — a single mixed file plus acoustic diarization — guesses at who spoke, and guesses wrong when people talk over each other. Lessons are full of that.
+**One Egress job per call, not two or three.** The previous design recorded one audio-only Egress per participant microphone track, purely to feed Deepgram, separate from the consented video recording — 2-3 concurrent Egress jobs per live call. LiveKit's `MediaSource`/`AudioConfig`/`AudioRoute` routes each participant's track to its own channel within a *single* file instead, so concurrent-Egress usage scales with concurrent calls, not a multiple of it.
 
-**Audio only, never video.** A transcript needs no pixels. Audio-only egress is cheaper to produce and to store, and it keeps this pipeline entirely separate from the consented video recording.
+**Channel, not diarization, decides who spoke.** `AudioRoute` matches by `participant_identity`, so the tutor's audio always lands on the left channel and the student's on the right regardless of join order. Deepgram's `multichannel` option transcribes each channel independently — attribution is a property of which channel the words came from, not a guess. (`diarize` is deliberately not combined with `multichannel` here: each channel already has exactly one speaker, and diarizing it too would just relabel that one speaker "0" on both sides.)
 
-**Deleted as soon as it is used.** These files are a processing buffer. The cron deletes them the moment the transcript is written, and `pruneExpiredAudio` removes anything older than 24 hours regardless of what went wrong. Nothing accumulates.
+**Audio only, never video.** A transcript needs no pixels, and dropping video recording removes an entire egress type (`RoomCompositeEgress`, backed by a headless-Chrome render — the heaviest and most failure-prone of LiveKit's Egress types) along with its cost.
+
+**The recording is not a processing buffer — it is kept.** Earlier versions of this pipeline (and an even earlier always-on LiveKit Agent before that) treated the audio as disposable: transcribe it, then delete it. This version's consent flow is the same one that used to gate a video recording, and a student expects to be able to replay what they consented to — so the file is kept for the same 90-day window the video recording used to use (`prune-session-recordings`, unchanged), not deleted the moment a transcript is written.
 
 **Batch, not live.** Nothing displays a transcript during a lesson — it is read afterwards by the summariser, the parent dashboard and the transcript-grounded chat. Prerecorded transcription is cheaper than streaming, and it is retryable: a failed transcription can run again against the same file, where a crashed live agent lost that lesson's transcript permanently.
 
 ## How the timeline is reconstructed
 
-Each track's file starts when that track was published, which is not when the lesson started — a student joining thirty seconds after their tutor produces a file that begins thirty seconds late.
-
-Every segment therefore records `started_at`, and `transcribeBooking` measures each one against the earliest start in that session. Deepgram returns utterance timestamps relative to each file, and adding that per-file offset puts every speaker on one shared timeline before the turns are sorted and merged.
-
-Getting this wrong does not throw — it silently produces a transcript where one person appears to say everything first. `src/lib/transcription.ts`'s `formatTranscript` is pure and unit-testable precisely so this can be checked without a real call.
+It mostly isn't anymore, which is the point of one file over several. Deepgram's `utterances` already come back in one chronological order across both channels of a single file, so `formatTranscript` just sorts by each utterance's own `start` time and merges consecutive same-channel lines into turns — no per-file offset math, because there is no second file to offset against.
 
 ## Output format
 
@@ -45,21 +43,14 @@ This format is a contract. `talkRatio` and `consolidateTranscriptTurns` in `src/
 
 ## Failure handling
 
-- Each attempt increments `transcribe_attempts`; after 3 the segments are marked `failed` and their audio is deleted rather than retried forever.
-- A session with any segment still `starting` or `active` is skipped — a lesson in progress is never transcribed halfway.
-- A two-minute settle window after the last segment ends lets a reconnecting tutor publish a new track before transcription runs.
-- A tutor who leaves and rejoins produces new tracks. Their transcript is **appended**, matching the rule that leaving a room is not the same as completing a lesson.
+- `session_recordings.transcribe_attempts` increments on each attempt; after `MAX_TRANSCRIBE_ATTEMPTS` (3, exported from `src/lib/transcription.ts`) the cron stops retrying that segment. The recording itself is left alone either way — it is the user's playable file, not disposable.
+- A tutor who leaves and rejoins produces a new recording segment with its own full lifecycle (its own `egress_id`, its own `ready`/`failed` status) — each one is transcribed independently and **appended** to `session_analytics.full_transcript`, matching the rule that leaving a room is not the same as completing a lesson.
+- The webhook's `stopStrayEgress` lists and stops any Egress already active for a room before starting a new one. Added after staging testing showed more Egress jobs running than this webhook had ever requested — the exact source was never conclusively identified, so this makes it structurally impossible for our own code to leave more than one job per room running regardless of cause.
 
 ## Traps
 
-Both of these produce silence rather than an error, and both have already happened.
-
-- **A `track_published` payload carries only the participant's sid, name and identity — no metadata.** The role therefore comes from the booking (`identity` against `tutor_id` / `student_id`), never from token metadata. An earlier version read metadata here, which meant every event was discarded and no session could ever produce a transcript. The webhook still returned 200 throughout.
-- **A wrong webhook path also returns 200.** Next.js answers an unknown POST path with a page, so LiveKit records a successful delivery and never retries. If no `session_transcript_audio` rows appear at all, check the configured URL includes `/api/webhooks/livekit` before suspecting the handler.
-
-## Retention
-
-Egress is told `disableManifest: true`, because it otherwise writes an `<egress-id>.json` beside every file that nothing reads. `transcribeBooking` deletes the audio as soon as the transcript is written, and `pruneExpiredAudio` removes both expired segments and anything in the bucket older than 24 hours with no row pointing at it. The intended invariant is that the bucket holds nothing but in-flight segments.
+- **A wrong webhook path returns 200.** Next.js answers an unknown POST path with a page, so LiveKit records a successful delivery and never retries. If no `session_recordings` rows appear at all, check the configured URL includes `/api/webhooks/livekit` before suspecting the handler.
+- **Token metadata is absent from some LiveKit webhook payloads.** Role (`tutor` vs `student`) is read by comparing the event's participant identity against the booking's `tutor_id`/`student_id`, never from token metadata — the booking is authoritative anyway, and unlike metadata it cannot be omitted or spoofed.
 
 ## Operational requirements
 
@@ -67,27 +58,17 @@ Egress is told `disableManifest: true`, because it otherwise writes an `<egress-
 | --- | --- |
 | `DEEPGRAM_API_KEY` | Vercel, both environments |
 | `DEEPGRAM_MODEL` | Optional override; defaults to `nova-3` |
-| LiveKit webhook → `/api/webhooks/livekit` | Signed with that environment's API key pair. All event types are delivered; `track_published` needs no enabling |
-| `session-transcript-audio` bucket | Created by migration; no manual setup |
-| `SUPABASE_STORAGE_S3_*` credentials | Already required by video recording; egress writes both buckets |
+| LiveKit webhook → `/api/webhooks/livekit` | Signed with that environment's API key pair, for `participant_joined`, `participant_left` and `egress_ended` |
+| `session-recordings` bucket | Private, provisioned per environment by hand (same bucket the old video recording used) |
+| `SUPABASE_STORAGE_S3_*` credentials | Egress writes to this bucket over Supabase Storage's S3 API |
 
-`LIVEKIT_AGENT_NAME` is no longer used by anything and can be removed from both environments.
-
-## Verified
-
-A real two-person lesson on staging produced:
-
-```
-[Tutor] Okay. Test. ... This is Priya, the tutor speaking ...
-[Student] Cool. This is the student, the demo student speaking now.
-```
-
-Correct attribution, correct interleaving, audio deleted on success, one attempt, and `talk_ratio` plus `summary_notes` generated downstream — which also confirms the summariser still parses the format.
-
-Timing, so the wait is not mistaken for a failure: the tutor left at 22:02:18 and the transcript was written at 22:05:28. Roughly **three minutes** — a two-minute settle window, then the next five-minute cron tick. The booking page distinguishes "being prepared" from "none captured" for exactly this reason.
+`LIVEKIT_AGENT_NAME` is not used by anything and can be removed from both environments.
 
 ## What this replaced
 
-A LiveKit Agent (`agent/`) that joined every room, held one Deepgram **streaming** connection per participant, and wrote the transcript on shutdown. It worked, but it was a third always-on deployable with its own Dockerfile, registry, release process and failure modes — and it streamed every participant's full audio, silence included, at streaming rates.
+Two designs came before this one:
 
-Its useful design notes live on here: per-track attribution, append-on-rejoin, and `[Tutor]`/`[Student]` formatting all came from it. Its deployment machinery did not survive, which was the point.
+1. A LiveKit Agent (`agent/`) that joined every room and held one Deepgram **streaming** connection per participant, writing the transcript on shutdown. It worked, but it was a third always-on deployable with its own Dockerfile, registry, release process and failure modes, and it streamed every participant's full audio, silence included, at streaming rates.
+2. A batch pipeline that replaced the agent but still recorded one Egress per participant microphone track, kept only as a transcription buffer and deleted immediately after use, entirely separate from the consented video recording. It was retryable and had no always-on service, which were real improvements — but it cost 2-3 concurrent Egress jobs per live call, which is what actually constrains how many lessons can run at once on a given LiveKit Cloud plan.
+
+Per-channel attribution, append-on-rejoin, `[Tutor]`/`[Student]` formatting, and the retry/attempt-count pattern all carried forward from these. What didn't survive: a second file per call, and deleting the audio once it had been transcribed.

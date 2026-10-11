@@ -2,29 +2,36 @@ import "server-only";
 
 export type SpeakerRole = "student" | "tutor";
 
-export type Utterance = {
-  /** Seconds from the start of the audio file this utterance came from. */
+export type RoleTurn = {
+  role: SpeakerRole;
+  /** Seconds from the start of the recording. */
   start: number;
   text: string;
 };
 
-export type SpeakerSegment = {
-  role: SpeakerRole;
-  /** Seconds this file started after the first file in the session. */
-  offsetSeconds: number;
-  utterances: Utterance[];
-};
-
 const DEEPGRAM_ENDPOINT = "https://api.deepgram.com/v1/listen";
 
+/** Shared between the transcribe-sessions cron and the booking review page, which needs to know when a recording has given up retrying. */
+export const MAX_TRANSCRIBE_ATTEMPTS = 3;
+
+// The LiveKit webhook's AudioRoute pins the tutor's track to the left
+// channel and the student's to the right — standard interleaved-stereo
+// convention puts the left channel at index 0, and Deepgram's multichannel
+// response numbers channels the same way.
+const TUTOR_CHANNEL = 0;
+
 /**
- * Transcribes one participant's audio with Deepgram's prerecorded API.
+ * Transcribes the booking's single stereo recording with Deepgram's
+ * prerecorded API. multichannel transcribes each channel independently, so
+ * speaker attribution comes from which channel a line is on, not acoustic
+ * diarization — diarize is deliberately not combined with multichannel here,
+ * since each channel already has exactly one speaker.
  *
- * Deepgram fetches the audio itself from a signed URL, so a full lesson's audio
- * never passes through this function — which keeps it well inside a serverless
- * function's memory and body limits.
+ * Deepgram fetches the audio itself from a signed URL, so the recording
+ * never passes through this function — which keeps it well inside a
+ * serverless function's memory and body limits.
  */
-export async function transcribeRemoteAudio(signedUrl: string): Promise<Utterance[]> {
+export async function transcribeStereoRecording(signedUrl: string): Promise<RoleTurn[]> {
   const apiKey = process.env.DEEPGRAM_API_KEY;
   if (!apiKey) throw new Error("DEEPGRAM_API_KEY is not configured");
 
@@ -34,7 +41,10 @@ export async function transcribeRemoteAudio(signedUrl: string): Promise<Utteranc
     language: "en",
     smart_format: "true",
     punctuate: "true",
-    // Utterance boundaries carry the timestamps used to interleave speakers.
+    multichannel: "true",
+    // Utterance boundaries are what let each channel's lines be merged back
+    // into turns; Deepgram returns them already in one chronological order
+    // across both channels.
     utterances: "true",
   });
 
@@ -51,7 +61,7 @@ export async function transcribeRemoteAudio(signedUrl: string): Promise<Utteranc
 
   const payload = (await response.json()) as {
     results?: {
-      utterances?: { start?: number; transcript?: string }[];
+      utterances?: { channel?: number; start?: number; transcript?: string }[];
       channels?: { alternatives?: { transcript?: string }[] }[];
     };
   };
@@ -60,48 +70,46 @@ export async function transcribeRemoteAudio(signedUrl: string): Promise<Utteranc
   if (Array.isArray(utterances) && utterances.length > 0) {
     return utterances
       .map((utterance) => ({
+        role: (utterance.channel === TUTOR_CHANNEL ? "tutor" : "student") as SpeakerRole,
         start: typeof utterance.start === "number" ? utterance.start : 0,
         text: (utterance.transcript ?? "").trim(),
       }))
-      .filter((utterance) => utterance.text.length > 0);
+      .filter((turn) => turn.text.length > 0);
   }
 
-  // Deepgram omits utterances when it found no speech boundaries. Fall back to
-  // the flat transcript so a quiet participant still contributes their words.
-  const flat = payload.results?.channels?.[0]?.alternatives?.[0]?.transcript?.trim();
-  return flat ? [{ start: 0, text: flat }] : [];
+  // Deepgram omits utterances when it found no speech boundaries on a
+  // channel. Fall back to each channel's flat transcript so a quiet
+  // participant still contributes their words, just as one turn each.
+  const channels = payload.results?.channels ?? [];
+  return channels
+    .map((channel, index) => ({
+      role: (index === TUTOR_CHANNEL ? "tutor" : "student") as SpeakerRole,
+      start: 0,
+      text: channel.alternatives?.[0]?.transcript?.trim() ?? "",
+    }))
+    .filter((turn) => turn.text.length > 0);
 }
 
 /**
- * Interleaves each participant's utterances onto one timeline and renders the
- * canonical transcript format: one "[Tutor] ..." / "[Student] ..." line per turn,
- * with consecutive utterances from the same speaker merged into that turn.
+ * Renders the canonical transcript format: one "[Tutor] ..." / "[Student]
+ * ..." line per turn, with consecutive utterances from the same speaker
+ * merged into that turn.
  *
  * The format is what `talkRatio` and `consolidateTranscriptTurns` in the
  * summarize-sessions cron already parse, so it must not drift from theirs.
  */
-export function formatTranscript(segments: SpeakerSegment[]): string {
-  const lines = segments
-    .flatMap((segment) =>
-      segment.utterances.map((utterance) => ({
-        role: segment.role,
-        at: segment.offsetSeconds + utterance.start,
-        text: utterance.text,
-      })),
-    )
-    .sort((a, b) => a.at - b.at);
+export function formatTranscript(turns: RoleTurn[]): string {
+  const sorted = [...turns].sort((a, b) => a.start - b.start);
 
-  const turns: { role: SpeakerRole; text: string }[] = [];
-  for (const line of lines) {
-    const previous = turns.at(-1);
-    if (previous?.role === line.role) {
-      previous.text = `${previous.text} ${line.text}`;
+  const out: { role: SpeakerRole; text: string }[] = [];
+  for (const turn of sorted) {
+    const previous = out.at(-1);
+    if (previous?.role === turn.role) {
+      previous.text = `${previous.text} ${turn.text}`;
     } else {
-      turns.push({ role: line.role, text: line.text });
+      out.push({ role: turn.role, text: turn.text });
     }
   }
 
-  return turns
-    .map((turn) => `[${turn.role === "tutor" ? "Tutor" : "Student"}] ${turn.text}`)
-    .join("\n");
+  return out.map((turn) => `[${turn.role === "tutor" ? "Tutor" : "Student"}] ${turn.text}`).join("\n");
 }

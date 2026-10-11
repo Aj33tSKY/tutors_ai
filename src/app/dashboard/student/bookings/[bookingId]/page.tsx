@@ -11,8 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { ReturnToDashboardLink } from "@/components/dashboard/return-to-dashboard-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { MAX_TRANSCRIBE_ATTEMPTS } from "@/lib/transcription";
 import type { Booking, SessionAnalytics, SessionRecording } from "@/lib/types";
 
 const RECORDINGS_BUCKET = "session-recordings";
@@ -43,7 +43,7 @@ export default async function StudentSessionReviewPage({
 
   const { data: recordings } = await supabase
     .from("session_recordings")
-    .select("id, booking_id, egress_id, storage_path, status, started_at, ended_at, expires_at, created_at")
+    .select("id, booking_id, egress_id, storage_path, status, started_at, ended_at, expires_at, created_at, transcribed_at, transcribe_attempts")
     .eq("booking_id", booking.id)
     .order("started_at", { ascending: true })
     .returns<SessionRecording[]>();
@@ -61,19 +61,15 @@ export default async function StudentSessionReviewPage({
     return { ...recording, url: data?.signedUrl ?? null };
   }));
 
-  // Transcript audio is deliberately unreadable by every user, including this
-  // lesson's own participants, so its status cannot be read with the caller's
-  // client. Whether transcription is still running is not sensitive though, and
-  // the booking above was already authorised under RLS, so read just the status
-  // with the service role scoped to that booking.
-  const { data: transcriptAudio } = await createAdminClient()
-    .from("session_transcript_audio")
-    .select("status")
-    .eq("booking_id", booking.id);
-  // "ready" means the audio was captured but the transcribe cron has not run yet.
-  const transcriptPending = (transcriptAudio ?? []).some((segment) =>
-    ["starting", "active", "ready"].includes(segment.status),
-  );
+  // The same recording is the transcript source, so its own rows (already
+  // authorised above under RLS) say whether transcription is still pending —
+  // still recording, or saved but not yet picked up by the transcribe cron
+  // and still within its retry budget.
+  const transcriptPending =
+    hasPendingRecordings ||
+    readyRecordings.some(
+      (recording) => !recording.transcribed_at && recording.transcribe_attempts < MAX_TRANSCRIBE_ATTEMPTS,
+    );
 
   const summary = analytics?.summary_notes;
   const startedAt = new Date(booking.start_time).toLocaleString("en-GB", {
@@ -102,7 +98,7 @@ export default async function StudentSessionReviewPage({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Video className="size-4 text-saffron" /> Session recording
+            <Video className="size-4 text-saffron" /> Session audio recording
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -111,8 +107,8 @@ export default async function StudentSessionReviewPage({
               {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
               {recordingPlayers.map((recording, index) => (
                 <div key={recording.id}>
-                  <p className="mb-2 text-sm font-medium">{recordingPlayers.length > 1 ? `Recording segment ${index + 1}` : "Session video"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
-                  {recording.url ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p>}
+                  <p className="mb-2 text-sm font-medium">{recordingPlayers.length > 1 ? `Recording segment ${index + 1}` : "Session audio"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                  {recording.url ? <audio controls preload="metadata" className="w-full"><source src={recording.url} type="audio/ogg" />Your browser does not support session audio playback.</audio> : <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p>}
                 </div>
               ))}
             </div>
@@ -120,7 +116,7 @@ export default async function StudentSessionReviewPage({
             <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
               <Play className="size-7 text-muted-foreground" />
               <p className="mt-3 font-medium">Recording is being finalized</p>
-              <p className="mt-1 max-w-md text-sm text-muted-foreground">The session video will appear here once LiveKit has finished saving it. Refresh this page shortly.</p>
+              <p className="mt-1 max-w-md text-sm text-muted-foreground">The session audio will appear here once LiveKit has finished saving it. Refresh this page shortly.</p>
             </div>
           ) : (
             <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">

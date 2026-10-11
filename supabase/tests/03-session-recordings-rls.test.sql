@@ -1,4 +1,4 @@
--- Session recordings are the most sensitive data here: video of a minor in a
+-- Session recordings are the most sensitive data here: audio of a minor in a
 -- lesson. Both the metadata row and the object in the private bucket must be
 -- readable only by that lesson's participants.
 --
@@ -33,11 +33,11 @@ values ('0000000a-0000-0000-0000-00000000000a',
 
 insert into public.session_recordings (booking_id, storage_path, status)
 values ('0000000a-0000-0000-0000-00000000000a',
-        '0000000a-0000-0000-0000-00000000000a/recording.mp4', 'ready');
+        '0000000a-0000-0000-0000-00000000000a/recording.ogg', 'ready');
 
 -- Objects are keyed by booking id, which is what the storage policy matches on.
 insert into storage.objects (bucket_id, name, owner_id) values
-  ('session-recordings', '0000000a-0000-0000-0000-00000000000a/recording.mp4',
+  ('session-recordings', '0000000a-0000-0000-0000-00000000000a/recording.ogg',
    'bbbbbbbb-0000-0000-0000-000000000002');
 
 create or replace function pg_temp.act_as(user_id uuid) returns void language plpgsql as $$
@@ -78,7 +78,7 @@ select is((select count(*) from storage.objects where bucket_id = 'session-recor
 
 select throws_ok(
   $$ insert into storage.objects (bucket_id, name, owner_id)
-     values ('session-recordings', '0000000a-0000-0000-0000-00000000000a/forged.mp4',
+     values ('session-recordings', '0000000a-0000-0000-0000-00000000000a/forged.ogg',
              'dddddddd-0000-0000-0000-000000000004') $$,
   '42501',
   null,

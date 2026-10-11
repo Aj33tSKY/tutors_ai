@@ -1,18 +1,21 @@
+// AudioConfig/AudioRoute/AudioChannel aren't re-exported by livekit-server-sdk
+// (only the older egress request types are) — import straight from the
+// protocol package it wraps.
+import { AudioChannel, AudioConfig, AudioRoute } from "@livekit/protocol";
 import {
-  DirectFileOutput,
-  EncodedFileOutput,
-  EncodedFileType,
   EgressClient,
-  RoomServiceClient,
+  EncodedFileType,
+  FileOutput,
+  MediaSource,
+  Output,
   S3Upload,
-  TrackSource,
-  TrackType,
+  StartEgressRequest,
+  StorageConfig,
   WebhookReceiver,
 } from "livekit-server-sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 const RECORDINGS_BUCKET = "session-recordings";
-const TRANSCRIPT_AUDIO_BUCKET = "session-transcript-audio";
 
 function livekitHost() {
   const url = process.env.NEXT_PUBLIC_LIVEKIT_URL;
@@ -32,12 +35,10 @@ function clients() {
   const host = livekitHost();
   return {
     egress: new EgressClient(host, key, secret),
-    rooms: new RoomServiceClient(host, key, secret),
   };
 }
 
-/** Both buckets are written by LiveKit Egress over Supabase Storage's S3 API. */
-function storageUpload(bucket: string) {
+function storageUpload() {
   const accessKey = process.env.SUPABASE_STORAGE_S3_ACCESS_KEY_ID;
   const secretKey = process.env.SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -49,109 +50,50 @@ function storageUpload(bucket: string) {
     secret: secretKey,
     endpoint: `${new URL(supabaseUrl).origin}/storage/v1/s3`,
     region: process.env.SUPABASE_STORAGE_S3_REGION || "us-east-1",
-    bucket,
+    bucket: RECORDINGS_BUCKET,
     forcePathStyle: true,
   });
 }
 
 /**
- * Starts an audio-only egress for one participant's microphone track. One file
- * per track is what gives the transcript reliable speaker attribution without
- * acoustic diarization — the same property the old in-room agent had, but
- * without an always-on service.
- *
- * These files exist only until the transcript is written; the transcribe-sessions
- * cron deletes them. They are not the consented session recording.
+ * Guards against ending up with more active Egress jobs per room than
+ * intended — observed on staging during rapid back-to-back testing. Belt and
+ * suspenders: stop anything already running for this room before starting a
+ * fresh job, so a stray or duplicate job can never pile up concurrency usage
+ * on its own, regardless of cause.
  */
-async function startTranscriptAudioEgress(
+async function stopStrayEgress(roomName: string) {
+  const { egress } = clients();
+  try {
+    const active = await egress.listEgress({ roomName, active: true });
+    await Promise.all(
+      active.map((info) =>
+        egress.stopEgress(info.egressId).catch((error) => {
+          console.warn(`Could not stop stray egress ${info.egressId} for ${roomName}:`, error);
+        }),
+      ),
+    );
+  } catch (error) {
+    console.warn(`Could not list egress for room ${roomName}:`, error);
+  }
+}
+
+/**
+ * Starts one audio-only, two-channel Egress for the whole booking — the
+ * tutor's track routed to the left channel, the student's to the right.
+ * One file gives the transcript reliable speaker attribution without
+ * acoustic diarization (the channel, not a guess, says who spoke), and one
+ * Egress job per call is what keeps concurrent-Egress usage proportional to
+ * concurrent calls instead of 2-3x it. The same file is both the transcript
+ * source and the persistent, user-playable recording — there is no separate
+ * video recording and no separate transcript-only buffer.
+ */
+async function startRecording(
   bookingId: string,
   roomName: string,
-  trackSid: string,
-  role: "student" | "tutor",
-  identity: string,
+  tutorIdentity: string,
+  studentIdentity: string,
 ) {
-  const admin = createAdminClient();
-  const storagePath = `${bookingId}/${trackSid}.ogg`;
-
-  // A repeated track_published webhook must not start a second egress; the
-  // unique index on track_sid makes the insert the idempotency gate.
-  const { data: segment, error: insertError } = await admin
-    .from("session_transcript_audio")
-    .insert({
-      booking_id: bookingId,
-      participant_identity: identity,
-      role,
-      track_sid: trackSid,
-      storage_path: storagePath,
-      started_at: new Date().toISOString(),
-    })
-    .select("id")
-    .single();
-  if (insertError || !segment) {
-    if (insertError?.code === "23505") return;
-    throw insertError ?? new Error("Could not reserve a transcript audio segment");
-  }
-
-  try {
-    const { egress } = clients();
-    const result = await egress.startTrackEgress(
-      roomName,
-      new DirectFileOutput({
-        filepath: storagePath,
-        // Egress writes a sibling <egress-id>.json manifest by default. Nothing
-        // reads it, and this bucket is meant to hold nothing for long, so not
-        // writing it beats deleting it afterwards.
-        disableManifest: true,
-        output: { case: "s3", value: storageUpload(TRANSCRIPT_AUDIO_BUCKET) },
-      }),
-      trackSid,
-    );
-    const { error } = await admin
-      .from("session_transcript_audio")
-      .update({ egress_id: result.egressId, status: "active" })
-      .eq("id", segment.id)
-      .eq("status", "starting");
-    if (error) throw error;
-  } catch (error) {
-    await admin
-      .from("session_transcript_audio")
-      .update({ status: "failed", ended_at: new Date().toISOString() })
-      .eq("id", segment.id);
-    throw error;
-  }
-}
-
-/** Transcription spans the tutor's presence, exactly as the old agent did. */
-async function stopTranscriptAudio(bookingId: string) {
-  const admin = createAdminClient();
-  const { data: segments } = await admin
-    .from("session_transcript_audio")
-    .select("id, egress_id")
-    .eq("booking_id", bookingId)
-    .in("status", ["starting", "active"]);
-  if (!segments?.length) return;
-
-  const { egress } = clients();
-  for (const segment of segments) {
-    if (!segment.egress_id) continue;
-    try {
-      await egress.stopEgress(segment.egress_id);
-    } catch (error) {
-      // Egress may already have ended when the room emptied; the signed
-      // egress_ended webhook is the source of truth either way.
-      console.warn(`Could not stop transcript egress ${segment.egress_id}:`, error);
-    }
-  }
-}
-
-/** True once the tutor is actually connected, so a lone student is not recorded. */
-async function tutorIsPresent(roomName: string, tutorId: string) {
-  const { rooms } = clients();
-  const participants = await rooms.listParticipants(roomName);
-  return participants.some((participant) => participant.identity === tutorId);
-}
-
-async function startRecording(bookingId: string, roomName: string) {
   const admin = createAdminClient();
   const { data: consent } = await admin
     .from("session_recording_consents")
@@ -168,31 +110,55 @@ async function startRecording(bookingId: string, roomName: string) {
     .maybeSingle();
   if (existing) return;
 
-  const storagePath = `${bookingId}/${crypto.randomUUID()}.mp4`;
+  await stopStrayEgress(roomName);
+
+  const storagePath = `${bookingId}/${crypto.randomUUID()}.ogg`;
   const { data: recording, error: insertError } = await admin
     .from("session_recordings")
     .insert({ booking_id: bookingId, storage_path: storagePath, status: "starting" })
     .select("id")
     .single();
   if (insertError || !recording) {
-    // A concurrent duplicate LiveKit webhook may have claimed the active
-    // recording slot. Treat that as already handled.
+    // A concurrent duplicate LiveKit webhook must not claim the active
+    // recording slot twice; the unique index on (booking_id) where status is
+    // starting/active makes the insert itself the idempotency gate.
     if (insertError?.code === "23505") return;
     throw insertError ?? new Error("Could not reserve a recording segment");
   }
 
   try {
     const { egress } = clients();
-    const result = await egress.startRoomCompositeEgress(
-      roomName,
-      {
-        file: new EncodedFileOutput({
-          fileType: EncodedFileType.MP4,
-          filepath: storagePath,
-          output: { case: "s3", value: storageUpload(RECORDINGS_BUCKET) },
-        }),
-      },
-      { layout: "speaker" },
+    const result = await egress.startEgress(
+      new StartEgressRequest({
+        roomName,
+        source: {
+          case: "media",
+          value: new MediaSource({
+            audio: new AudioConfig({
+              captureAll: false,
+              routes: [
+                new AudioRoute({
+                  match: { case: "participantIdentity", value: tutorIdentity },
+                  channel: AudioChannel.LEFT,
+                }),
+                new AudioRoute({
+                  match: { case: "participantIdentity", value: studentIdentity },
+                  channel: AudioChannel.RIGHT,
+                }),
+              ],
+            }),
+          }),
+        },
+        outputs: [
+          new Output({
+            config: {
+              case: "file",
+              value: new FileOutput({ fileType: EncodedFileType.OGG, filepath: storagePath }),
+            },
+          }),
+        ],
+        storage: new StorageConfig({ provider: { case: "s3", value: storageUpload() } }),
+      }),
     );
     const { error } = await admin
       .from("session_recordings")
@@ -256,61 +222,23 @@ export async function POST(request: Request) {
       const successful = !info.error && info.fileResults.length > 0;
       const endedAt = new Date().toISOString();
 
-      const { error } = await admin
-        .from("session_recordings")
-        .update({ status: successful ? "ready" : "failed", ended_at: endedAt })
-        .eq("egress_id", info.egressId);
-      if (error) throw error;
-
-      // LiveKit's own start time is what the transcript timeline is built from,
-      // and it is more accurate than when this app requested the egress.
-      // startedAt is unix nanoseconds; the tsconfig target predates BigInt literals.
+      // LiveKit's own start time is more accurate than when this app
+      // requested the egress, and is what the booking page's segment labels
+      // are built from. startedAt is unix nanoseconds; the tsconfig target
+      // predates BigInt literals.
       const startedAtNanos = Number(info.startedAt);
       const startedAt =
         startedAtNanos > 0 ? new Date(startedAtNanos / 1_000_000).toISOString() : undefined;
-      const { error: audioError } = await admin
-        .from("session_transcript_audio")
+
+      const { error } = await admin
+        .from("session_recordings")
         .update({
           status: successful ? "ready" : "failed",
           ended_at: endedAt,
           ...(startedAt ? { started_at: startedAt } : {}),
         })
-        .eq("egress_id", info.egressId)
-        .in("status", ["starting", "active"]);
-      if (audioError) throw audioError;
-
-      return new Response("ok");
-    }
-
-    if (event.event === "track_published") {
-      const track = event.track;
-      if (track?.type !== TrackType.AUDIO || track.source !== TrackSource.MICROPHONE) {
-        return new Response("ok");
-      }
-      const roomName = event.room?.name;
-      const bookingId = bookingIdFromRoom(roomName);
-      const identity = event.participant?.identity;
-      if (!roomName || !bookingId || !identity) return new Response("ok");
-
-      const admin = createAdminClient();
-      const { data: booking } = await admin
-        .from("bookings")
-        .select("id, tutor_id, student_id, status")
-        .eq("id", bookingId)
-        .maybeSingle();
-      if (!booking || booking.status !== "scheduled") return new Response("ok");
-
-      // A track_published payload carries only the participant's sid, name and
-      // identity — no metadata — so the role cannot be read from the token here.
-      // The booking is the authoritative source anyway, and unlike metadata it
-      // cannot be omitted or spoofed.
-      const role =
-        identity === booking.tutor_id ? "tutor" : identity === booking.student_id ? "student" : null;
-      if (!role) return new Response("ok");
-
-      if (!(await tutorIsPresent(roomName, booking.tutor_id))) return new Response("ok");
-
-      await startTranscriptAudioEgress(bookingId, roomName, track.sid, role, identity);
+        .eq("egress_id", info.egressId);
+      if (error) throw error;
       return new Response("ok");
     }
 
@@ -325,7 +253,7 @@ export async function POST(request: Request) {
     const admin = createAdminClient();
     const { data: booking } = await admin
       .from("bookings")
-      .select("id, tutor_id, status")
+      .select("id, tutor_id, student_id, status")
       .eq("id", bookingId)
       .maybeSingle();
     // Comparing identity against the booking is what establishes this is the
@@ -337,11 +265,8 @@ export async function POST(request: Request) {
 
     if (event.event === "participant_joined") {
       if (booking.status !== "scheduled") return new Response("ok");
-      // Transcript audio starts from each track_published event, since a track
-      // only exists after its participant has joined.
-      await startRecording(bookingId, roomName);
+      await startRecording(bookingId, roomName, booking.tutor_id, booking.student_id);
     } else {
-      await stopTranscriptAudio(bookingId);
       await stopTutorRecording(bookingId, roomName);
     }
     return new Response("ok");

@@ -92,6 +92,8 @@ export interface SessionRecording {
   ended_at: string | null;
   expires_at: string;
   created_at: string;
+  transcribed_at: string | null;
+  transcribe_attempts: number;
 }
 
 export interface LessonRequest {

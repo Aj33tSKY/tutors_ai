@@ -38,8 +38,10 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   (not other users, not even a linked parent — deliberate, for safeguarding); everyone else gets a
   404, not a redirect, so the booking's existence isn't leaked either. Token minting happens
   entirely server-side in the page component — there's no separate public token endpoint.
-- **Session transcription** — the LiveKit webhook starts a recording and the app's cron
-  transcribes it in batches with Deepgram. See [transcription setup](docs/transcription.md).
+- **Session recording & transcription** — a signed LiveKit webhook starts one audio-only, stereo
+  recording per booking (tutor/student on separate channels, no video), and the app's cron
+  transcribes it in batches with Deepgram. The same file is also the student's playback recording.
+  See [transcription setup](docs/transcription.md).
 - **Post-session summarizer** (`src/app/api/cron/summarize-sessions`) — a Vercel Cron job (every 5
   minutes, `vercel.ts`) finds completed bookings with a transcript but no summary yet, extracts
   spec-mapped topics/misconceptions/homework via the AI Gateway, computes a talk-time ratio from
@@ -48,7 +50,7 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   table was always empty. The student dashboard's "Topics covered" card reads this live.
 - **Per-session review** (`/dashboard/student/bookings/[bookingId]`) — each completed booking has
   its own review with the LLM overview, topics, action points, misconceptions and full transcript.
-  When recording is enabled, the same page plays the session video from a private, short-lived URL.
+  When recording is enabled, the same page plays the session audio from a private, short-lived URL.
 
 ### Chatbot cost controls
 
@@ -158,11 +160,15 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/summ
 
 ### Session recording
 
-The tutor explicitly opts in on the session page. When they join, a signed LiveKit webhook starts
-RoomComposite Egress and writes an MP4 segment to the private `session-recordings` Supabase Storage
-bucket. When the tutor leaves, the webhook stops Egress; rejoining creates another segment, which
-the review page plays in order. A daily cron deletes each segment after 90 days. Playback uses
-short-lived signed URLs and Storage RLS; no public recording URL is stored.
+The tutor explicitly opts in on the session page (audio only — there is no video recording). When
+they join, a signed LiveKit webhook starts a single stereo Egress job, routing the tutor's track to
+the left channel and the student's to the right, and writes one OGG segment to the private
+`session-recordings` Supabase Storage bucket. When the tutor leaves, the webhook stops Egress;
+rejoining creates another segment, which the review page plays in order. The same file is what the
+`transcribe-sessions` cron sends to Deepgram — see [transcription setup](docs/transcription.md) for
+why one file per call (not one per participant) is the point. A daily cron deletes each segment
+after 90 days. Playback uses short-lived signed URLs and Storage RLS; no public recording URL is
+stored.
 
 Before enabling this in a deployment:
 
@@ -173,6 +179,8 @@ Before enabling this in a deployment:
 3. Configure LiveKit Cloud to POST its signed webhook events to `/api/webhooks/livekit`
    using that environment's API key pair.
 4. Apply the Supabase migration and redeploy the app so the 90-day cleanup cron is active.
+5. Check LiveKit Cloud's concurrent-Egress limit against expected concurrent call volume — one
+   Egress job now runs per concurrent call for the whole call's duration.
 
 ### Direct messages and homework attachments
 
