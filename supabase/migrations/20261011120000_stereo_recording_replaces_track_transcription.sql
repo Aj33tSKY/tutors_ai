@@ -21,5 +21,10 @@ alter table public.session_recordings
 drop policy if exists "transcript audio is never user readable" on public.session_transcript_audio;
 drop table if exists public.session_transcript_audio;
 
-delete from storage.objects where bucket_id = 'session-transcript-audio';
-delete from storage.buckets where id = 'session-transcript-audio';
+-- The session-transcript-audio bucket is left in place deliberately: Supabase
+-- rejects direct DML on storage.objects/storage.buckets ("Direct deletion from
+-- storage tables is not allowed. Use the Storage API instead."), and any
+-- objects it still holds would block deleting the bucket row via FK anyway.
+-- It is private, carries no storage policy, and nothing references it once
+-- the table above is gone — removing the bucket and whatever it holds is a
+-- one-off Storage API / dashboard cleanup, not something a migration can do.
