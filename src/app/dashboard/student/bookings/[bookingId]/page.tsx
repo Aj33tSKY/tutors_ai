@@ -14,7 +14,7 @@ import { boardLabel, subjectLabel } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/server";
 import { MAX_TRANSCRIBE_ATTEMPTS } from "@/lib/transcription";
 import type { Booking, SessionAnalytics, SessionRecording } from "@/lib/types";
-import { RecordingAudio } from "./recording-audio";
+import { LessonPlayer, type ScreenSegment } from "./lesson-player";
 
 const RECORDINGS_BUCKET = "session-recordings";
 
@@ -44,31 +44,62 @@ export default async function StudentSessionReviewPage({
 
   const { data: recordings } = await supabase
     .from("session_recordings")
-    .select("id, booking_id, egress_id, storage_path, status, started_at, ended_at, expires_at, created_at, transcribed_at, transcribe_attempts")
+    .select("id, booking_id, egress_id, storage_path, status, started_at, ended_at, expires_at, created_at, transcribed_at, transcribe_attempts, kind, track_sid")
     .eq("booking_id", booking.id)
     .order("started_at", { ascending: true })
     .returns<SessionRecording[]>();
 
-  // Older sessions can still have the single recording_path value.
-  const readyRecordings = recordings?.filter((recording) => recording.status === "ready") ?? [];
-  const hasPendingRecordings = recordings?.some((recording) => ["starting", "active", "stopping"].includes(recording.status)) ?? false;
-  const recordingPaths = readyRecordings.length
-    ? readyRecordings.map((recording) => ({ id: recording.id, path: recording.storage_path, startedAt: recording.started_at }))
-    : analytics?.recording_path
-      ? [{ id: "legacy", path: analytics.recording_path, startedAt: booking.started_at ?? booking.start_time }]
-      : [];
-  const recordingPlayers = await Promise.all(recordingPaths.map(async (recording) => {
-    const { data } = await supabase.storage.from(RECORDINGS_BUCKET).createSignedUrl(recording.path, 60 * 60);
-    return { ...recording, url: data?.signedUrl ?? null };
-  }));
+  const signedUrl = async (path: string) =>
+    (await supabase.storage.from(RECORDINGS_BUCKET).createSignedUrl(path, 60 * 60)).data?.signedUrl ?? null;
 
-  // The same recording is the transcript source, so its own rows (already
+  const isPending = (recording: SessionRecording) => ["starting", "active", "stopping"].includes(recording.status);
+  const hasPendingRecordings = recordings?.some(isPending) ?? false;
+  const readyAudio = recordings?.filter((recording) => recording.kind === "audio" && recording.status === "ready") ?? [];
+
+  // Older sessions can still have the single recording_path value.
+  const audioPaths = readyAudio.length
+    ? readyAudio.map((recording) => ({ id: recording.id, path: recording.storage_path, startedAt: recording.started_at, endedAt: recording.ended_at }))
+    : analytics?.recording_path
+      ? [{ id: "legacy", path: analytics.recording_path, startedAt: booking.started_at ?? booking.start_time, endedAt: null }]
+      : [];
+  const audioPlayers = await Promise.all(audioPaths.map(async (recording) => ({ ...recording, url: await signedUrl(recording.path) })));
+
+  const screenSegments = (
+    await Promise.all(
+      (recordings ?? [])
+        .filter((recording) => recording.kind === "screen" && recording.status === "ready" && recording.ended_at)
+        .map(async (recording): Promise<ScreenSegment | null> => {
+          const src = await signedUrl(recording.storage_path);
+          return src
+            ? {
+                id: recording.id,
+                src,
+                type: recording.storage_path.endsWith(".webm") ? "video/webm" : "video/mp4",
+                startMs: Date.parse(recording.started_at),
+                endMs: Date.parse(recording.ended_at!),
+              }
+            : null;
+        }),
+    )
+  ).filter((segment): segment is ScreenSegment => segment !== null);
+
+  // Each screen share plays alongside whichever audio segment it overlaps. A
+  // share with no audio to sit beside (the audio recording failed, say) is
+  // still shown on its own rather than lost.
+  const overlaps = (screen: ScreenSegment, audio: (typeof audioPlayers)[number]) =>
+    screen.startMs < (audio.endedAt ? Date.parse(audio.endedAt) : Infinity) && screen.endMs > Date.parse(audio.startedAt);
+  const unpairedScreens = screenSegments.filter(
+    (screen) => !audioPlayers.some((audio) => audio.url && !audio.path.endsWith(".mp4") && overlaps(screen, audio)),
+  );
+  const hasAnyRecording = audioPlayers.length > 0 || unpairedScreens.length > 0;
+
+  // The audio recording is the transcript source, so its own rows (already
   // authorised above under RLS) say whether transcription is still pending —
   // still recording, or saved but not yet picked up by the transcribe cron
-  // and still within its retry budget.
+  // and still within its retry budget. Screen recordings are never transcribed.
   const transcriptPending =
-    hasPendingRecordings ||
-    readyRecordings.some(
+    (recordings?.some((recording) => recording.kind === "audio" && isPending(recording)) ?? false) ||
+    readyAudio.some(
       (recording) => !recording.transcribed_at && recording.transcribe_attempts < MAX_TRANSCRIBE_ATTEMPTS,
     );
 
@@ -103,14 +134,20 @@ export default async function StudentSessionReviewPage({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          {recordingPlayers.length ? (
+          {hasAnyRecording ? (
             <div className="space-y-5">
               {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
-              {recordingPlayers.map((recording, index) => (
+              {audioPlayers.map((recording, index) => (
                 <div key={recording.id}>
-                  <p className="mb-2 text-sm font-medium">{recordingPlayers.length > 1 ? `Recording segment ${index + 1}` : recording.path.endsWith(".mp4") ? "Session video" : "Session audio"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                  <p className="mb-2 text-sm font-medium">{audioPlayers.length > 1 ? `Recording segment ${index + 1}` : recording.path.endsWith(".mp4") ? "Session video" : "Session recording"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
                   {/* Recordings made before audio-only recording are MP4 video and stay playable until they expire. */}
-                  {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <RecordingAudio src={recording.url} />}
+                  {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <LessonPlayer audioSrc={recording.url} audioStartMs={Date.parse(recording.startedAt)} screens={screenSegments.filter((screen) => overlaps(screen, recording))} />}
+                </div>
+              ))}
+              {unpairedScreens.map((screen, index) => (
+                <div key={screen.id}>
+                  <p className="mb-2 text-sm font-medium">Screen share {index + 1} · {new Date(screen.startMs).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                  <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={screen.src} type={screen.type} />Your browser does not support session video playback.</video>
                 </div>
               ))}
             </div>

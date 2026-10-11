@@ -5,12 +5,15 @@ import { AudioChannel, AudioConfig, AudioRoute } from "@livekit/protocol";
 import {
   EgressClient,
   EncodedFileType,
+  EncodingOptionsPreset,
   FileOutput,
   MediaSource,
   Output,
   S3Upload,
   StartEgressRequest,
   StorageConfig,
+  TrackSource,
+  TrackType,
   WebhookReceiver,
 } from "livekit-server-sdk";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -59,15 +62,26 @@ function storageUpload() {
  * Guards against ending up with more active Egress jobs per room than
  * intended — observed on staging during rapid back-to-back testing. Belt and
  * suspenders: stop anything already running for this room before starting a
- * fresh job, so a stray or duplicate job can never pile up concurrency usage
- * on its own, regardless of cause.
+ * fresh audio job, so a stray or duplicate job can never pile up concurrency
+ * usage on its own, regardless of cause.
+ *
+ * Screen-share jobs this booking is tracking are left alone: webhooks can be
+ * handled out of order, so a share started right after joining may already be
+ * recording by the time the tutor's join is processed.
  */
-async function stopStrayEgress(roomName: string) {
+async function stopStrayEgress(bookingId: string, roomName: string) {
   const { egress } = clients();
   try {
+    const { data: screens } = await createAdminClient()
+      .from("session_recordings")
+      .select("egress_id")
+      .eq("booking_id", bookingId)
+      .eq("kind", "screen")
+      .in("status", ["starting", "active"]);
+    const tracked = new Set((screens ?? []).map((row) => row.egress_id));
     const active = await egress.listEgress({ roomName, active: true });
     await Promise.all(
-      active.map((info) =>
+      active.filter((info) => !tracked.has(info.egressId)).map((info) =>
         egress.stopEgress(info.egressId).catch((error) => {
           console.warn(`Could not stop stray egress ${info.egressId} for ${roomName}:`, error);
         }),
@@ -110,18 +124,18 @@ async function startRecording(
     .maybeSingle();
   if (existing) return;
 
-  await stopStrayEgress(roomName);
+  await stopStrayEgress(bookingId, roomName);
 
   const storagePath = `${bookingId}/${crypto.randomUUID()}.ogg`;
   const { data: recording, error: insertError } = await admin
     .from("session_recordings")
-    .insert({ booking_id: bookingId, storage_path: storagePath, status: "starting" })
+    .insert({ booking_id: bookingId, storage_path: storagePath, status: "starting", kind: "audio" })
     .select("id")
     .single();
   if (insertError || !recording) {
     // A concurrent duplicate LiveKit webhook must not claim the active
-    // recording slot twice; the unique index on (booking_id) where status is
-    // starting/active makes the insert itself the idempotency gate.
+    // recording slot twice; the unique index on (booking_id) for an active
+    // audio recording makes the insert itself the idempotency gate.
     if (insertError?.code === "23505") return;
     throw insertError ?? new Error("Could not reserve a recording segment");
   }
@@ -205,6 +219,106 @@ async function stopTutorRecording(bookingId: string, roomName: string) {
   }
 }
 
+/**
+ * Records one screen-share track, saved exactly as published (PASSTHROUGH:
+ * no decode, no re-encode, no audio). That is what should make it cheap — a
+ * raw track export rather than a video transcode, though LiveKit doesn't
+ * document how passthrough is billed — and the lesson audio already comes
+ * from the stereo recording. Playback lines the two up by their start times.
+ */
+async function startScreenRecording(bookingId: string, roomName: string, trackSid: string, mimeType: string) {
+  const admin = createAdminClient();
+  const { data: consent } = await admin
+    .from("session_recording_consents")
+    .select("booking_id")
+    .eq("booking_id", bookingId)
+    .maybeSingle();
+  if (!consent) return;
+
+  // Passthrough keeps the track's own codec, and the container follows it:
+  // H.264 is written as MP4, VP8/VP9 as WebM. The call publishes H.264 (see
+  // video-room.tsx); WebM covers a browser that fell back to VP8.
+  const isH264 = !mimeType || mimeType.toLowerCase().includes("h264");
+  const storagePath = `${bookingId}/screen-${trackSid}.${isH264 ? "mp4" : "webm"}`;
+
+  const { data: recording, error: insertError } = await admin
+    .from("session_recordings")
+    .insert({
+      booking_id: bookingId,
+      storage_path: storagePath,
+      status: "starting",
+      kind: "screen",
+      track_sid: trackSid,
+    })
+    .select("id")
+    .single();
+  if (insertError || !recording) {
+    // A repeated track_published webhook must not start a second job for the
+    // same share; the unique index on track_sid is the idempotency gate.
+    if (insertError?.code === "23505") return;
+    throw insertError ?? new Error("Could not reserve a screen recording");
+  }
+
+  try {
+    const { egress } = clients();
+    const result = await egress.startEgress(
+      new StartEgressRequest({
+        roomName,
+        source: {
+          case: "media",
+          value: new MediaSource({ video: { case: "videoTrackId", value: trackSid } }),
+        },
+        encoding: { case: "preset", value: EncodingOptionsPreset.PASSTHROUGH },
+        outputs: [
+          new Output({
+            config: {
+              case: "file",
+              value: new FileOutput({
+                fileType: isH264 ? EncodedFileType.MP4 : EncodedFileType.DEFAULT_FILETYPE,
+                filepath: storagePath,
+                disableManifest: true,
+              }),
+            },
+          }),
+        ],
+        storage: new StorageConfig({ provider: { case: "s3", value: storageUpload() } }),
+      }),
+    );
+    const { error } = await admin
+      .from("session_recordings")
+      .update({ egress_id: result.egressId, status: "active" })
+      .eq("id", recording.id)
+      .eq("status", "starting");
+    if (error) throw error;
+  } catch (error) {
+    await admin
+      .from("session_recordings")
+      .update({ status: "failed", ended_at: new Date().toISOString() })
+      .eq("id", recording.id);
+    throw error;
+  }
+}
+
+/** A single-track export ends by itself when its track goes away; this is the backstop. */
+async function stopScreenRecording(trackSid: string) {
+  const admin = createAdminClient();
+  const { data: recording } = await admin
+    .from("session_recordings")
+    .select("id, egress_id")
+    .eq("track_sid", trackSid)
+    .eq("status", "active")
+    .maybeSingle();
+  if (!recording?.egress_id) return;
+
+  await admin.from("session_recordings").update({ status: "stopping" }).eq("id", recording.id).eq("status", "active");
+  try {
+    await clients().egress.stopEgress(recording.egress_id);
+  } catch (error) {
+    // Usually it has already ended with the track; egress_ended finalizes it.
+    console.warn(`Could not stop screen egress ${recording.egress_id}:`, error);
+  }
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.LIVEKIT_API_KEY;
   const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -222,16 +336,23 @@ export async function POST(request: Request) {
     if (event.event === "egress_ended" && event.egressInfo?.egressId) {
       const admin = createAdminClient();
       const info = event.egressInfo;
-      const successful = !info.error && info.fileResults.length > 0;
-      const endedAt = new Date().toISOString();
+      const file = info.fileResults[0];
+      // Judged by whether a file was saved rather than by info.error alone: a
+      // screen share that simply ends takes its export down with it, and that
+      // must not hide a good recording.
+      const successful = Boolean(file && Number(file.size) > 0);
+      if (info.error) console.warn(`Egress ${info.egressId} ended with: ${info.error}`);
 
-      // LiveKit's own start time is more accurate than when this app
-      // requested the egress, and is what the booking page's segment labels
-      // are built from. startedAt is unix nanoseconds; the tsconfig target
-      // predates BigInt literals.
-      const startedAtNanos = Number(info.startedAt);
-      const startedAt =
-        startedAtNanos > 0 ? new Date(startedAtNanos / 1_000_000).toISOString() : undefined;
+      // The file's own media start and length, not when this app asked for the
+      // egress or when this webhook arrived: playback lines screen shares up
+      // against the lesson audio with these, so they need to be exact. Values
+      // are unix nanoseconds; the tsconfig target predates BigInt literals.
+      const startNanos = Number(file?.startedAt ?? 0) || Number(info.startedAt);
+      const startedAtMs = startNanos > 0 ? startNanos / 1_000_000 : undefined;
+      const durationMs = Number(file?.duration ?? 0) / 1_000_000;
+      const startedAt = startedAtMs ? new Date(startedAtMs).toISOString() : undefined;
+      const endedAt =
+        startedAtMs && durationMs > 0 ? new Date(startedAtMs + durationMs).toISOString() : new Date().toISOString();
 
       const { error } = await admin
         .from("session_recordings")
@@ -242,6 +363,36 @@ export async function POST(request: Request) {
         })
         .eq("egress_id", info.egressId);
       if (error) throw error;
+      return new Response("ok");
+    }
+
+    if (event.event === "track_published" || event.event === "track_unpublished") {
+      const track = event.track;
+      if (!track?.sid || track.type !== TrackType.VIDEO || track.source !== TrackSource.SCREEN_SHARE) {
+        return new Response("ok");
+      }
+      if (event.event === "track_unpublished") {
+        await stopScreenRecording(track.sid);
+        return new Response("ok");
+      }
+
+      const roomName = event.room?.name;
+      const bookingId = bookingIdFromRoom(roomName);
+      if (!roomName || !bookingId) return new Response("ok");
+
+      const { data: booking } = await createAdminClient()
+        .from("bookings")
+        .select("id, tutor_id, status")
+        .eq("id", bookingId)
+        .maybeSingle();
+      // Only the tutor's shares are recorded. A track_published payload has no
+      // token metadata, so the booking decides who the tutor is.
+      if (!booking || booking.status !== "scheduled" || booking.tutor_id !== event.participant?.identity) {
+        return new Response("ok");
+      }
+
+      const mimeType = track.mimeType || track.codecs[0]?.mimeType || "";
+      await startScreenRecording(bookingId, roomName, track.sid, mimeType);
       return new Response("ok");
     }
 
