@@ -153,7 +153,10 @@ async function startRecording(
           new Output({
             config: {
               case: "file",
-              value: new FileOutput({ fileType: EncodedFileType.OGG, filepath: storagePath }),
+              // Egress otherwise writes an <egress-id>.json manifest beside the
+              // file. Nothing reads it, and no session_recordings row points at
+              // it, so the 90-day prune would never delete it.
+              value: new FileOutput({ fileType: EncodedFileType.OGG, filepath: storagePath, disableManifest: true }),
             },
           }),
         ],

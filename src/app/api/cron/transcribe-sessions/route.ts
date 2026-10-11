@@ -74,6 +74,9 @@ export async function GET(req: Request) {
     .from("session_recordings")
     .select("id, booking_id, storage_path, transcribe_attempts")
     .eq("status", "ready")
+    // Only the stereo recordings have one speaker per channel; older MP4s have
+    // the same mixed audio on both and would transcribe every line twice.
+    .like("storage_path", "%.ogg")
     .is("transcribed_at", null)
     .lt("transcribe_attempts", MAX_TRANSCRIBE_ATTEMPTS)
     .order("started_at", { ascending: true })
