@@ -235,9 +235,10 @@ async function startScreenRecording(bookingId: string, roomName: string, trackSi
     .maybeSingle();
   if (!consent) return;
 
-  // Passthrough keeps the track's own codec, and the container follows it:
-  // H.264 is written as MP4, VP8/VP9 as WebM. The call publishes H.264 (see
-  // video-room.tsx); WebM covers a browser that fell back to VP8.
+  // Passthrough keeps the track's own codec, and LiveKit picks the container
+  // from it: H.264 is written as MP4, VP8/VP9 as WebM. The call publishes H.264
+  // (see video-room.tsx); WebM covers a browser that fell back to VP8. This is
+  // only our best guess at the name — egress_ended records the real one.
   const isH264 = !mimeType || mimeType.toLowerCase().includes("h264");
   const storagePath = `${bookingId}/screen-${trackSid}.${isH264 ? "mp4" : "webm"}`;
 
@@ -273,11 +274,10 @@ async function startScreenRecording(bookingId: string, roomName: string, trackSi
           new Output({
             config: {
               case: "file",
-              value: new FileOutput({
-                fileType: isH264 ? EncodedFileType.MP4 : EncodedFileType.DEFAULT_FILETYPE,
-                filepath: storagePath,
-                disableManifest: true,
-              }),
+              // No fileType: with PASSTHROUGH, LiveKit rejects any explicit
+              // type ("invalid field: passthrough file_type") and picks the
+              // container from the track's codec itself.
+              value: new FileOutput({ filepath: storagePath, disableManifest: true }),
             },
           }),
         ],
@@ -360,6 +360,10 @@ export async function POST(request: Request) {
           status: successful ? "ready" : "failed",
           ended_at: endedAt,
           ...(startedAt ? { started_at: startedAt } : {}),
+          // The path LiveKit actually wrote. For a passthrough screen share
+          // LiveKit chooses the container, so the extension we asked for is
+          // only a guess; playback must point at the real file.
+          ...(file?.filename ? { storage_path: file.filename } : {}),
         })
         .eq("egress_id", info.egressId);
       if (error) throw error;

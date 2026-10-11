@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { LiveKitRoom, VideoConference, useRoomContext } from "@livekit/components-react";
-import { ConnectionState, RoomEvent, type RoomOptions } from "livekit-client";
+import { ConnectionState, Room, RoomEvent, type RoomOptions } from "livekit-client";
 import "@livekit/components-styles";
 import { Check, LoaderCircle, Maximize2, Minimize2, Play, Video } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,42 @@ import { consentToSessionRecording } from "./recording-consent-action";
 // Screen shares are recorded exactly as published, and the container follows
 // the codec: H.264 saves as MP4, which plays everywhere, where the VP8 default
 // saves as WebM. livekit-client only sets the codec room-wide, so cameras
-// publish H.264 too. Module-level so LiveKitRoom never sees a new object.
+// publish H.264 too.
 const ROOM_OPTIONS: RoomOptions = { publishDefaults: { videoCodec: "h264" } };
+
+/** Long enough for audio already spoken to finish reaching LiveKit's recorder. */
+const LEAVE_DRAIN_MS = 1500;
+
+/**
+ * Disconnecting closes the microphone track at once, and the recorder drops
+ * whatever of it is still in flight — the last word or so before Leave was
+ * clicked. Leaving therefore mutes straight away (so nothing said after the
+ * click is heard or recorded) but keeps the connection open briefly so the
+ * speech before it gets through, then disconnects.
+ *
+ * VideoConference's Leave button just calls room.disconnect() and offers no
+ * hook of its own, so this room wraps it. Room declares disconnect as an
+ * instance field, so it is wrapped in the constructor rather than overridden.
+ * Closing the tab skips this; there is nothing to wait on there.
+ */
+class DrainingRoom extends Room {
+  constructor(options: RoomOptions, onLeaving: () => void) {
+    super(options);
+    const disconnect = this.disconnect;
+    let draining = false;
+    this.disconnect = async (stopTracks?: boolean) => {
+      if (draining || this.state !== ConnectionState.Connected) return disconnect(stopTracks);
+      draining = true;
+      onLeaving();
+      await Promise.allSettled([
+        this.localParticipant.setMicrophoneEnabled(false),
+        this.localParticipant.setCameraEnabled(false),
+      ]);
+      await new Promise((resolve) => setTimeout(resolve, LEAVE_DRAIN_MS));
+      return disconnect(stopTracks);
+    };
+  }
+}
 
 export function VideoRoom({
   token,
@@ -40,6 +74,9 @@ export function VideoRoom({
   const [recordingConsented, setRecordingConsented] = useState(initiallyConsented);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+  // A fresh room for each join, so a rejoin never reuses a disconnected one.
+  const room = useMemo(() => (joined ? new DrainingRoom(ROOM_OPTIONS, () => setLeaving(true)) : null), [joined]);
   useEffect(() => {
     const updateFullscreenState = () => setIsFullscreen(document.fullscreenElement === roomRef.current);
     document.addEventListener("fullscreenchange", updateFullscreenState);
@@ -83,6 +120,7 @@ export function VideoRoom({
       }
       setRecordingConsented(true);
     }
+    setJoining(false);
     setJoined(true);
   }
 
@@ -99,14 +137,15 @@ export function VideoRoom({
         connect
         audio
         video
-        options={ROOM_OPTIONS}
+        room={room ?? undefined}
         style={{ height: "100%" }}
         onConnected={() => { if (isTutor) setTutorPresent(true); }}
-        onDisconnected={() => setJoined(false)}
+        onDisconnected={() => { setLeaving(false); setJoined(false); }}
       >
         <VideoConference />
         {!isTutor && <TutorPresenceMonitor tutorIdentity={tutorIdentity} onPresenceChange={setTutorPresent} />}
       </LiveKitRoom>}
+      {leaving && <div className="absolute inset-0 z-40 flex items-center justify-center gap-2 bg-black/85 text-white"><LoaderCircle className="size-5 animate-spin" />Leaving the session…</div>}
       <span className="sr-only">{subject} session</span>
     </div>
   );
