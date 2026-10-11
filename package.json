@@ -13,6 +13,7 @@
     "@ai-sdk/react": "^4.0.114",
     "@hookform/resolvers": "^5.9.1",
     "@livekit/components-react": "^2.9.24",
+    "@livekit/protocol": "1.51.0",
     "@livekit/components-styles": "^1.2.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.117.0",

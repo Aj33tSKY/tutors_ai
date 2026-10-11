@@ -271,7 +271,6 @@ RLS is this app's security boundary, so it is tested with pgTAP under `supabase/
 | `01-bookings-rls.test.sql` | Lesson visibility for student, tutor, linked parent, admin, outsider and anonymous callers; booking in someone else's name; updating someone else's lesson |
 | `02-direct-messages-rls.test.sql` | Conversation scoping for reads; posting into a conversation you are not in; forging another person's `sender_id` |
 | `03-session-recordings-rls.test.sql` | Recording metadata and the private `session-recordings` object for participants, linked parent and outsiders; attachment uploads confined to `<conversation_id>/<uploader_id>/` |
-| `04-transcript-audio-rls.test.sql` | Transcript audio is unreadable by everyone including the lesson's own participants; its bucket is private and carries no storage policy |
 
 Each test authenticates by setting `role` to `authenticated` and `request.jwt.claims` to the user being impersonated, which is what `auth.uid()` reads — the same path a real PostgREST request takes. Fixtures are created as the table owner, which bypasses RLS deliberately; a test that needs to create fixtures after impersonating someone resets with `pg_temp.act_as_owner()` first.
 
@@ -286,7 +285,7 @@ npm run test:db
 
 Two notes on running them locally:
 
-- **Some suites create storage buckets themselves.** Migrations do not create `session-recordings` or `message-attachments`; those are provisioned per environment by hand, so the storage tests insert them into `storage.buckets` as fixtures. `session-transcript-audio` is the exception — it holds no user content and is created by migration, so it needs no fixture and no manual setup.
+- **Some suites create storage buckets themselves.** Migrations do not create `session-recordings` or `message-attachments`; those are provisioned per environment by hand, so the storage tests insert them into `storage.buckets` as fixtures.
 - **On macOS the Supabase CLI may fail to pull `pg_prove`** with `docker-credential-desktop: executable file not found in $PATH`. Docker Desktop installs that helper outside the default PATH; prefix the command with it:
 
   ```bash
