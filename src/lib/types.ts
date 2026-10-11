@@ -94,6 +94,9 @@ export interface SessionRecording {
   created_at: string;
   transcribed_at: string | null;
   transcribe_attempts: number;
+  /** "audio": the whole-lesson stereo recording. "screen": one screen share, video only. */
+  kind: "audio" | "screen";
+  track_sid: string | null;
 }
 
 export interface LessonRequest {
