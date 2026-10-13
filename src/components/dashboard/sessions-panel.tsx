@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { CalendarPlus, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
+import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { subjectLabel } from "@/lib/subjects";
 import type { Booking } from "@/lib/types";
@@ -14,8 +15,8 @@ import { cancelSessionAction, markSessionCompleteAction, markSessionUpcomingActi
 import { createTutorSessionAction } from "@/app/dashboard/tutor/create-session-action";
 
 type SessionRow = Pick<Booking, "id" | "subject" | "start_time" | "end_time" | "status" | "lesson_name" | "is_trial" | "stripe_invoice_id" | "amount_gbp_pence" | "started_at" | "recurrence_rule" | "recurrence_series_id"> & { counterpartName: string; counterpartId: string };
-type Filter = "upcoming" | "completed";
 type CalendarView = "day" | "week" | "month";
+const VIEWS: CalendarView[] = ["day", "week", "month"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const FIRST_HOUR = 7;
 const LAST_HOUR = 21;
@@ -63,16 +64,16 @@ function rangeLabel(anchor: Date, view: CalendarView) {
 }
 
 export function SessionsPanel({ sessions, title = "Sessions", counterpartLabel = "Tutor", canMarkComplete = false, canSendInvoice = false, canCreateSession = false, students = [] }: { sessions: SessionRow[]; title?: string; counterpartLabel?: string; canMarkComplete?: boolean; canSendInvoice?: boolean; canCreateSession?: boolean; students?: { id: string; fullName: string }[] }) {
-  const [filter, setFilter] = useState<Filter>("upcoming");
   const [query, setQuery] = useState("");
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
   const [selected, setSelected] = useState<SessionRow | null>(null);
   const [newSessionStart, setNewSessionStart] = useState<{ date: Date; time: string } | null>(null);
   const visible = useMemo(() => sessions.filter((session) => {
+    // Upcoming and completed sessions share the calendar, told apart by colour.
     const matchesName = session.counterpartName.toLowerCase().includes(query.trim().toLowerCase());
-    return matchesName && (filter === "upcoming" ? session.status === "scheduled" : session.status === "completed");
-  }), [filter, query, sessions]);
+    return matchesName && session.status !== "cancelled";
+  }), [query, sessions]);
   const byDay = useMemo(() => {
     const result = new Map<string, SessionRow[]>();
     visible.forEach((session) => {
@@ -87,16 +88,21 @@ export function SessionsPanel({ sessions, title = "Sessions", counterpartLabel =
   return <>
     <Card>
       <CardHeader className="gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-3"><CardTitle>{title}</CardTitle><span className="text-sm text-muted-foreground">{visible.length} shown</span>{canCreateSession && <Button type="button" size="lg" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}</div>
+          <div className="flex flex-wrap items-center gap-3"><CardTitle>{title}</CardTitle>{canCreateSession && <Button type="button" size="lg" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}</div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-md border border-hairline p-0.5">{(["upcoming", "completed"] as Filter[]).map((option) => <button key={option} type="button" onClick={() => setFilter(option)} className={`rounded-sm px-3 py-1 text-xs capitalize transition-colors ${filter === option ? "bg-raised text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{option}</button>)}</div>
           <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${counterpartLabel.toLowerCase()}`} aria-label={`Search by ${counterpartLabel.toLowerCase()} name`} className="w-44 pl-8" /></label>
         </div>
       </CardHeader>
       <CardContent>
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-1"><Button type="button" size="icon-sm" variant="ghost" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1) : addDays(anchor, view === "week" ? -7 : -1))} aria-label="Previous period"><ChevronLeft className="size-4" /></Button><h3 className="min-w-48 text-center font-heading text-lg font-semibold">{rangeLabel(anchor, view)}</h3><Button type="button" size="icon-sm" variant="ghost" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) : addDays(anchor, view === "week" ? 7 : 1))} aria-label="Next period"><ChevronRight className="size-4" /></Button></div>
-          <div className="flex items-center gap-2"><div className="flex rounded-md border border-hairline p-0.5">{(["day", "week", "month"] as CalendarView[]).map((option) => <button key={option} type="button" onClick={() => setView(option)} className={`rounded-sm px-2.5 py-1 text-xs capitalize ${view === option ? "bg-raised text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{option}</button>)}</div><Button type="button" size="sm" variant="outline" onClick={() => setAnchor(new Date())}>Today</Button></div>
+        {/* Laid out like Google Calendar: Today, previous/next, the period, and the view picker on the right. */}
+        <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-3">
+          <Button type="button" variant="ghost" className="h-9 rounded-full border-border px-4" onClick={() => setAnchor(new Date())}>Today</Button>
+          <div className="flex items-center"><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1) : addDays(anchor, view === "week" ? -7 : -1))} aria-label={`Previous ${view}`}><ChevronLeft className="size-5" /></Button><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) : addDays(anchor, view === "week" ? 7 : 1))} aria-label={`Next ${view}`}><ChevronRight className="size-5" /></Button></div>
+          <h3 className="mr-auto font-heading text-lg font-semibold">{rangeLabel(anchor, view)}</h3>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild><Button type="button" variant="ghost" className="h-9 rounded-full border-border pr-3 pl-4 capitalize">{view}<ChevronDown className="size-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36"><DropdownMenuRadioGroup value={view} onValueChange={(value) => setView(value as CalendarView)}>{VIEWS.map((option) => <DropdownMenuRadioItem key={option} value={option} className="py-2 pl-3 capitalize">{option}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent>
+          </DropdownMenu>
         </div>
         {view === "month" ? <div className="overflow-x-auto"><div className="min-w-[700px] overflow-hidden rounded-xl border border-hairline">
           <div className="grid grid-cols-7 border-b border-hairline bg-muted/30">{WEEKDAYS.map((day) => <div key={day} className="px-2 py-2 text-center text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">{day}</div>)}</div>
@@ -108,7 +114,7 @@ export function SessionsPanel({ sessions, title = "Sessions", counterpartLabel =
             </div>;
           })}</div>
         </div></div> : <TimeCalendar view={view} anchor={anchor} byDay={byDay} onSelect={setSelected} onEmptySlot={canCreateSession ? (date, time) => setNewSessionStart({ date, time }) : undefined} />}
-        {visible.length === 0 && <p className="mt-4 text-center text-sm text-muted-foreground">{query ? `No sessions match that ${counterpartLabel.toLowerCase()}.` : `No ${filter} sessions yet.`}</p>}
+        {visible.length === 0 && <p className="mt-4 text-center text-sm text-muted-foreground">{query ? `No sessions match that ${counterpartLabel.toLowerCase()}.` : "No sessions yet."}</p>}
       </CardContent>
     </Card>
     <SessionDialog key={selected?.id ?? "none"} session={selected} open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)} counterpartLabel={counterpartLabel} canMarkComplete={canMarkComplete} canSendInvoice={canSendInvoice} />
