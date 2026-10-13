@@ -22,7 +22,7 @@ export default async function StudentDashboardPage() {
   const tutorNames = new Map((tutors ?? []).map((tutor) => [tutor.id, tutor.full_name]));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="max-w-6xl space-y-8">
       <RefreshDashboardOnHistoryNavigation />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>

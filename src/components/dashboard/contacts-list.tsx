@@ -12,7 +12,7 @@ export type Contact = {
 
 export function ContactsList({ title, singular, contacts }: { title: string; singular: string; contacts: Contact[] }) {
   return (
-    <div className="mx-auto max-w-5xl space-y-8">
+    <div className="max-w-5xl space-y-8">
       <div>
         <h2 className="display-md">{title}</h2>
         <p className="mt-1 text-sm text-muted-foreground">

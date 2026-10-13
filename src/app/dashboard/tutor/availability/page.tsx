@@ -23,7 +23,7 @@ export default async function TutorAvailabilityPage() {
     .returns<Availability[]>();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div>
         <h2 className="display-md">Weekly availability</h2>
         <p className="mt-1 text-sm text-muted-foreground">

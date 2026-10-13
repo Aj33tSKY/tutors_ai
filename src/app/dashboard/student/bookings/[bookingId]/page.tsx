@@ -114,7 +114,7 @@ export default async function StudentSessionReviewPage({
   });
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6">
+    <div className="max-w-5xl space-y-6">
       <ReturnToDashboardLink />
 
       <header className="flex flex-wrap items-end justify-between gap-4">

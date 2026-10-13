@@ -14,7 +14,7 @@ export default async function ParentDashboardPage() {
     .eq("parent_id", userId);
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="max-w-6xl space-y-8">
       <div>
         <h2 className="display-md">Family overview</h2>
         <p className="mt-1 text-sm text-muted-foreground">

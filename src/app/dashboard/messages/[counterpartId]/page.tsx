@@ -91,7 +91,7 @@ export default async function DirectMessagesPage({
 
   const backHref = profile.role === "student" ? "/dashboard/student/tutors" : "/dashboard/tutor/students";
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
+    <div className="max-w-4xl space-y-4">
       <Button asChild variant="ghost" size="sm" className="-ml-2">
         <Link href={backHref}><ArrowLeft className="size-4" /> Back</Link>
       </Button>
@@ -107,7 +107,7 @@ export default async function DirectMessagesPage({
 
 function MessagingUnavailable() {
   return (
-    <div className="mx-auto max-w-xl py-12">
+    <div className="max-w-xl py-12">
       <Card>
         <CardContent className="py-10 text-center">
           <p className="font-medium">Direct messages are still being set up</p>

@@ -31,7 +31,7 @@ export default async function TutorDashboardPage() {
   const studentNames = new Map((students ?? []).map((student) => [student.id, student.full_name]));
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="max-w-6xl space-y-8">
       <RefreshDashboardOnHistoryNavigation />
       <div>
         <h2 className="display-md">
