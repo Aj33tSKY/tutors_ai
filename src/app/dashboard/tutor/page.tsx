@@ -31,15 +31,19 @@ export default async function TutorDashboardPage() {
   const studentNames = new Map((students ?? []).map((student) => [student.id, student.full_name]));
 
   return (
-    <div className="max-w-6xl space-y-8">
+    <div className="space-y-8">
       <RefreshDashboardOnHistoryNavigation />
-      <div>
-        <h2 className="display-md">
-          Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
-        </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Your lessons, all in one place.</p>
+      {/* The welcome header and lesson requests read best at a capped width;
+          the calendar below is left unconstrained to use the full page. */}
+      <div className="max-w-6xl space-y-8">
+        <div>
+          <h2 className="display-md">
+            Welcome back{profile?.full_name ? `, ${profile.full_name.split(" ")[0]}` : ""}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">Your lessons, all in one place.</p>
+        </div>
+        <LessonRequests requests={requests ?? []} names={studentNames} />
       </div>
-      <LessonRequests requests={requests ?? []} names={studentNames} />
       <SessionsPanel
         counterpartLabel="Student"
         canMarkComplete
