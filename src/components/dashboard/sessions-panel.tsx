@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -118,24 +118,42 @@ export function SessionsPanel({ sessions, counterpartLabel = "Tutor", canMarkCom
   </>;
 }
 
+/** How much of the day is visible without scrolling, matching Google Calendar's own fold. */
+const VISIBLE_HOURS = 9;
+
 function TimeCalendar({ view, anchor, byDay, onSelect, onEmptySlot }: { view: Exclude<CalendarView, "month">; anchor: Date; byDay: Map<string, SessionRow[]>; onSelect: (session: SessionRow) => void; onEmptySlot?: (date: Date, time: string) => void }) {
   const [now, setNow] = useState(() => new Date());
+  const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
+  }, []);
+  // Open already scrolled to the current time, the way Google Calendar does,
+  // instead of always starting at the first hour of the day.
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const nowTop = ((now.getHours() * 60 + now.getMinutes() - FIRST_HOUR * 60) / 60) * HOUR_HEIGHT;
+    container.scrollTop = Math.max(0, nowTop - HOUR_HEIGHT);
+    // Only on mount: a user who has scrolled the grid themselves keeps that position.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const days = view === "week" ? Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(anchor), index)) : [anchor];
   const totalHeight = (LAST_HOUR - FIRST_HOUR) * HOUR_HEIGHT;
   const nowDay = dateKey(now);
   const nowTop = ((now.getHours() * 60 + now.getMinutes() - FIRST_HOUR * 60) / 60) * HOUR_HEIGHT;
   const activeNow = nowTop >= 0 && nowTop <= totalHeight;
+  const gridColumns = `3.5rem repeat(${days.length}, minmax(0, 1fr))`;
   return <div className="overflow-x-auto"><div className="overflow-hidden rounded-xl border border-hairline" style={{ minWidth: view === "week" ? 760 : 420 }}>
-    <div className="grid border-b border-hairline bg-muted/30" style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` }}><div />{days.map((day) => <div key={dateKey(day)} className="border-l border-hairline px-2 py-2 text-center"><p className="text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">{day.toLocaleDateString("en-GB", { weekday: "short" })}</p><span className={`mx-auto mt-1 flex size-7 items-center justify-center rounded-full text-sm ${dateKey(day) === nowDay ? "bg-saffron font-semibold text-white" : ""}`}>{day.getDate()}</span></div>)}</div>
-    <div className="grid pt-4" style={{ gridTemplateColumns: `3.5rem repeat(${days.length}, minmax(0, 1fr))` }}><div className="relative" style={{ height: totalHeight }}>{Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className="absolute left-0 w-full -translate-y-2 text-right text-[0.65rem] text-muted-foreground" style={{ top: index * HOUR_HEIGHT }}>{String(FIRST_HOUR + index).padStart(2, "0")}:00</div>)}</div>{days.map((day) => <div key={dateKey(day)} onClick={(event) => { if (!onEmptySlot || (event.target as Element).closest("button")) return; const offset = event.clientY - event.currentTarget.getBoundingClientRect().top; const minutes = Math.max(FIRST_HOUR * 60, Math.min(LAST_HOUR * 60 - 15, FIRST_HOUR * 60 + Math.round((offset / HOUR_HEIGHT) * 4) * 15)); onEmptySlot(day, `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`); }} className={`relative border-l border-hairline bg-card ${onEmptySlot ? "cursor-pointer" : ""}`} style={{ height: totalHeight }}>
-      {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className="absolute inset-x-0 border-t border-hairline/80" style={{ top: index * HOUR_HEIGHT }} />)}
-      {dateKey(day) === nowDay && activeNow && <div className="pointer-events-none absolute z-20 inset-x-0 border-t-2 border-red-500" style={{ top: nowTop }}><span className="absolute -left-1 -top-1.5 size-2.5 rounded-full bg-red-500" /></div>}
-      {(byDay.get(dateKey(day)) ?? []).map((session) => { const start = new Date(session.start_time); const end = new Date(session.end_time); const top = ((start.getHours() * 60 + start.getMinutes() - FIRST_HOUR * 60) / 60) * HOUR_HEIGHT; const height = Math.max(HOUR_HEIGHT - 3, ((end.getTime() - start.getTime()) / (60 * 60 * 1000)) * HOUR_HEIGHT - 3); if (top < -HOUR_HEIGHT || top > totalHeight) return null; return <button key={session.id} type="button" onClick={() => onSelect(session)} className={`absolute z-10 mx-1 block overflow-hidden rounded-md px-2 py-1.5 text-left shadow-sm transition-opacity hover:opacity-80 ${session.status === "completed" ? "bg-muted text-foreground ring-1 ring-border" : "bg-saffron/20 text-foreground ring-1 ring-saffron/30"}`} style={{ top: Math.max(0, top + 1), height: Math.min(height, totalHeight - Math.max(0, top) - 2), left: 0, right: 0 }}><span className="block truncate text-xs font-semibold">{session.lesson_name || subjectLabel(session.subject)}</span><span className="block truncate text-xs">{session.counterpartName}</span><span className="block text-[0.65rem] text-muted-foreground">{timeLabel(session.start_time)}</span></button>; })}
-    </div>)}</div>
+    {/* The day-of-week header stays fixed while the hour grid scrolls beneath it. */}
+    <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: VISIBLE_HOURS * HOUR_HEIGHT }}>
+      <div className="sticky top-0 z-30 grid border-b border-hairline bg-muted" style={{ gridTemplateColumns: gridColumns }}><div />{days.map((day) => <div key={dateKey(day)} className="border-l border-hairline bg-muted px-2 py-2 text-center"><p className="text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">{day.toLocaleDateString("en-GB", { weekday: "short" })}</p><span className={`mx-auto mt-1 flex size-7 items-center justify-center rounded-full text-sm ${dateKey(day) === nowDay ? "bg-saffron font-semibold text-white" : ""}`}>{day.getDate()}</span></div>)}</div>
+      <div className="grid" style={{ gridTemplateColumns: gridColumns }}><div className="relative" style={{ height: totalHeight }}>{Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className={`absolute left-0 w-full text-right text-[0.65rem] text-muted-foreground ${index === 0 ? "" : "-translate-y-2"}`} style={{ top: index * HOUR_HEIGHT }}>{String(FIRST_HOUR + index).padStart(2, "0")}:00</div>)}</div>{days.map((day) => <div key={dateKey(day)} onClick={(event) => { if (!onEmptySlot || (event.target as Element).closest("button")) return; const offset = event.clientY - event.currentTarget.getBoundingClientRect().top; const minutes = Math.max(FIRST_HOUR * 60, Math.min(LAST_HOUR * 60 - 15, FIRST_HOUR * 60 + Math.round((offset / HOUR_HEIGHT) * 4) * 15)); onEmptySlot(day, `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`); }} className={`relative border-l border-hairline bg-card ${onEmptySlot ? "cursor-pointer" : ""}`} style={{ height: totalHeight }}>
+        {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className="absolute inset-x-0 border-t border-hairline/80" style={{ top: index * HOUR_HEIGHT }} />)}
+        {dateKey(day) === nowDay && activeNow && <div className="pointer-events-none absolute z-20 inset-x-0 border-t-2 border-red-500" style={{ top: nowTop }}><span className="absolute -left-1 -top-1.5 size-2.5 rounded-full bg-red-500" /></div>}
+        {(byDay.get(dateKey(day)) ?? []).map((session) => { const start = new Date(session.start_time); const end = new Date(session.end_time); const top = ((start.getHours() * 60 + start.getMinutes() - FIRST_HOUR * 60) / 60) * HOUR_HEIGHT; const height = Math.max(HOUR_HEIGHT - 3, ((end.getTime() - start.getTime()) / (60 * 60 * 1000)) * HOUR_HEIGHT - 3); if (top < -HOUR_HEIGHT || top > totalHeight) return null; return <button key={session.id} type="button" onClick={() => onSelect(session)} className={`absolute z-10 mx-1 block overflow-hidden rounded-md px-2 py-1.5 text-left shadow-sm transition-opacity hover:opacity-80 ${session.status === "completed" ? "bg-muted text-foreground ring-1 ring-border" : "bg-saffron/20 text-foreground ring-1 ring-saffron/30"}`} style={{ top: Math.max(0, top + 1), height: Math.min(height, totalHeight - Math.max(0, top) - 2), left: 0, right: 0 }}><span className="block truncate text-xs font-semibold">{session.lesson_name || subjectLabel(session.subject)}</span><span className="block truncate text-xs">{session.counterpartName}</span><span className="block text-[0.65rem] text-muted-foreground">{timeLabel(session.start_time)}</span></button>; })}
+      </div>)}</div>
+    </div>
   </div></div>;
 }
 
