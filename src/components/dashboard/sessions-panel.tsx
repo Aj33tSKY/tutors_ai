@@ -5,7 +5,7 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -63,7 +63,7 @@ function rangeLabel(anchor: Date, view: CalendarView) {
   return `${startOfWeek(anchor).toLocaleDateString("en-GB", { day: "numeric", month: "short" })} – ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}`;
 }
 
-export function SessionsPanel({ sessions, title = "Sessions", counterpartLabel = "Tutor", canMarkComplete = false, canSendInvoice = false, canCreateSession = false, students = [] }: { sessions: SessionRow[]; title?: string; counterpartLabel?: string; canMarkComplete?: boolean; canSendInvoice?: boolean; canCreateSession?: boolean; students?: { id: string; fullName: string }[] }) {
+export function SessionsPanel({ sessions, counterpartLabel = "Tutor", canMarkComplete = false, canSendInvoice = false, canCreateSession = false, students = [] }: { sessions: SessionRow[]; counterpartLabel?: string; canMarkComplete?: boolean; canSendInvoice?: boolean; canCreateSession?: boolean; students?: { id: string; fullName: string }[] }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
@@ -87,18 +87,14 @@ export function SessionsPanel({ sessions, title = "Sessions", counterpartLabel =
 
   return <>
     <Card>
-      <CardHeader className="gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex flex-wrap items-center gap-3"><CardTitle>{title}</CardTitle>{canCreateSession && <Button type="button" size="lg" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}</div>
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${counterpartLabel.toLowerCase()}`} aria-label={`Search by ${counterpartLabel.toLowerCase()} name`} className="w-44 pl-8" /></label>
-        </div>
-      </CardHeader>
       <CardContent>
-        {/* Laid out like Google Calendar: Today, previous/next, the period, and the view picker on the right. */}
+        {/* Laid out like Google Calendar: Today, previous/next and the period on the left; search and the view picker on the right. */}
         <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-3">
+          {canCreateSession && <Button type="button" className="h-9 rounded-full px-4" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}
           <Button type="button" variant="ghost" className="h-9 rounded-full border-border px-4" onClick={() => setAnchor(new Date())}>Today</Button>
           <div className="flex items-center"><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1) : addDays(anchor, view === "week" ? -7 : -1))} aria-label={`Previous ${view}`}><ChevronLeft className="size-5" /></Button><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) : addDays(anchor, view === "week" ? 7 : 1))} aria-label={`Next ${view}`}><ChevronRight className="size-5" /></Button></div>
           <h3 className="mr-auto font-heading text-lg font-semibold">{rangeLabel(anchor, view)}</h3>
+          <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${counterpartLabel.toLowerCase()}`} aria-label={`Search by ${counterpartLabel.toLowerCase()} name`} className="h-9 w-44 rounded-full pl-8" /></label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button type="button" variant="ghost" className="h-9 rounded-full border-border pr-3 pl-4 capitalize">{view}<ChevronDown className="size-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36"><DropdownMenuRadioGroup value={view} onValueChange={(value) => setView(value as CalendarView)}>{VIEWS.map((option) => <DropdownMenuRadioItem key={option} value={option} className="py-2 pl-3 capitalize">{option}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent>
