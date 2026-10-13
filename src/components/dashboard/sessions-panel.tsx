@@ -124,6 +124,22 @@ const VISIBLE_HOURS = 9;
 function TimeCalendar({ view, anchor, byDay, onSelect, onEmptySlot }: { view: Exclude<CalendarView, "month">; anchor: Date; byDay: Map<string, SessionRow[]>; onSelect: (session: SessionRow) => void; onEmptySlot?: (date: Date, time: string) => void }) {
   const [now, setNow] = useState(() => new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
+  // The header is a sibling above the scrolling grid, not a sticky element
+  // inside it — simpler and avoids the sliver of the scrolled-away content
+  // that sticky-over-rounded-corners can show for an instant while scrolling.
+  // Its own vertical scrollbar narrows the grid by this many pixels, so the
+  // header needs the same reserved width or its day columns drift out of
+  // alignment with the grid's. 0 on the overlay scrollbars most of our users
+  // have (macOS, touch), measured on the rest.
+  const [scrollbarWidth, setScrollbarWidth] = useState(0);
+  useEffect(() => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const measure = () => setScrollbarWidth(container.offsetWidth - container.clientWidth);
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 60_000);
     return () => window.clearInterval(timer);
@@ -145,9 +161,11 @@ function TimeCalendar({ view, anchor, byDay, onSelect, onEmptySlot }: { view: Ex
   const activeNow = nowTop >= 0 && nowTop <= totalHeight;
   const gridColumns = `3.5rem repeat(${days.length}, minmax(0, 1fr))`;
   return <div className="overflow-x-auto"><div className="overflow-hidden rounded-xl border border-hairline" style={{ minWidth: view === "week" ? 760 : 420 }}>
-    {/* The day-of-week header stays fixed while the hour grid scrolls beneath it. */}
+    {/* The day-of-week header is a plain sibling above the scrolling grid,
+        not a sticky element inside it, so it is genuinely fixed rather than
+        occasionally showing a sliver of whatever just scrolled past it. */}
+    <div className="grid border-b border-hairline bg-muted" style={{ gridTemplateColumns: gridColumns, paddingRight: scrollbarWidth }}><div />{days.map((day) => <div key={dateKey(day)} className="border-l border-hairline px-2 py-2 text-center"><p className="text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">{day.toLocaleDateString("en-GB", { weekday: "short" })}</p><span className={`mx-auto mt-1 flex size-7 items-center justify-center rounded-full text-sm ${dateKey(day) === nowDay ? "bg-saffron font-semibold text-white" : ""}`}>{day.getDate()}</span></div>)}</div>
     <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: VISIBLE_HOURS * HOUR_HEIGHT }}>
-      <div className="sticky top-0 z-30 grid border-b border-hairline bg-muted" style={{ gridTemplateColumns: gridColumns }}><div />{days.map((day) => <div key={dateKey(day)} className="border-l border-hairline bg-muted px-2 py-2 text-center"><p className="text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">{day.toLocaleDateString("en-GB", { weekday: "short" })}</p><span className={`mx-auto mt-1 flex size-7 items-center justify-center rounded-full text-sm ${dateKey(day) === nowDay ? "bg-saffron font-semibold text-white" : ""}`}>{day.getDate()}</span></div>)}</div>
       <div className="grid" style={{ gridTemplateColumns: gridColumns }}><div className="relative" style={{ height: totalHeight }}>{Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className={`absolute left-0 w-full text-right text-[0.65rem] text-muted-foreground ${index === 0 ? "" : "-translate-y-2"}`} style={{ top: index * HOUR_HEIGHT }}>{String(FIRST_HOUR + index).padStart(2, "0")}:00</div>)}</div>{days.map((day) => <div key={dateKey(day)} onClick={(event) => { if (!onEmptySlot || (event.target as Element).closest("button")) return; const offset = event.clientY - event.currentTarget.getBoundingClientRect().top; const minutes = Math.max(FIRST_HOUR * 60, Math.min(LAST_HOUR * 60 - 15, FIRST_HOUR * 60 + Math.round((offset / HOUR_HEIGHT) * 4) * 15)); onEmptySlot(day, `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`); }} className={`relative border-l border-hairline bg-card ${onEmptySlot ? "cursor-pointer" : ""}`} style={{ height: totalHeight }}>
         {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className="absolute inset-x-0 border-t border-hairline/80" style={{ top: index * HOUR_HEIGHT }} />)}
         {dateKey(day) === nowDay && activeNow && <div className="pointer-events-none absolute z-20 inset-x-0 border-t-2 border-red-500" style={{ top: nowTop }}><span className="absolute -left-1 -top-1.5 size-2.5 rounded-full bg-red-500" /></div>}
