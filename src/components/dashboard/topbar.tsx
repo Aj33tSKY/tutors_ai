@@ -11,23 +11,23 @@ import type { UserRole } from "@/lib/types";
 /**
  * Every dashboard page already carries its own heading as the first thing in
  * its content — some generic ("Payouts"), some personalised ("Welcome back,
- * Yusuf") — styled the same way a page's own <h1> normally would be. This bar
- * used to repeat that as a second, chrome-level title ("Payouts" twice on
- * one screen); it's now just navigation chrome, the way Stripe's or Linear's
- * top bar is on pages that don't need a page-level search or action there.
- * The mobile menu button is still essential below the lg breakpoint, where
- * the sidebar itself is hidden.
+ * Yusuf") — styled the same way a page's own <h1> normally would be, so this
+ * bar no longer repeats that as a second, chrome-level title. Its only job
+ * now is the mobile menu button, which is essential below the lg breakpoint
+ * (the sidebar itself is hidden there) and pointless above it (the sidebar
+ * is always visible) — so the whole bar is lg:hidden rather than sitting on
+ * desktop as a tall, empty, otherwise-unexplained strip above every page.
  */
 export function DashboardTopbar({ role }: { role: UserRole }) {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-border/70 bg-background/85 px-5 backdrop-blur-md md:px-8">
+    <header className="flex h-16 items-center gap-4 border-b border-border/70 bg-background/85 px-5 backdrop-blur-md md:px-8 lg:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <button
             type="button"
-            className="-ml-2 flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground lg:hidden"
+            className="-ml-2 flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground"
             aria-label="Open menu"
           >
             <Menu className="size-5" />
