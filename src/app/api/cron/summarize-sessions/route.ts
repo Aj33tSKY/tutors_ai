@@ -14,36 +14,34 @@ export const maxDuration = 300;
 const BATCH_SIZE = 5;
 const CHUNK_LINES = 6; // transcript lines per embedding chunk
 
+// Seven short, factual fields rather than free paragraphs — cheap for the
+// model to produce reliably every time (a fixed schema beats hoping a
+// free-form prompt reliably reproduces the same seven headings) and cheap
+// to turn into markdown afterwards, with zero extra model cost: see
+// formatSessionNotesMarkdown, which just maps each field onto its own
+// heading. The tutor only ever edits the resulting markdown, never this
+// shape directly.
 const SummarySchema = z.object({
-  overview: z
-    .string()
-    .describe("A concise, factual 2–4 sentence account of what happened in this session"),
-  covered_topics: z
-    .array(
-      z.object({
-        spec_point: z
-          .string()
-          .describe("Best-effort exam board spec point reference, e.g. 'Edexcel Physics 4.2'"),
-        title: z.string().describe("Short topic title, e.g. 'Particle Accelerators'"),
-      }),
-    )
-    .describe("Distinct syllabus topics actually covered in this session"),
-  misconceptions: z
-    .array(z.string())
-    .describe("Specific misconceptions or knowledge gaps the student showed, if any"),
-  homework: z
-    .array(z.string())
-    .describe("Homework or follow-up action items assigned or implied, if any"),
+  goals: z.string().describe("What this session aimed to cover or achieve, inferred from how it opened and its context"),
+  outcomes: z.string().describe("What was actually covered and achieved in the session"),
+  whatWorked: z.string().describe("Teaching approaches, explanations or activities that worked well"),
+  whatWasChallenging: z.string().describe("Where the student struggled, or the session hit difficulty"),
+  patternNoticed: z.string().describe("Any preference or recurring pattern in how the student learns or responds, noticed in this session"),
+  breakthrough: z.string().describe("A specific breakthrough, win or moment of real understanding, if there was one"),
+  nextSteps: z.string().describe("What should happen next — follow-up actions, homework, or what to focus on next session"),
 });
 
-// Sessions summarized before `overview` was introduced remain valid and can
+// Sessions summarized under an earlier field shape remain valid and can
 // still have their embeddings repaired without spending another model call.
-const ExistingSummarySchema = SummarySchema.extend({ overview: z.string().optional() });
+const ExistingSummarySchema = SummarySchema.partial();
 
 function summaryNeedsRefresh(summary: unknown): boolean {
   if (!summary || typeof summary !== "object") return true;
-  const overview = (summary as { overview?: unknown }).overview;
-  return typeof overview !== "string" || overview.trim().length === 0;
+  // Sessions summarized under the previous overview/covered_topics/
+  // misconceptions/homework shape have no `outcomes` field, so this also
+  // picks them up for a one-time regeneration into the current shape.
+  const outcomes = (summary as { outcomes?: unknown }).outcomes;
+  return typeof outcomes !== "string" || outcomes.trim().length === 0;
 }
 
 /** Backfill older transcripts that saved one Deepgram utterance per line. */
@@ -99,7 +97,7 @@ function chunkTranscript(transcript: string, linesPerChunk = CHUNK_LINES): strin
 
 type PendingRow = {
   booking: Pick<Booking, "id" | "student_id" | "subject" | "exam_board">;
-  analytics: Pick<SessionAnalytics, "id" | "full_transcript" | "summary_notes"> & {
+  analytics: Pick<SessionAnalytics, "id" | "full_transcript" | "summary_notes" | "notes_markdown"> & {
     full_transcript: string;
   };
   needsSummary: boolean;
@@ -118,7 +116,7 @@ export async function GET(req: Request) {
   // "has a transcript, no summary yet" in application code instead.
   const { data: bookings, error } = await supabase
     .from("bookings")
-    .select("id, student_id, subject, exam_board, session_analytics(id, full_transcript, summary_notes)")
+    .select("id, student_id, subject, exam_board, session_analytics(id, full_transcript, summary_notes, notes_markdown)")
     .eq("status", "completed")
     .order("start_time", { ascending: false })
     .limit(50);
@@ -175,7 +173,7 @@ export async function GET(req: Request) {
             await generateObject({
               model: "openai/gpt-5.4-nano",
               schema: SummarySchema,
-              system: `You are analysing a transcript of a UK A-Level ${subjectLabel(subject)} tutoring session for the ${boardLabel(examBoard)} exam board. Always write a short, factual overview of what took place, even when the call is only an introduction, product test, or has no substantive syllabus content. Map topics onto real ${boardLabel(examBoard)} ${subjectLabel(subject)} specification points where you can, but never invent a spec point number you're not reasonably confident about — a plausible topic title alone is fine when unsure. Only report misconceptions and homework that are actually evidenced in the transcript; leave those arrays empty rather than guessing.`,
+              system: `You are a UK A-Level ${subjectLabel(subject)} tutor writing your own private reflection notes on a session you just taught, for the ${boardLabel(examBoard)} exam board, based on its transcript. Write each field as one to three short, factual sentences in your own voice, grounded only in what the transcript actually shows — never invent content to fill a field. When a field genuinely doesn't apply (no clear breakthrough, no particular pattern noticed), say so briefly and honestly rather than stretching for something that isn't there. This applies even when the call is only an introduction, a product test, or has no substantive syllabus content.`,
               prompt: transcript,
             })
           ).object
@@ -205,7 +203,7 @@ export async function GET(req: Request) {
           booking_id: booking.id,
           student_id: booking.student_id,
           content,
-          topic: summary.covered_topics[0]?.title ?? subjectLabel(subject),
+          topic: subjectLabel(subject),
           embedding: embeddings[i],
         }));
 
@@ -222,7 +220,14 @@ export async function GET(req: Request) {
           .update({
             full_transcript: transcript,
             ...(needsSummary
-              ? { summary_notes: summary, talk_ratio: talkRatio(transcript), notes_markdown: formatSessionNotesMarkdown(summary) }
+              ? {
+                  summary_notes: summary,
+                  talk_ratio: talkRatio(transcript),
+                  // Never clobber a tutor's saved edits — only seed this the
+                  // first time (or after an explicit reset, which nulls it
+                  // alongside summary_notes; see markSessionUpcomingAction).
+                  ...(analytics.notes_markdown ? {} : { notes_markdown: formatSessionNotesMarkdown(summary) }),
+                }
               : {}),
           })
           .eq("id", analytics.id);

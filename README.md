@@ -52,7 +52,8 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   `session_analytics.notes_markdown` (`src/lib/session-notes.ts`) — see below.
 - **Per-session review** (`/dashboard/student/bookings/[bookingId]`) — each completed booking has
   its own review page. The session recording sits beside a single editable markdown notes panel
-  (overview, topics, misconceptions, action points, seeded from the LLM summary above), scrollable
+  (goals, outcomes, what worked, what was challenging, a pattern noticed, a breakthrough, next
+  steps — seeded from the LLM summary above), scrollable
   independently of the recording and stacking below it on mobile; the tutor can rewrite it freely
   and save, with an undo back to the last save before doing so — everyone on the booking sees the
   same document. A collapsible section below both has the full transcript. When recording is

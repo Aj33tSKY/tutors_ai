@@ -117,22 +117,27 @@ export default async function StudentSessionReviewPage({
   });
 
   return (
-    <div className="max-w-6xl space-y-6">
-      <ReturnToDashboardLink />
+    <div className="space-y-6">
+      {/* The back-link and title read best at a capped width, same as the
+          calendar's own header; the recording/notes row below is left
+          unconstrained so it uses the full page, same as the calendar. */}
+      <div className="max-w-6xl space-y-6">
+        <ReturnToDashboardLink />
 
-      <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h2 className="display-md">{booking.lesson_name || subjectLabel(booking.subject)}</h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {startedAt} · {boardLabel(booking.exam_board)}
-          </p>
-        </div>
-        <Badge variant="secondary">Completed</Badge>
-      </header>
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h2 className="display-md">{booking.lesson_name || subjectLabel(booking.subject)}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {startedAt} · {boardLabel(booking.exam_board)}
+            </p>
+          </div>
+          <Badge variant="secondary">Completed</Badge>
+        </header>
+      </div>
 
-      {/* The recording sits beside its notes on desktop — the notes panel
-          scrolls on its own and stays in view while the page scrolls past a
-          tall recording. On mobile the notes drop below instead. */}
+      {/* The recording sits beside its notes on desktop, each in its own
+          bounded, independently scrollable container. On mobile the notes
+          drop below instead. */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
           <Card>
@@ -197,7 +202,6 @@ export default async function StudentSessionReviewPage({
               bookingId={booking.id}
               initialMarkdown={notesMarkdown}
               canEdit={canEditNotes}
-              talkRatio={analytics.talk_ratio}
             />
           )}
         </div>
@@ -207,7 +211,9 @@ export default async function StudentSessionReviewPage({
         <details className="rounded-2xl border border-border bg-card shadow-sm">
           <summary className="cursor-pointer px-6 py-5 font-heading text-lg font-semibold">Full transcript</summary>
           <div className="border-t border-border px-6 py-5">
-            <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+            {/* The box itself can be full width, but a transcript read as
+                one long unbroken line gets harder to follow, not easier. */}
+            <p className="max-w-4xl whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
               {analytics.full_transcript}
             </p>
           </div>

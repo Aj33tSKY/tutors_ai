@@ -35,12 +35,10 @@ export function SessionNotes({
   bookingId,
   initialMarkdown,
   canEdit,
-  talkRatio,
 }: {
   bookingId: string;
   initialMarkdown: string;
   canEdit: boolean;
-  talkRatio: number | null;
 }) {
   const [state, formAction, pending] = useActionState(updateSessionNotesAction, {});
   const [saved, setSaved] = useState(initialMarkdown);
@@ -87,14 +85,6 @@ export function SessionNotes({
         )}
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto">
-        {talkRatio != null && (
-          <p className="eyebrow mb-4">
-            {talkRatio === 0
-              ? "No tutor speech was transcribed in this session"
-              : `Tutor spoke for ${Math.round(talkRatio * 100)}% of transcribed words`}
-          </p>
-        )}
-
         {editing ? (
           <form action={formAction} className="space-y-3">
             <input type="hidden" name="booking_id" value={bookingId} />

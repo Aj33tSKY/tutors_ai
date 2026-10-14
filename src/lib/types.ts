@@ -118,10 +118,13 @@ export interface SessionAnalytics {
   booking_id: string;
   full_transcript: string | null;
   summary_notes: {
-    overview?: string;
-    covered_topics?: { spec_point: string; title: string }[];
-    misconceptions?: string[];
-    homework?: string[];
+    goals?: string;
+    outcomes?: string;
+    whatWorked?: string;
+    whatWasChallenging?: string;
+    patternNoticed?: string;
+    breakthrough?: string;
+    nextSteps?: string;
   } | null;
   talk_ratio: number | null;
   recording_path?: string | null;

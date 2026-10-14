@@ -12,27 +12,16 @@ import type { SessionAnalytics } from "@/lib/types";
  * column existed, so older reviews still render nicely without a backfill.
  */
 export function formatSessionNotesMarkdown(summary: NonNullable<SessionAnalytics["summary_notes"]>): string {
-  const overview = summary.overview?.trim() || "No overview was generated for this session.";
-
-  const topics = summary.covered_topics ?? [];
-  const topicsList = topics.length
-    ? topics.map((topic) => `- ${topic.spec_point ? `**${topic.spec_point}** — ${topic.title}` : topic.title}`).join("\n")
-    : "_No specific specification topics were identified._";
-
-  const misconceptions = summary.misconceptions ?? [];
-  const misconceptionsList = misconceptions.length
-    ? misconceptions.map((item) => `- ${item}`).join("\n")
-    : "_No misconceptions were evidenced in the transcript._";
-
-  const homework = summary.homework ?? [];
-  const homeworkList = homework.length
-    ? homework.map((item) => `- ${item}`).join("\n")
-    : "_No follow-up actions were assigned in this session._";
+  const section = (heading: string, text: string | undefined) =>
+    `## ${heading}\n\n${text?.trim() || "_Not noted for this session._"}`;
 
   return [
-    `## Overview\n\n${overview}`,
-    `## Topics covered\n\n${topicsList}`,
-    `## Things to revisit\n\n${misconceptionsList}`,
-    `## Action points\n\n${homeworkList}`,
+    section("Goals/Topics for the session", summary.goals),
+    section("Actual outcomes/what was covered", summary.outcomes),
+    section("What worked", summary.whatWorked),
+    section("What was challenging", summary.whatWasChallenging),
+    section("Preference or pattern noticed", summary.patternNoticed),
+    section("Key breakthrough or win", summary.breakthrough),
+    section("Next steps", summary.nextSteps),
   ].join("\n\n");
 }
