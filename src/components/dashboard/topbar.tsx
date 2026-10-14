@@ -2,27 +2,32 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { usePathname } from "next/navigation";
 import { Menu } from "lucide-react";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Wordmark } from "@/components/marketing/wordmark";
-import { DashboardNav, NAV_BY_ROLE } from "./sidebar";
+import { DashboardNav } from "./sidebar";
 import type { UserRole } from "@/lib/types";
 
-export function DashboardTopbar({ role, title }: { role: UserRole; title?: string }) {
+/**
+ * Every dashboard page already carries its own heading as the first thing in
+ * its content — some generic ("Payouts"), some personalised ("Welcome back,
+ * Yusuf") — styled the same way a page's own <h1> normally would be, so this
+ * bar no longer repeats that as a second, chrome-level title. Its only job
+ * now is the mobile menu button, which is essential below the lg breakpoint
+ * (the sidebar itself is hidden there) and pointless above it (the sidebar
+ * is always visible) — so the whole bar is lg:hidden rather than sitting on
+ * desktop as a tall, empty, otherwise-unexplained strip above every page.
+ */
+export function DashboardTopbar({ role }: { role: UserRole }) {
   const [open, setOpen] = useState(false);
-  const pathname = usePathname();
-
-  const resolvedTitle =
-    title ?? NAV_BY_ROLE[role].find((i) => i.href === pathname)?.label ?? "Dashboard";
 
   return (
-    <header className="flex h-16 items-center gap-4 border-b border-border/70 bg-background/85 px-5 backdrop-blur-md md:px-8">
+    <header className="flex h-16 items-center gap-4 border-b border-border/70 bg-background/85 px-5 backdrop-blur-md md:px-8 lg:hidden">
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <button
             type="button"
-            className="-ml-2 flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground lg:hidden"
+            className="-ml-2 flex size-10 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-black/[0.05] hover:text-foreground"
             aria-label="Open menu"
           >
             <Menu className="size-5" />
@@ -38,8 +43,6 @@ export function DashboardTopbar({ role, title }: { role: UserRole; title?: strin
           <DashboardNav role={role} onNavigate={() => setOpen(false)} />
         </SheetContent>
       </Sheet>
-
-      <h1 className="text-lg font-semibold">{resolvedTitle}</h1>
     </header>
   );
 }

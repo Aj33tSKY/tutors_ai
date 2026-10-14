@@ -33,7 +33,7 @@ export default async function AdminDashboardPage() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl space-y-8">
+    <div className="max-w-6xl space-y-8">
       <div>
         <h2 className="display-md">Platform overview</h2>
         <p className="mt-1 text-sm text-muted-foreground">Live counts from the database.</p>

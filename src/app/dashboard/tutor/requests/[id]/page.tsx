@@ -20,7 +20,7 @@ export default async function ScheduleRequestPage({ params, searchParams }: { pa
   const { data: student } = await supabase.from("profiles").select("full_name").eq("id", request.student_id).maybeSingle<Pick<Profile, "full_name">>();
   const action = scheduleLessonRequestAction.bind(null, request.id);
   const defaultDateTime = new Date(request.requested_start_time).toISOString().slice(0, 16);
-  return <div className="mx-auto max-w-2xl space-y-6">
+  return <div className="max-w-2xl space-y-6">
     <div><Link href="/dashboard/tutor" className="text-sm text-muted-foreground hover:text-foreground">← Back to sessions</Link><h2 className="display-md mt-3">Confirm lesson schedule</h2><p className="mt-1 text-sm text-muted-foreground">Set the actual time with {student?.full_name ?? "your student"}. This creates the scheduled sessions and sends confirmation in DMs.</p></div>
     <Card><CardHeader><CardTitle>{subjectLabel(request.subject)} · {boardLabel(request.exam_board)}</CardTitle></CardHeader><CardContent><form action={action} className="space-y-5">
       <div className="rounded-xl bg-muted/50 p-4 text-sm"><p className="font-medium">Requested slot</p><p className="mt-1 text-muted-foreground">{new Date(request.requested_start_time).toLocaleString("en-GB", { dateStyle: "full", timeStyle: "short" })}</p>{request.is_trial && <p className="mt-3 font-medium text-emerald-700 dark:text-emerald-300">This first session is a free trial.</p>}</div>

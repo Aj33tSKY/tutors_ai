@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Host_Grotesk, Roboto_Mono } from "next/font/google";
+import { Geist, Roboto_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
-// One friendly variable sans for both body copy and headings — mono is kept
-// only for tabular numbers (timers, percentages, prices).
-const hostGrotesk = Host_Grotesk({
+// One variable sans for both body copy and headings — mono is kept only for
+// tabular numbers (timers, percentages, prices). Body text renders at its
+// default weight (regular); headings opt up to medium/semibold in
+// globals.css, never past semibold.
+const geist = Geist({
   variable: "--font-body",
   subsets: ["latin"],
   weight: "variable",
@@ -39,7 +41,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${hostGrotesk.variable} ${robotoMono.variable} h-full`}
+      className={`${geist.variable} ${robotoMono.variable} h-full`}
     >
       <head>
         <noscript>

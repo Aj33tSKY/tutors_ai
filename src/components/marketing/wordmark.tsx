@@ -2,7 +2,7 @@
  * Wordmark. The mark is a struck match — "kindling" — drawn as a hairline
  * so it sits in the same weight class as the rest of the chrome.
  */
-export function Wordmark({ className = "" }: { className?: string }) {
+export function Wordmark({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   return (
     <span className={`flex items-center gap-2.5 ${className}`}>
       <svg viewBox="0 0 16 20" className="size-4 shrink-0" aria-hidden fill="none">
@@ -15,9 +15,12 @@ export function Wordmark({ className = "" }: { className?: string }) {
         />
         <path d="M8 19v-3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
       </svg>
-      <span className="font-heading text-[1.35rem] leading-none tracking-[-0.03em]">
-        Kindling
-      </span>
+      {/* The collapsed sidebar keeps just the mark — "Kindling" doesn't fit a 4.5rem rail. */}
+      {!compact && (
+        <span className="font-heading text-[1.35rem] leading-none tracking-[-0.03em]">
+          Kindling
+        </span>
+      )}
     </span>
   );
 }

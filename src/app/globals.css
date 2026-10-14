@@ -256,14 +256,14 @@
   .display-xl {
     font-family: var(--font-body);
     font-size: clamp(2.25rem, 4.5vw, 3.75rem);
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.05;
     letter-spacing: -0.03em;
   }
   .display-lg {
     font-family: var(--font-body);
     font-size: clamp(1.875rem, 3.2vw, 2.75rem);
-    font-weight: 700;
+    font-weight: 600;
     line-height: 1.08;
     letter-spacing: -0.025em;
   }

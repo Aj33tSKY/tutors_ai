@@ -74,7 +74,7 @@ export default async function StudentBillingPage({
   const autoCharge = Boolean(profile?.auto_charge_enabled) && Boolean(savedMethod);
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="max-w-3xl space-y-6">
       <div>
         <ReturnToDashboardLink />
         <h2 className="display-md mt-3">Payment settings</h2>

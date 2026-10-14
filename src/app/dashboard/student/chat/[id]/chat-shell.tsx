@@ -74,7 +74,7 @@ export function ChatShell({
   };
 
   return (
-    <div className="mx-auto flex h-[calc(100vh-8rem)] max-w-5xl gap-8">
+    <div className="flex h-[calc(100vh-8rem)] max-w-5xl gap-8">
       <aside className="hidden w-60 shrink-0 flex-col lg:flex">
         <form action={createConversationAction}>
           <button
