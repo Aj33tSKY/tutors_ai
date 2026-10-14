@@ -11,6 +11,7 @@ type PendingSegment = {
   booking_id: string;
   storage_path: string;
   transcribe_attempts: number;
+  started_at: string;
 };
 
 /**
@@ -36,8 +37,20 @@ async function transcribeSegment(
     throw new Error(`Could not sign ${segment.storage_path}: ${signError?.message ?? "no URL returned"}`);
   }
 
+  // Puts a resumed session's later segment on the same clock as the first,
+  // rather than restarting its timestamps at 0 — see formatTranscript.
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("started_at, start_time")
+    .eq("id", segment.booking_id)
+    .maybeSingle();
+  const sessionStart = booking?.started_at ?? booking?.start_time;
+  const offsetSeconds = sessionStart
+    ? Math.max(0, (new Date(segment.started_at).getTime() - new Date(sessionStart).getTime()) / 1000)
+    : 0;
+
   const turns = await transcribeStereoRecording(signed.signedUrl);
-  const transcript = formatTranscript(turns);
+  const transcript = formatTranscript(turns, offsetSeconds);
 
   if (transcript.trim().length > 0) {
     // A tutor may leave and rejoin, producing a new segment; append rather
@@ -72,7 +85,7 @@ export async function GET(req: Request) {
   const admin = createAdminClient();
   const { data: pending, error } = await admin
     .from("session_recordings")
-    .select("id, booking_id, storage_path, transcribe_attempts")
+    .select("id, booking_id, storage_path, transcribe_attempts, started_at")
     .eq("status", "ready")
     .eq("kind", "audio")
     // Only the stereo recordings have one speaker per channel; older MP4s have

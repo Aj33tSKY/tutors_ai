@@ -1,4 +1,4 @@
-import { embedMany, generateObject } from "ai";
+import { embedMany, generateText, Output } from "ai";
 import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyCronRequest } from "@/lib/cron";
@@ -22,12 +22,12 @@ const CHUNK_LINES = 6; // transcript lines per embedding chunk
 // heading. The tutor only ever edits the resulting markdown, never this
 // shape directly.
 const SummarySchema = z.object({
-  goals: z.string().describe("What this session aimed to cover or achieve, inferred from how it opened and its context"),
-  outcomes: z.string().describe("What was actually covered and achieved in the session"),
-  whatWorked: z.string().describe("Teaching approaches, explanations or activities that worked well"),
-  whatWasChallenging: z.string().describe("Where the student struggled, or the session hit difficulty"),
-  patternNoticed: z.string().describe("Any preference or recurring pattern in how the student learns or responds, noticed in this session"),
-  breakthrough: z.string().describe("A specific breakthrough, win or moment of real understanding, if there was one"),
+  sessionGoals: z.string().describe("What this session aimed to cover or achieve, inferred from how it opened and its context"),
+  whatWeCovered: z.string().describe("What was actually covered and achieved in the session"),
+  whatWentWell: z.string().describe("Teaching approaches, explanations or activities that worked well"),
+  areasForImprovement: z.string().describe("Where the student struggled, or the session hit difficulty"),
+  learningInsights: z.string().describe("Any preference or recurring pattern in how the student learns or responds, noticed in this session"),
+  keyBreakthrough: z.string().describe("A specific breakthrough, win or moment of real understanding, if there was one"),
   nextSteps: z.string().describe("What should happen next — follow-up actions, homework, or what to focus on next session"),
 });
 
@@ -37,38 +37,48 @@ const ExistingSummarySchema = SummarySchema.partial();
 
 function summaryNeedsRefresh(summary: unknown): boolean {
   if (!summary || typeof summary !== "object") return true;
-  // Sessions summarized under the previous overview/covered_topics/
-  // misconceptions/homework shape have no `outcomes` field, so this also
-  // picks them up for a one-time regeneration into the current shape.
-  const outcomes = (summary as { outcomes?: unknown }).outcomes;
-  return typeof outcomes !== "string" || outcomes.trim().length === 0;
+  // Sessions summarized under an earlier field shape have no
+  // `whatWeCovered` field, so this also picks them up for a one-time
+  // regeneration into the current one.
+  const whatWeCovered = (summary as { whatWeCovered?: unknown }).whatWeCovered;
+  return typeof whatWeCovered !== "string" || whatWeCovered.trim().length === 0;
 }
 
-/** Backfill older transcripts that saved one Deepgram utterance per line. */
+/**
+ * Backfill older transcripts that saved one Deepgram utterance per line.
+ * This also runs against every already-correct transcript, to decide
+ * whether it needs rewriting at all (see needsTranscriptNormalization
+ * below) — the optional " MM:SS"/" H:MM:SS" group is what makes that a
+ * no-op for current transcripts rather than quietly stripping every line's
+ * timestamp the next time this processes them.
+ */
 function consolidateTranscriptTurns(transcript: string): string {
-  const turns: { speaker: string; text: string }[] = [];
+  const turns: { speaker: string; time: string; text: string }[] = [];
 
   for (const rawLine of transcript.split("\n")) {
     const line = rawLine.trim();
     if (!line) continue;
 
-    const match = line.match(/^\[(Tutor|Student)\]\s*(.+)$/);
+    const match = line.match(/^\[(Tutor|Student)(\s+\d{1,2}:\d{2}(?::\d{2})?)?\]\s*(.+)$/);
     if (!match) {
-      turns.push({ speaker: "", text: line });
+      turns.push({ speaker: "", time: "", text: line });
       continue;
     }
 
     const speaker = match[1];
-    const text = match[2].trim();
+    const time = match[2] ?? "";
+    const text = match[3].trim();
     const previous = turns.at(-1);
     if (previous?.speaker === speaker) {
+      // Keep the earlier turn's own timestamp — it marks when the (now
+      // merged) turn began, same convention as formatTranscript's.
       previous.text = `${previous.text} ${text}`;
     } else {
-      turns.push({ speaker, text });
+      turns.push({ speaker, time, text });
     }
   }
 
-  return turns.map((turn) => (turn.speaker ? `[${turn.speaker}] ${turn.text}` : turn.text)).join("\n");
+  return turns.map((turn) => (turn.speaker ? `[${turn.speaker}${turn.time}] ${turn.text}` : turn.text)).join("\n");
 }
 
 /** Transcript lines are "[Tutor] ..." / "[Student] ...", written by the transcribe-sessions cron. */
@@ -76,7 +86,10 @@ function talkRatio(transcript: string): number | null {
   let tutorWords = 0;
   let studentWords = 0;
   for (const line of transcript.split("\n")) {
-    const match = line.match(/^\[(Tutor|Student)\]\s*(.*)$/);
+    // The optional " MM:SS" (or " H:MM:SS") covers formatTranscript's
+    // current "[Tutor 00:02] ..." lines; the bare "[Tutor] ..." form still
+    // matches too, for transcripts saved before timestamps were added.
+    const match = line.match(/^\[(Tutor|Student)(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?\]\s*(.*)$/);
     if (!match) continue;
     const words = match[2].trim().split(/\s+/).filter(Boolean).length;
     if (match[1] === "Tutor") tutorWords += words;
@@ -170,13 +183,15 @@ export async function GET(req: Request) {
 
       const summary = needsSummary
         ? (
-            await generateObject({
+            await generateText({
               model: "openai/gpt-5.4-nano",
-              schema: SummarySchema,
-              system: `You are a UK A-Level ${subjectLabel(subject)} tutor writing your own private reflection notes on a session you just taught, for the ${boardLabel(examBoard)} exam board, based on its transcript. Write each field as one to three short, factual sentences in your own voice, grounded only in what the transcript actually shows — never invent content to fill a field. When a field genuinely doesn't apply (no clear breakthrough, no particular pattern noticed), say so briefly and honestly rather than stretching for something that isn't there. This applies even when the call is only an introduction, a product test, or has no substantive syllabus content.`,
+              output: Output.object({ schema: SummarySchema }),
+              system: `You are a UK A-Level ${subjectLabel(subject)} tutor writing your own private reflection notes on a session you just taught, for the ${boardLabel(examBoard)} exam board, based on its transcript. Write each field as one to three short, factual sentences in your own voice, grounded only in what the transcript actually shows — never invent content to fill a field. When a field genuinely doesn't apply (no clear breakthrough, no particular pattern noticed), say so briefly and honestly rather than stretching for something that isn't there. This applies even when the call is only an introduction, a product test, or has no substantive syllabus content.
+
+Each transcript line is tagged "[Tutor MM:SS]" or "[Student MM:SS]" with when it happened. When a field makes a specific, checkable claim about what someone said or did (not a general impression), cite the timestamp of the line it's drawn from in square brackets at the end of that sentence, e.g. "Jayden solved one problem independently and needed one prompt on the second. [17:28]". Cite only timestamps that actually appear in the transcript, and only for claims concrete enough to point at one moment — don't force a citation onto a general summary sentence.`,
               prompt: transcript,
             })
-          ).object
+          ).output
         : ExistingSummarySchema.parse(analytics.summary_notes);
 
       const chunks = chunkTranscript(transcript);

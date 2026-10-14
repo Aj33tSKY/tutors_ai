@@ -49,14 +49,16 @@ Both kinds live in `session_recordings`, told apart by `kind` (`audio`/`screen`)
 
 ## Output format
 
-One line per turn, consecutive utterances from the same speaker merged:
+One line per turn, consecutive utterances from the same speaker merged, each tagged with when that turn began (elapsed time since the tutor first joined, not wall-clock time — `mm:ss`, or `h:mm:ss` past an hour):
 
 ```text
-[Tutor] Hello, ready to start?
-[Student] Yes I am.
+[Tutor 00:02] Hello, ready to start?
+[Student 00:05] Yes I am.
 ```
 
-This format is a contract. `talkRatio` and `consolidateTranscriptTurns` in `src/app/api/cron/summarize-sessions/route.ts` parse it with regexes, and the booking detail page renders it directly. Changing it means changing them.
+This format is a contract. `talkRatio` and `consolidateTranscriptTurns` in `src/app/api/cron/summarize-sessions/route.ts` parse it with regexes, and the booking detail page renders it directly. Changing it means changing them — both regexes make the timestamp optional, so transcripts saved before it was added still parse.
+
+The timestamp is what lets `summarize-sessions` cite evidence for a claim in the notes it generates (`[17:28]`-style, in prose), the same way a tutor would reference a specific moment. A resumed session's later recording segment is placed on the same clock as the first rather than restarting at `00:00` — `transcribe-sessions` computes each segment's offset from the booking's own start before calling `formatTranscript`.
 
 ## Failure handling
 

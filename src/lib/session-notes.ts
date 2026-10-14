@@ -16,12 +16,12 @@ export function formatSessionNotesMarkdown(summary: NonNullable<SessionAnalytics
     `## ${heading}\n\n${text?.trim() || "_Not noted for this session._"}`;
 
   return [
-    section("Goals/Topics for the session", summary.goals),
-    section("Actual outcomes/what was covered", summary.outcomes),
-    section("What worked", summary.whatWorked),
-    section("What was challenging", summary.whatWasChallenging),
-    section("Preference or pattern noticed", summary.patternNoticed),
-    section("Key breakthrough or win", summary.breakthrough),
-    section("Next steps", summary.nextSteps),
+    section("Session Goals", summary.sessionGoals),
+    section("What We Covered", summary.whatWeCovered),
+    section("What Went Well", summary.whatWentWell),
+    section("Areas for Improvement", summary.areasForImprovement),
+    section("Learning Insights", summary.learningInsights),
+    section("Key Breakthrough", summary.keyBreakthrough),
+    section("Next Steps", summary.nextSteps),
   ].join("\n\n");
 }
