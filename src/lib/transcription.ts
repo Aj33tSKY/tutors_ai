@@ -90,26 +90,47 @@ export async function transcribeStereoRecording(signedUrl: string): Promise<Role
     .filter((turn) => turn.text.length > 0);
 }
 
+/** mm:ss, or h:mm:ss past an hour — same convention as the session player's own clock (lesson-player.tsx). */
+function clockLabel(totalSeconds: number): string {
+  const s = Math.max(0, Math.round(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const mm = String(Math.floor((s % 3600) / 60)).padStart(h ? 2 : 1, "0");
+  const ss = String(s % 60).padStart(2, "0");
+  return h ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
+}
+
 /**
- * Renders the canonical transcript format: one "[Tutor] ..." / "[Student]
- * ..." line per turn, with consecutive utterances from the same speaker
- * merged into that turn.
+ * Renders the canonical transcript format: one "[Tutor MM:SS] ..." /
+ * "[Student MM:SS] ..." line per turn, with consecutive utterances from the
+ * same speaker merged into that turn (the merged line's timestamp is its
+ * first utterance's). The timestamp lets summarize-sessions cite evidence
+ * in its generated notes against a specific moment.
+ *
+ * `offsetSeconds` places a resumed session's second (or later) recording
+ * segment on the same clock as the first, rather than restarting at 0 — see
+ * transcribe-sessions, which passes each segment's own start time relative
+ * to the booking's.
  *
  * The format is what `talkRatio` and `consolidateTranscriptTurns` in the
  * summarize-sessions cron already parse, so it must not drift from theirs.
  */
-export function formatTranscript(turns: RoleTurn[]): string {
+export function formatTranscript(turns: RoleTurn[], offsetSeconds = 0): string {
   const sorted = [...turns].sort((a, b) => a.start - b.start);
 
-  const out: { role: SpeakerRole; text: string }[] = [];
+  const out: { role: SpeakerRole; start: number; text: string }[] = [];
   for (const turn of sorted) {
     const previous = out.at(-1);
     if (previous?.role === turn.role) {
       previous.text = `${previous.text} ${turn.text}`;
     } else {
-      out.push({ role: turn.role, text: turn.text });
+      out.push({ role: turn.role, start: turn.start, text: turn.text });
     }
   }
 
-  return out.map((turn) => `[${turn.role === "tutor" ? "Tutor" : "Student"}] ${turn.text}`).join("\n");
+  return out
+    .map(
+      (turn) =>
+        `[${turn.role === "tutor" ? "Tutor" : "Student"} ${clockLabel(offsetSeconds + turn.start)}] ${turn.text}`,
+    )
+    .join("\n");
 }
