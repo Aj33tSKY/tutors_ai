@@ -124,14 +124,15 @@ export default async function StudentSessionReviewPage({
       <div className="max-w-6xl space-y-6">
         <ReturnToDashboardLink />
 
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <header>
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="display-md">{booking.lesson_name || subjectLabel(booking.subject)}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {startedAt} · {boardLabel(booking.exam_board)}
-            </p>
+            <Badge variant="secondary">Completed</Badge>
+            <PaymentBadge booking={booking} />
           </div>
-          <Badge variant="secondary">Completed</Badge>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {startedAt} · {boardLabel(booking.exam_board)}
+          </p>
         </header>
       </div>
 
@@ -221,6 +222,22 @@ export default async function StudentSessionReviewPage({
       )}
     </div>
   );
+}
+
+/** A trial session was never charged, so its payment status is irrelevant here. */
+function PaymentBadge({ booking }: { booking: Booking }) {
+  if (booking.is_trial) return <Badge variant="outline">Free trial</Badge>;
+  switch (booking.payment_status) {
+    case "paid":
+      return <Badge variant="secondary">Paid</Badge>;
+    case "refunded":
+      return <Badge variant="outline">Refunded</Badge>;
+    case "failed":
+      return <Badge variant="destructive">Payment failed</Badge>;
+    case "pending":
+    default:
+      return <Badge variant="outline">Payment pending</Badge>;
+  }
 }
 
 function ProcessingState({
