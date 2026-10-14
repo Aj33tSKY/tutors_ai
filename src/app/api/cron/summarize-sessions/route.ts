@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyCronRequest } from "@/lib/cron";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
+import { formatSessionNotesMarkdown } from "@/lib/session-notes";
 import type { Booking, ExamBoard, SessionAnalytics, StemSubject } from "@/lib/types";
 
 export const maxDuration = 300;
@@ -220,7 +221,9 @@ export async function GET(req: Request) {
           .from("session_analytics")
           .update({
             full_transcript: transcript,
-            ...(needsSummary ? { summary_notes: summary, talk_ratio: talkRatio(transcript) } : {}),
+            ...(needsSummary
+              ? { summary_notes: summary, talk_ratio: talkRatio(transcript), notes_markdown: formatSessionNotesMarkdown(summary) }
+              : {}),
           })
           .eq("id", analytics.id);
         if (updateError) throw updateError;

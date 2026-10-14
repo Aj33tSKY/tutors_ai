@@ -125,6 +125,8 @@ export interface SessionAnalytics {
   } | null;
   talk_ratio: number | null;
   recording_path?: string | null;
+  /** The editable notes shown on the session review page. See src/lib/session-notes.ts. */
+  notes_markdown: string | null;
   created_at: string;
 }
 

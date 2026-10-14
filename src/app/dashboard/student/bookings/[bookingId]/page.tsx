@@ -1,20 +1,16 @@
 import { notFound } from "next/navigation";
-import {
-  BookOpenCheck,
-  CircleAlert,
-  ClipboardCheck,
-  FileText,
-  Play,
-  Video,
-} from "lucide-react";
+import { Play, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReturnToDashboardLink } from "@/components/dashboard/return-to-dashboard-link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/supabase/profile";
+import { formatSessionNotesMarkdown } from "@/lib/session-notes";
 import { MAX_TRANSCRIBE_ATTEMPTS } from "@/lib/transcription";
 import type { Booking, SessionAnalytics, SessionRecording } from "@/lib/types";
 import { LessonPlayer, type ScreenSegment } from "./lesson-player";
+import { SessionNotes } from "./session-notes";
 
 const RECORDINGS_BUCKET = "session-recordings";
 
@@ -25,6 +21,7 @@ export default async function StudentSessionReviewPage({
 }) {
   const { bookingId } = await params;
   const supabase = await createClient();
+  const { userId } = await getCurrentProfile();
 
   // Booking RLS is the access check. It deliberately includes the booking id
   // in the query, so a student cannot use this route to load another session.
@@ -104,6 +101,12 @@ export default async function StudentSessionReviewPage({
     );
 
   const summary = analytics?.summary_notes;
+  const canEditNotes = Boolean(userId) && userId === booking.tutor_id;
+  // notes_markdown is only unset for sessions summarized before this column
+  // existed (or mid-regeneration after a reopen) — fall back to formatting
+  // the structured summary the same way the cron seeds it, so those reviews
+  // still render without a backfill migration.
+  const notesMarkdown = analytics?.notes_markdown ?? (summary ? formatSessionNotesMarkdown(summary) : "");
   const startedAt = new Date(booking.start_time).toLocaleString("en-GB", {
     weekday: "long",
     day: "numeric",
@@ -114,7 +117,7 @@ export default async function StudentSessionReviewPage({
   });
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="max-w-6xl space-y-6">
       <ReturnToDashboardLink />
 
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -127,116 +130,88 @@ export default async function StudentSessionReviewPage({
         <Badge variant="secondary">Completed</Badge>
       </header>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Video className="size-4 text-saffron" /> Session recording
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {hasAnyRecording ? (
-            <div className="space-y-5">
-              {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
-              {audioPlayers.map((recording, index) => (
-                <div key={recording.id}>
-                  <p className="mb-2 text-sm font-medium">{audioPlayers.length > 1 ? `Recording segment ${index + 1}` : recording.path.endsWith(".mp4") ? "Session video" : "Session recording"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
-                  {/* Recordings made before audio-only recording are MP4 video and stay playable until they expire. */}
-                  {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <LessonPlayer audioSrc={recording.url} audioStartMs={Date.parse(recording.startedAt)} audioDurationMs={recording.endedAt ? Date.parse(recording.endedAt) - Date.parse(recording.startedAt) : undefined} screens={screenSegments.filter((screen) => overlaps(screen, recording))} />}
-                </div>
-              ))}
-              {unpairedScreens.map((screen, index) => (
-                <div key={screen.id}>
-                  <p className="mb-2 text-sm font-medium">Screen share {index + 1} · {new Date(screen.startMs).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
-                  <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={screen.src} type={screen.type} />Your browser does not support session video playback.</video>
-                </div>
-              ))}
-            </div>
-          ) : hasPendingRecordings ? (
-            <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
-              <Play className="size-7 text-muted-foreground" />
-              <p className="mt-3 font-medium">Recording is being finalized</p>
-              <p className="mt-1 max-w-md text-sm text-muted-foreground">The session audio will appear here once LiveKit has finished saving it. Refresh this page shortly.</p>
-            </div>
-          ) : (
-            <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
-              <Play className="size-7 text-muted-foreground" />
-              <p className="mt-3 font-medium">No recording is available</p>
-              <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                Recordings appear here when recording was enabled for this session.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {analyticsError ? (
-        <ProcessingState title="Session notes are unavailable" description="We couldn't load the session analysis. Please refresh shortly." />
-      ) : !analytics?.full_transcript ? (
-        transcriptPending ? (
-          <ProcessingState
-            title="Transcript is being prepared"
-            description="This lesson's audio was captured and is being transcribed. It usually appears within a few minutes of the session ending."
-          />
-        ) : (
-          <ProcessingState title="No transcript was captured" description="This session ended without a saved transcript, so notes cannot be generated." />
-        )
-      ) : !summary ? (
-        <ProcessingState />
-      ) : (
-        <>
+      {/* The recording sits beside its notes on desktop — the notes panel
+          scrolls on its own and stays in view while the page scrolls past a
+          tall recording. On mobile the notes drop below instead. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="min-w-0 flex-1">
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="size-4 text-saffron" /> Tutor session summary
+                <Video className="size-4 text-saffron" /> Session recording
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">
-                {summary.overview?.trim() || "This existing session is being refreshed with a short overview."}
-              </p>
-              {analytics.talk_ratio != null && (
-                <p className="eyebrow">
-                  {analytics.talk_ratio === 0
-                    ? "No tutor speech was transcribed in this session"
-                    : `Tutor spoke for ${Math.round(analytics.talk_ratio * 100)}% of transcribed words`}
-                </p>
+            <CardContent>
+              {hasAnyRecording ? (
+                <div className="space-y-5">
+                  {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
+                  {audioPlayers.map((recording, index) => (
+                    <div key={recording.id}>
+                      <p className="mb-2 text-sm font-medium">{audioPlayers.length > 1 ? `Recording segment ${index + 1}` : recording.path.endsWith(".mp4") ? "Session video" : "Session recording"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                      {/* Recordings made before audio-only recording are MP4 video and stay playable until they expire. */}
+                      {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <LessonPlayer audioSrc={recording.url} audioStartMs={Date.parse(recording.startedAt)} audioDurationMs={recording.endedAt ? Date.parse(recording.endedAt) - Date.parse(recording.startedAt) : undefined} screens={screenSegments.filter((screen) => overlaps(screen, recording))} />}
+                    </div>
+                  ))}
+                  {unpairedScreens.map((screen, index) => (
+                    <div key={screen.id}>
+                      <p className="mb-2 text-sm font-medium">Screen share {index + 1} · {new Date(screen.startMs).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                      <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={screen.src} type={screen.type} />Your browser does not support session video playback.</video>
+                    </div>
+                  ))}
+                </div>
+              ) : hasPendingRecordings ? (
+                <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
+                  <Play className="size-7 text-muted-foreground" />
+                  <p className="mt-3 font-medium">Recording is being finalized</p>
+                  <p className="mt-1 max-w-md text-sm text-muted-foreground">The session audio will appear here once LiveKit has finished saving it. Refresh this page shortly.</p>
+                </div>
+              ) : (
+                <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
+                  <Play className="size-7 text-muted-foreground" />
+                  <p className="mt-3 font-medium">No recording is available</p>
+                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                    Recordings appear here when recording was enabled for this session.
+                  </p>
+                </div>
               )}
             </CardContent>
           </Card>
+        </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <ListCard
-              icon={BookOpenCheck}
-              title="Topics covered"
-              empty="No specific specification topics were identified."
-              items={(summary.covered_topics ?? []).map((topic) =>
-                topic.spec_point ? `${topic.spec_point} — ${topic.title}` : topic.title,
-              )}
+        <div className="lg:w-[26rem] lg:shrink-0">
+          {analyticsError ? (
+            <ProcessingState title="Session notes are unavailable" description="We couldn't load the session analysis. Please refresh shortly." />
+          ) : !analytics?.full_transcript ? (
+            transcriptPending ? (
+              <ProcessingState
+                title="Transcript is being prepared"
+                description="This lesson's audio was captured and is being transcribed. It usually appears within a few minutes of the session ending."
+              />
+            ) : (
+              <ProcessingState title="No transcript was captured" description="This session ended without a saved transcript, so notes cannot be generated." />
+            )
+          ) : !summary ? (
+            <ProcessingState />
+          ) : (
+            <SessionNotes
+              bookingId={booking.id}
+              initialMarkdown={notesMarkdown}
+              canEdit={canEditNotes}
+              talkRatio={analytics.talk_ratio}
             />
-            <ListCard
-              icon={ClipboardCheck}
-              title="Action points"
-              empty="No follow-up actions were assigned in this session."
-              items={summary.homework ?? []}
-            />
+          )}
+        </div>
+      </div>
+
+      {!analyticsError && analytics?.full_transcript && summary && (
+        <details className="rounded-2xl border border-border bg-card shadow-sm">
+          <summary className="cursor-pointer px-6 py-5 font-heading text-lg font-semibold">Full transcript</summary>
+          <div className="border-t border-border px-6 py-5">
+            <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+              {analytics.full_transcript}
+            </p>
           </div>
-
-          <ListCard
-            icon={CircleAlert}
-            title="Things to revisit"
-            empty="No misconceptions were evidenced in the transcript."
-            items={summary.misconceptions ?? []}
-          />
-
-          <details className="rounded-2xl border border-border bg-card shadow-sm">
-            <summary className="cursor-pointer px-6 py-5 font-heading text-lg font-semibold">Full transcript</summary>
-            <div className="border-t border-border px-6 py-5">
-              <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
-                {analytics.full_transcript}
-              </p>
-            </div>
-          </details>
-        </>
+        </details>
       )}
     </div>
   );
@@ -256,41 +231,6 @@ function ProcessingState({
         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
           {description}
         </p>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ListCard({
-  icon: Icon,
-  title,
-  items,
-  empty,
-}: {
-  icon: typeof BookOpenCheck;
-  title: string;
-  items: string[];
-  empty: string;
-}) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Icon className="size-4 text-saffron" /> {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">{empty}</p>
-        ) : (
-          <ul className="space-y-2">
-            {items.map((item) => (
-              <li key={item} className="rounded-xl border border-border px-3 py-2 text-sm">
-                {item}
-              </li>
-            ))}
-          </ul>
-        )}
       </CardContent>
     </Card>
   );

@@ -163,7 +163,7 @@ export async function markSessionUpcomingAction(formData: FormData) {
   // from the stitched transcript rather than the first partial call.
   const admin = createAdminClient();
   await Promise.all([
-    admin.from("session_analytics").update({ summary_notes: null, talk_ratio: null }).eq("booking_id", booking.id),
+    admin.from("session_analytics").update({ summary_notes: null, talk_ratio: null, notes_markdown: null }).eq("booking_id", booking.id),
     admin.from("session_embeddings").delete().eq("booking_id", booking.id),
   ]);
   revalidatePath("/dashboard/tutor");
@@ -292,5 +292,54 @@ export async function sendSessionInvoiceAction(
   }
   revalidatePath("/dashboard/tutor");
   revalidatePath("/dashboard/student");
+  return { success: true };
+}
+
+export type SessionNotesActionState = { error?: string; success?: boolean };
+
+const SessionNotesSchema = z.object({
+  bookingId: z.string().uuid(),
+  notesMarkdown: z.string().max(20_000, "Notes must be 20,000 characters or fewer."),
+});
+
+/**
+ * Saves the tutor's edits to a completed session's notes. These replace the
+ * separate summary/topics/action-point cards the summarize-sessions cron
+ * used to produce as read-only output — once generated, the markdown is the
+ * tutor's to rewrite, same as updateLessonNameAction's one-column pattern:
+ * the RLS policy on session_analytics is the real authority check, and this
+ * action only ever sends the one column a tutor is allowed to touch.
+ */
+export async function updateSessionNotesAction(
+  _previous: SessionNotesActionState,
+  formData: FormData,
+): Promise<SessionNotesActionState> {
+  const parsed = SessionNotesSchema.safeParse({
+    bookingId: formData.get("booking_id"),
+    notesMarkdown: formData.get("notes_markdown"),
+  });
+  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "We couldn’t save those notes." };
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Please sign in again before saving." };
+
+  const { data: booking } = await supabase
+    .from("bookings")
+    .select("id, tutor_id, status")
+    .eq("id", parsed.data.bookingId)
+    .maybeSingle();
+  if (!booking || booking.tutor_id !== user.id) return { error: "Only the tutor can edit these notes." };
+  if (booking.status !== "completed") return { error: "Notes can only be edited once the session is completed." };
+
+  const { error } = await supabase
+    .from("session_analytics")
+    .update({ notes_markdown: parsed.data.notesMarkdown })
+    .eq("booking_id", booking.id);
+  if (error) return { error: "We couldn’t save your changes. Please try again." };
+
+  revalidatePath(`/dashboard/student/bookings/${booking.id}`);
   return { success: true };
 }
