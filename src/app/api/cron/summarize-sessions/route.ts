@@ -35,13 +35,20 @@ const SummarySchema = z.object({
 // still have their embeddings repaired without spending another model call.
 const ExistingSummarySchema = SummarySchema.partial();
 
+/**
+ * A session needs (re)summarizing only when it has never been summarized at
+ * all — a brand new session, or one explicitly reset by
+ * markSessionUpcomingAction, which nulls summary_notes/notes_markdown
+ * together for exactly this reason. A schema change (new field names, an
+ * added field) must never retroactively rewrite sessions that already have
+ * a summary, however old its shape: do that and the next cron run
+ * regenerates every previously-summarized session's notes and spends an LLM
+ * call doing it, which really happened once already. Any existing summary,
+ * in whatever shape, is left alone; formatSessionNotesMarkdown's fallback
+ * handles rendering it.
+ */
 function summaryNeedsRefresh(summary: unknown): boolean {
-  if (!summary || typeof summary !== "object") return true;
-  // Sessions summarized under an earlier field shape have no
-  // `whatWeCovered` field, so this also picks them up for a one-time
-  // regeneration into the current one.
-  const whatWeCovered = (summary as { whatWeCovered?: unknown }).whatWeCovered;
-  return typeof whatWeCovered !== "string" || whatWeCovered.trim().length === 0;
+  return summary === null || summary === undefined;
 }
 
 /**
@@ -186,7 +193,7 @@ export async function GET(req: Request) {
             await generateText({
               model: "openai/gpt-5.4-nano",
               output: Output.object({ schema: SummarySchema }),
-              system: `You are a UK A-Level ${subjectLabel(subject)} tutor writing your own private reflection notes on a session you just taught, for the ${boardLabel(examBoard)} exam board, based on its transcript. Write each field as one to three short, factual sentences in your own voice, grounded only in what the transcript actually shows — never invent content to fill a field. When a field genuinely doesn't apply (no clear breakthrough, no particular pattern noticed), say so briefly and honestly rather than stretching for something that isn't there. This applies even when the call is only an introduction, a product test, or has no substantive syllabus content.
+              system: `You are a UK A-Level ${subjectLabel(subject)} tutor writing your own private reflection notes on a session you just taught, for the ${boardLabel(examBoard)} exam board, based on its transcript. Write each field as one to three short, factual sentences in your own voice, grounded only in what the transcript actually shows — never invent content to fill a field. When a field genuinely doesn't apply (no clear breakthrough, no particular pattern noticed), write exactly "N/A" for that field and nothing else — don't spend a sentence explaining why it doesn't apply. This applies even when the call is only an introduction, a product test, or has no substantive syllabus content.
 
 Each transcript line is tagged "[Tutor MM:SS]" or "[Student MM:SS]" with when it happened. When a field makes a specific, checkable claim about what someone said or did (not a general impression), cite the timestamp of the line it's drawn from in square brackets at the end of that sentence, e.g. "Jayden solved one problem independently and needed one prompt on the second. [17:28]". Cite only timestamps that actually appear in the transcript, and only for claims concrete enough to point at one moment — don't force a citation onto a general summary sentence.`,
               prompt: transcript,
