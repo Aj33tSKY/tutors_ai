@@ -124,14 +124,15 @@ export default async function StudentSessionReviewPage({
       <div className="max-w-6xl space-y-6">
         <ReturnToDashboardLink />
 
-        <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+        <header>
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="display-md">{booking.lesson_name || subjectLabel(booking.subject)}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {startedAt} · {boardLabel(booking.exam_board)}
-            </p>
+            <Badge variant="secondary">Completed</Badge>
+            <PaymentBadge booking={booking} />
           </div>
-          <Badge variant="secondary">Completed</Badge>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {startedAt} · {boardLabel(booking.exam_board)}
+          </p>
         </header>
       </div>
 
@@ -152,7 +153,14 @@ export default async function StudentSessionReviewPage({
                   {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
                   {audioPlayers.map((recording, index) => (
                     <div key={recording.id}>
-                      <p className="mb-2 text-sm font-medium">{audioPlayers.length > 1 ? `Recording segment ${index + 1}` : recording.path.endsWith(".mp4") ? "Session video" : "Session recording"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                      {/* A lone recording needs no label — the card title
+                          already says "Session recording". Multiple segments
+                          (a tutor who left and rejoined) still need telling apart. */}
+                      {audioPlayers.length > 1 && (
+                        <p className="mb-2 text-sm font-medium">
+                          Recording segment {index + 1} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
                       {/* Recordings made before audio-only recording are MP4 video and stay playable until they expire. */}
                       {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <LessonPlayer audioSrc={recording.url} audioStartMs={Date.parse(recording.startedAt)} audioDurationMs={recording.endedAt ? Date.parse(recording.endedAt) - Date.parse(recording.startedAt) : undefined} screens={screenSegments.filter((screen) => overlaps(screen, recording))} />}
                     </div>
@@ -221,6 +229,22 @@ export default async function StudentSessionReviewPage({
       )}
     </div>
   );
+}
+
+/** A trial session was never charged, so its payment status is irrelevant here. */
+function PaymentBadge({ booking }: { booking: Booking }) {
+  if (booking.is_trial) return <Badge variant="outline">Free trial</Badge>;
+  switch (booking.payment_status) {
+    case "paid":
+      return <Badge variant="secondary">Paid</Badge>;
+    case "refunded":
+      return <Badge variant="outline">Refunded</Badge>;
+    case "failed":
+      return <Badge variant="destructive">Payment failed</Badge>;
+    case "pending":
+    default:
+      return <Badge variant="outline">Payment pending</Badge>;
+  }
 }
 
 function ProcessingState({

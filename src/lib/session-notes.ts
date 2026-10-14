@@ -12,16 +12,19 @@ import type { SessionAnalytics } from "@/lib/types";
  * column existed, so older reviews still render nicely without a backfill.
  */
 export function formatSessionNotesMarkdown(summary: NonNullable<SessionAnalytics["summary_notes"]>): string {
-  const section = (heading: string, text: string | undefined) =>
-    `## ${heading}\n\n${text?.trim() || "_Not noted for this session._"}`;
+  // "N/A" matches what the model itself is asked to write for a field that
+  // doesn't apply — one convention, not two different phrasings, for the
+  // same case: whether the model wrote it or this is a genuinely missing
+  // field (parsing an older or unexpected shape), the fallback agrees.
+  const section = (heading: string, text: string | undefined) => `## ${heading}\n\n${text?.trim() || "N/A"}`;
 
   return [
-    section("Goals/Topics for the session", summary.goals),
-    section("Actual outcomes/what was covered", summary.outcomes),
-    section("What worked", summary.whatWorked),
-    section("What was challenging", summary.whatWasChallenging),
-    section("Preference or pattern noticed", summary.patternNoticed),
-    section("Key breakthrough or win", summary.breakthrough),
-    section("Next steps", summary.nextSteps),
+    section("Session Goals", summary.sessionGoals),
+    section("What We Covered", summary.whatWeCovered),
+    section("What Went Well", summary.whatWentWell),
+    section("Areas for Improvement", summary.areasForImprovement),
+    section("Learning Insights", summary.learningInsights),
+    section("Key Breakthrough", summary.keyBreakthrough),
+    section("Next Steps", summary.nextSteps),
   ].join("\n\n");
 }
