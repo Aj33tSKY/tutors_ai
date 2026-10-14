@@ -104,7 +104,7 @@
   --secondary-foreground: var(--foreground);
 
   --muted: #f2f3f5;
-  --muted-foreground: #6b7280;
+  --muted-foreground: #606060;
 
   /* neutral by default — brand colour is used deliberately, not on every hover */
   --accent: #f2f3f5;
