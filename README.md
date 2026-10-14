@@ -44,17 +44,20 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   the same audio is the student's playback recording, with screen shares shown in sync. The camera
   is never recorded. See [transcription setup](docs/transcription.md).
 - **Post-session summarizer** (`src/app/api/cron/summarize-sessions`) — a Vercel Cron job (every 5
-  minutes, `vercel.ts`) finds completed bookings with a transcript but no summary yet, extracts
-  spec-mapped topics/misconceptions/homework via the AI Gateway, computes a talk-time ratio from
-  the transcript directly (no LLM needed for that part), and chunks + embeds the transcript into
+  minutes, `vercel.ts`) finds completed bookings with a transcript but no summary yet, writes the
+  tutor's reflection on the session (goals, what was covered, what went well, areas for
+  improvement, learning insights, a key breakthrough, next steps) via the AI Gateway, citing a
+  `[MM:SS]` timestamp from the transcript's own per-line timestamps against any claim concrete
+  enough to point at one moment, computes a talk-time ratio from the transcript directly (no LLM
+  needed for that part), and chunks + embeds the transcript into
   `session_embeddings` — this is what actually grounds the revision chatbot; before this, that
   table was always empty. It also formats that structured summary into the markdown seed for
   `session_analytics.notes_markdown` (`src/lib/session-notes.ts`) — see below.
 - **Per-session review** (`/dashboard/student/bookings/[bookingId]`) — each completed booking has
   its own review page. The session recording sits beside a single editable markdown notes panel
-  (goals, outcomes, what worked, what was challenging, a pattern noticed, a breakthrough, next
-  steps — seeded from the LLM summary above), scrollable
-  independently of the recording and stacking below it on mobile; the tutor can rewrite it freely
+  (Session Goals, What We Covered, What Went Well, Areas for Improvement, Learning Insights, Key
+  Breakthrough, Next Steps — seeded from the LLM summary above, with its timestamp citations),
+  scrollable independently of the recording and stacking below it on mobile; the tutor can rewrite it freely
   and save, with an undo back to the last save before doing so — everyone on the booking sees the
   same document. A collapsible section below both has the full transcript. When recording is
   enabled, the recording panel plays the session audio from a private, short-lived URL, showing the

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState, type PointerEvent } from "react";
-import { MonitorUp, Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { MonitorUp, Pause, Play, SkipForward, Volume2, VolumeX } from "lucide-react";
 
 export type ScreenSegment = {
   id: string;
@@ -123,6 +123,13 @@ export function LessonPlayer({
     if (!audio) return;
     audio.currentTime = Math.min(Math.max(0, seconds), duration || seconds);
     sync();
+  }
+
+  // Skips to whichever share starts next; wraps back to the first once
+  // playback is inside or past the last one, so the button is always useful.
+  function jumpToNextShare() {
+    const next = marks.find((mark) => mark.from > time) ?? marks[0];
+    if (next) seek(next.from);
   }
 
   function togglePlay() {
@@ -276,6 +283,17 @@ export function LessonPlayer({
           />
         </div>
 
+        {screens.length > 0 && (
+          <button
+            type="button"
+            onClick={jumpToNextShare}
+            aria-label="Jump to next screen share"
+            title="Jump to next screen share"
+            className="flex shrink-0 items-center gap-1 rounded-md px-1.5 py-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <SkipForward className="size-4" />
+          </button>
+        )}
         <button
           type="button"
           onClick={cycleSpeed}
@@ -293,25 +311,6 @@ export function LessonPlayer({
           {muted ? <VolumeX className="size-4" /> : <Volume2 className="size-4" />}
         </button>
       </div>
-
-      {screens.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <span className="inline-block h-1.5 w-4 rounded-full bg-saffron" />
-            Screen share
-          </span>
-          {marks.map((mark) => (
-            <button
-              key={mark.id}
-              type="button"
-              onClick={() => seek(mark.from)}
-              className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-            >
-              Screen share {mark.index + 1} · {clock(mark.from)}–{clock(mark.to)}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
