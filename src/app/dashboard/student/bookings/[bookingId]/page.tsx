@@ -153,7 +153,14 @@ export default async function StudentSessionReviewPage({
                   {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
                   {audioPlayers.map((recording, index) => (
                     <div key={recording.id}>
-                      <p className="mb-2 text-sm font-medium">{audioPlayers.length > 1 ? `Recording segment ${index + 1}` : recording.path.endsWith(".mp4") ? "Session video" : "Session recording"} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                      {/* A lone recording needs no label — the card title
+                          already says "Session recording". Multiple segments
+                          (a tutor who left and rejoined) still need telling apart. */}
+                      {audioPlayers.length > 1 && (
+                        <p className="mb-2 text-sm font-medium">
+                          Recording segment {index + 1} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        </p>
+                      )}
                       {/* Recordings made before audio-only recording are MP4 video and stay playable until they expire. */}
                       {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <LessonPlayer audioSrc={recording.url} audioStartMs={Date.parse(recording.startedAt)} audioDurationMs={recording.endedAt ? Date.parse(recording.endedAt) - Date.parse(recording.startedAt) : undefined} screens={screenSegments.filter((screen) => overlaps(screen, recording))} />}
                     </div>
