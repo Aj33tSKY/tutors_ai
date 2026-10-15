@@ -48,7 +48,7 @@ export default async function TutorPayoutsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Landmark className="size-4 text-saffron" /> Stripe Connect
+            <Landmark className="size-4 text-brand-strong" /> Stripe Connect
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -59,7 +59,7 @@ export default async function TutorPayoutsPage() {
           ) : payoutsEnabled ? (
             <>
               <div className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="size-4 text-saffron" />
+                <CheckCircle2 className="size-4 text-brand-strong" />
                 Payouts are enabled. Bookings pay out to your connected account, minus the
                 platform fee.
               </div>

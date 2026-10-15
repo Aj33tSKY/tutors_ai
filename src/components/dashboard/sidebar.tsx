@@ -135,7 +135,7 @@ export function DashboardSidebar({
           <div className="flex flex-col items-center gap-2 rounded-2xl border border-border/70 bg-card p-2 shadow-sm">
             <div
               title={fullName}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-sm font-semibold text-saffron"
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-sm font-semibold text-brand-strong"
             >
               {initial}
             </div>
@@ -151,7 +151,7 @@ export function DashboardSidebar({
           </div>
         ) : (
           <div className="flex items-center gap-3 rounded-2xl border border-border/70 bg-card p-3 shadow-sm">
-            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-sm font-semibold text-saffron">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-sm font-semibold text-brand-strong">
               {initial}
             </div>
             <div className="min-w-0 flex-1">

@@ -79,7 +79,7 @@ export function ChatShell({
         <form action={createConversationAction}>
           <button
             type="submit"
-            className="flex w-full items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2.5 text-sm font-medium shadow-sm transition-colors hover:border-saffron hover:text-saffron"
+            className="flex w-full items-center gap-2 rounded-full border border-border bg-card px-3.5 py-2.5 text-sm font-medium shadow-sm transition-colors hover:border-saffron hover:text-brand-strong"
           >
             <Plus className="size-4" /> New chat
           </button>
@@ -116,7 +116,7 @@ export function ChatShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="flex items-center gap-3 border-b border-border/70 pb-5">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-saffron">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-brand-strong">
             <Sparkles className="size-4" />
           </span>
           <div>
@@ -167,7 +167,7 @@ export function ChatShell({
                 <button
                   key={s}
                   onClick={() => submit(s)}
-                  className="rounded-full border border-border bg-card px-4 py-2.5 text-left text-sm shadow-sm transition-colors hover:border-saffron hover:text-saffron"
+                  className="rounded-full border border-border bg-card px-4 py-2.5 text-left text-sm shadow-sm transition-colors hover:border-saffron hover:text-brand-strong"
                 >
                   {s}
                 </button>
@@ -188,7 +188,7 @@ export function ChatShell({
                 </div>
               ) : (
                 <div key={m.id} className="flex gap-3">
-                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-saffron">
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-brand-strong">
                     <Sparkles className="size-3.5" />
                   </span>
                   <div className="max-w-[85%] pt-0.5 text-sm leading-relaxed text-foreground">
@@ -202,7 +202,7 @@ export function ChatShell({
 
           {status === "submitted" && (
             <div className="flex items-center gap-3">
-              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-saffron">
+              <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-saffron/15 text-brand-strong">
                 <Sparkles className="size-3.5" />
               </span>
               <div className="flex items-center gap-2 pt-0.5 text-sm text-muted-foreground">

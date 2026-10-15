@@ -58,6 +58,7 @@ for (const t of MOCK_TUTORS_RAW) {
         headline: t.headline,
         hourly_rate: t.hourlyRate * 100,
         dbs_verified: true,
+        is_demo: true,
         subjects: t.subjects,
         boards: t.boards,
         years_experience: t.yearsExperience,

@@ -147,7 +147,7 @@ export default async function StudentSessionReviewPage({
           drop below instead. */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
-          <RecordingCard title="Session recording" icon={<Video className="size-4 text-saffron" />}>
+          <RecordingCard title="Session recording" icon={<Video className="size-4 text-brand-strong" />}>
             {hasAnyRecording ? (
               <div className="space-y-5">
                 {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}

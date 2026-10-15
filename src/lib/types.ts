@@ -31,7 +31,8 @@ export interface TutorProfile {
   dbs_verified: boolean;
   subjects: StemSubject[];
   boards: ExamBoard[];
-  rating: number;
+  rating: number | null;
+  is_demo?: boolean;
   headline?: string | null;
   years_experience?: number | null;
   sessions_taught?: number | null;

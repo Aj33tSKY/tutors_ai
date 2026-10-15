@@ -55,6 +55,7 @@
   --color-hairline: var(--hairline);
   --color-cream: var(--cream);
   --color-saffron: var(--saffron);
+  --color-brand-strong: var(--brand-strong);
   --color-rust: var(--rust);
   --color-violet: var(--violet);
 
@@ -84,6 +85,7 @@
   --hairline: #e4e4e7;
   --cream: #fafafa;
   --saffron: #58cc02;
+  --brand-strong: #237000;
   --rust: #1272a0;
   --violet: #1cb0f6;
   --ember-flame: #0ea5e9;

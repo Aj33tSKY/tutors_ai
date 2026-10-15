@@ -48,7 +48,7 @@ export default function SignInPage() {
 
       <p className="mt-8 text-sm text-muted-foreground">
         New to Kindling?{" "}
-        <Link href="/sign-up" className="link-draw text-saffron">
+        <Link href="/sign-up" className="link-draw text-brand-strong">
           Create an account
         </Link>
       </p>

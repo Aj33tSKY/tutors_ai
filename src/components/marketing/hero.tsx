@@ -9,9 +9,9 @@ const WIDEST = SUBJECTS.reduce((a, b) => (b.length > a.length ? b : a));
 
 const STATS = [
   { value: "6", label: "A-Level STEM subjects" },
-  { value: "5", label: "Exam boards covered" },
-  { value: "100%", label: "DBS-verified tutors" },
-  { value: "24/7", label: "Grounded revision AI" },
+  { value: "6", label: "Exam board options" },
+  { value: "1:1", label: "Live online lessons" },
+  { value: "90 days", label: "Recording retention" },
 ];
 
 export function Hero() {
@@ -22,10 +22,10 @@ export function Hero() {
       <div className="shell pt-16 pb-[var(--section-y)] sm:pt-24">
         <h1 className="display-xl max-w-[13ch]">
           Tutoring that{" "}
-          <span className="text-saffron">remembers</span> every lesson.
+          <span className="text-brand-strong">remembers</span> every lesson.
         </h1>
         <p className="mt-4 text-sm text-muted-foreground">
-          A-Level STEM · AQA / Edexcel / OCR / CIE
+          A-Level STEM · AQA / Edexcel / OCR / WJEC / CIE
         </p>
 
         <div className="mt-14 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-16">
@@ -39,8 +39,8 @@ export function Hero() {
               <RotatingSubject />
             </p>
             <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
-              Every live session is transcribed, mapped to your exam spec, and turned into a
-              revision AI grounded in your own tutor&apos;s words.
+              Review lesson recordings and notes, then practise with a revision assistant
+              that can use your session transcripts.
             </p>
 
             <div className="mt-10 flex flex-wrap items-center gap-3">
@@ -65,7 +65,7 @@ export function Hero() {
               <div key={s.label} className="rounded-2xl bg-card p-5 shadow-sm">
                 <dt className="sr-only">{s.label}</dt>
                 <dd>
-                  <span className="display-md block text-saffron">{s.value}</span>
+                  <span className="display-md block text-brand-strong">{s.value}</span>
                   <span className="eyebrow mt-2 block">{s.label}</span>
                 </dd>
               </div>
@@ -89,7 +89,7 @@ export function Hero() {
  */
 function RotatingSubject() {
   return (
-    <span className="relative inline-block leading-[1.25] whitespace-nowrap text-saffron">
+    <span className="relative inline-block leading-[1.25] whitespace-nowrap text-brand-strong">
       <span className="sr-only">
         maths, further maths, physics, chemistry, biology and computing
       </span>
@@ -119,13 +119,10 @@ function SessionPanel() {
     <div className="w-full min-w-0 max-w-md overflow-hidden rounded-3xl border border-border/70 bg-card shadow-lg lg:w-[26rem]">
       <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
         <span className="eyebrow flex items-center gap-2 text-foreground">
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-saffron opacity-60" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-saffron" />
-          </span>
-          Live · Physics
+          <span className="size-1.5 rounded-full bg-saffron" />
+          Example lesson · Physics
         </span>
-        <span className="font-mono text-xs text-muted-foreground tabular-nums">34:12</span>
+        <span className="font-mono text-xs text-muted-foreground">Lesson review</span>
       </div>
 
       <div className="space-y-4 px-5 py-5">
@@ -135,19 +132,8 @@ function SessionPanel() {
       </div>
 
       <div className="border-t border-border/70 bg-secondary/50 px-5 py-5">
-        <p className="font-heading text-lg font-semibold">
-          Edexcel Physics 4.2 — Particle Accelerators
-        </p>
-        <p className="mt-1 text-sm text-muted-foreground">Auto-detected spec point</p>
-        <div className="mt-4 flex items-center gap-3">
-          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-hairline">
-            <div
-              className="h-full rounded-full bg-saffron"
-              style={{ width: "72%" }}
-            />
-          </div>
-          <span className="font-mono text-xs text-saffron tabular-nums">72%</span>
-        </div>
+        <p className="font-heading text-lg font-semibold">Particle accelerators</p>
+        <p className="mt-1 text-sm text-muted-foreground">After a lesson, return to its recording, transcript and notes.</p>
       </div>
     </div>
   );
@@ -157,7 +143,7 @@ function TranscriptLine({ speaker, text }: { speaker: "Tutor" | "Student"; text:
   return (
     <p className="grid grid-cols-[4.5rem_1fr] gap-3 text-sm">
       <span
-        className={`eyebrow pt-1 ${speaker === "Tutor" ? "text-saffron" : "text-violet"}`}
+        className={`eyebrow pt-1 ${speaker === "Tutor" ? "text-brand-strong" : "text-violet"}`}
       >
         {speaker}
       </span>

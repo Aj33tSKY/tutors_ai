@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { CalendarPlus, ChevronDown, ChevronLeft, ChevronRight, Pencil, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +28,14 @@ const QUARTER_HOUR_OPTIONS = Array.from({ length: 96 }, (_, index) => {
   const minutes = (index % 4) * 15;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 });
+const MOBILE_QUERY = "(max-width: 639px)";
+function subscribeToViewport(change: () => void) {
+  const query = window.matchMedia(MOBILE_QUERY);
+  query.addEventListener("change", change);
+  return () => query.removeEventListener("change", change);
+}
+function isNarrowViewport() { return window.matchMedia(MOBILE_QUERY).matches; }
+function isNarrowOnServer() { return false; }
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
@@ -82,7 +90,9 @@ function rangeLabel(anchor: Date, view: CalendarView) {
 
 export function SessionsPanel({ sessions, initialRange, counterpartLabel = "Tutor", canMarkComplete = false, canSendInvoice = false, canCreateSession = false, students = [] }: { sessions: SessionRow[]; initialRange: CalendarWindow; counterpartLabel?: string; canMarkComplete?: boolean; canSendInvoice?: boolean; canCreateSession?: boolean; students?: { id: string; fullName: string }[] }) {
   const [query, setQuery] = useState("");
-  const [view, setView] = useState<CalendarView>("week");
+  const narrowViewport = useSyncExternalStore(subscribeToViewport, isNarrowViewport, isNarrowOnServer);
+  const [chosenView, setView] = useState<CalendarView | null>(null);
+  const view = chosenView ?? (narrowViewport ? "day" : "week");
   const [anchor, setAnchor] = useState(() => new Date());
   const [remote, setRemote] = useState<{ baseSessions: SessionRow[]; range: CalendarWindow; sessions: SessionRow[] } | null>(null);
   const [loadError, setLoadError] = useState(false);
@@ -139,7 +149,7 @@ export function SessionsPanel({ sessions, initialRange, counterpartLabel = "Tuto
       <CardContent>
         {/* Laid out like Google Calendar: Today, previous/next and the period on the left; search and the view picker on the right. */}
         <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-3">
-          {canCreateSession && <Button type="button" className="h-9 rounded-full px-4 text-white" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}
+          {canCreateSession && <Button type="button" className="h-9 rounded-full px-4" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}
           <Button type="button" variant="ghost" className="h-9 rounded-full border-border px-4" onClick={() => setAnchor(new Date())}>Today</Button>
           <div className="flex items-center"><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1) : addDays(anchor, view === "week" ? -7 : -1))} aria-label={`Previous ${view}`}><ChevronLeft className="size-5" /></Button><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) : addDays(anchor, view === "week" ? 7 : 1))} aria-label={`Next ${view}`}><ChevronRight className="size-5" /></Button></div>
           <h3 className="mr-auto font-heading text-lg font-semibold">{rangeLabel(anchor, view)}</h3>
@@ -156,12 +166,12 @@ export function SessionsPanel({ sessions, initialRange, counterpartLabel = "Tuto
           <div className="grid grid-cols-7">{cells.map((day) => {
             const inMonth = day.getMonth() === anchor.getMonth(); const key = dateKey(day); const daySessions = byDay.get(key) ?? [];
             return <div key={key} onClick={(event) => { if (canCreateSession && !(event.target as Element).closest("button")) setNewSessionStart({ date: day, time: "09:00" }); }} className={`min-h-28 border-r border-b border-hairline p-1.5 last:border-r-0 ${inMonth ? "bg-card" : "bg-muted/20 text-muted-foreground"} ${canCreateSession ? "cursor-pointer hover:bg-muted/30" : ""}`}>
-              <span className={`mb-1 flex size-6 items-center justify-center rounded-full text-xs ${key === today ? "bg-saffron font-semibold text-white" : ""}`}>{day.getDate()}</span>
-              <div className="space-y-1">{daySessions.slice(0, 3).map((session) => <button key={session.id} type="button" onClick={() => setSelected(session)} className={`block w-full truncate rounded-md px-1.5 py-1 text-left text-xs font-medium shadow-sm transition-opacity hover:opacity-80 ${session.status === "completed" ? "bg-muted text-foreground" : "bg-saffron text-white"}`}><span className={session.status === "completed" ? "mr-1 text-muted-foreground" : "mr-1 text-white/80"}>{timeLabel(session.start_time)}</span>{session.lesson_name || subjectLabel(session.subject)} · {session.counterpartName}</button>)}{daySessions.length > 3 && <button type="button" className="px-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => setSelected(daySessions[3])}>+{daySessions.length - 3} more</button>}</div>
+              <span className={`mb-1 flex size-6 items-center justify-center rounded-full text-xs ${key === today ? "bg-saffron font-semibold text-ink" : ""}`}>{day.getDate()}</span>
+              <div className="space-y-1">{daySessions.slice(0, 3).map((session) => <button key={session.id} type="button" onClick={() => setSelected(session)} className={`block w-full truncate rounded-md px-1.5 py-1 text-left text-xs font-medium shadow-sm transition-opacity hover:opacity-80 ${session.status === "completed" ? "bg-muted text-foreground" : "bg-saffron text-ink"}`}><span className={session.status === "completed" ? "mr-1 text-muted-foreground" : "mr-1 text-ink/70"}>{timeLabel(session.start_time)}</span>{session.lesson_name || subjectLabel(session.subject)} · {session.counterpartName}</button>)}{daySessions.length > 3 && <button type="button" className="px-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => setSelected(daySessions[3])}>+{daySessions.length - 3} more</button>}</div>
             </div>;
           })}</div>
         </div></div> : <TimeCalendar view={view} anchor={anchor} byDay={byDay} onSelect={setSelected} onEmptySlot={canCreateSession ? (date, time) => setNewSessionStart({ date, time }) : undefined} />}
-        {visible.length === 0 && <p className="mt-4 text-center text-sm text-muted-foreground">{query ? `No sessions match that ${counterpartLabel.toLowerCase()}.` : "No sessions yet."}</p>}
+        {visible.length === 0 && query && <p className="mt-4 text-center text-sm text-muted-foreground">No sessions match that {counterpartLabel.toLowerCase()}.</p>}
       </CardContent>
     </Card>
     <SessionDialog key={selected?.id ?? "none"} session={selected} open={Boolean(selected)} onOpenChange={(open) => !open && setSelected(null)} counterpartLabel={counterpartLabel} canMarkComplete={canMarkComplete} canSendInvoice={canSendInvoice} />
@@ -172,7 +182,7 @@ export function SessionsPanel({ sessions, initialRange, counterpartLabel = "Tuto
 /** How much of the day is visible without scrolling, matching Google Calendar's own fold. */
 const VISIBLE_HOURS = 9;
 
-function TimeCalendar({ view, anchor, byDay, onSelect, onEmptySlot }: { view: Exclude<CalendarView, "month">; anchor: Date; byDay: Map<string, SessionRow[]>; onSelect: (session: SessionRow) => void; onEmptySlot?: (date: Date, time: string) => void }) {
+function TimeCalendar({ view, anchor, byDay, onSelect, onEmptySlot }: { view: "day" | "week"; anchor: Date; byDay: Map<string, SessionRow[]>; onSelect: (session: SessionRow) => void; onEmptySlot?: (date: Date, time: string) => void }) {
   const [now, setNow] = useState(() => new Date());
   const scrollRef = useRef<HTMLDivElement>(null);
   // The header is a sibling above the scrolling grid, not a sticky element
@@ -211,16 +221,16 @@ function TimeCalendar({ view, anchor, byDay, onSelect, onEmptySlot }: { view: Ex
   const nowTop = ((now.getHours() * 60 + now.getMinutes() - FIRST_HOUR * 60) / 60) * HOUR_HEIGHT;
   const activeNow = nowTop >= 0 && nowTop <= totalHeight;
   const gridColumns = `3.5rem repeat(${days.length}, minmax(0, 1fr))`;
-  return <div className="overflow-x-auto"><div className="overflow-hidden rounded-xl border border-hairline" style={{ minWidth: view === "week" ? 760 : 420 }}>
+  return <div className="overflow-x-auto"><div className="overflow-hidden rounded-xl border border-hairline" style={{ minWidth: view === "week" ? 760 : undefined }}>
     {/* The day-of-week header is a plain sibling above the scrolling grid,
         not a sticky element inside it, so it is genuinely fixed rather than
         occasionally showing a sliver of whatever just scrolled past it. */}
-    <div className="grid border-b border-hairline bg-muted" style={{ gridTemplateColumns: gridColumns, paddingRight: scrollbarWidth }}><div />{days.map((day) => <div key={dateKey(day)} className="border-l border-hairline px-2 py-2 text-center"><p className="text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">{day.toLocaleDateString("en-GB", { weekday: "short" })}</p><span className={`mx-auto mt-1 flex size-7 items-center justify-center rounded-full text-sm ${dateKey(day) === nowDay ? "bg-saffron font-semibold text-white" : ""}`}>{day.getDate()}</span></div>)}</div>
+    <div className="grid border-b border-hairline bg-muted" style={{ gridTemplateColumns: gridColumns, paddingRight: scrollbarWidth }}><div />{days.map((day) => <div key={dateKey(day)} className="border-l border-hairline px-2 py-2 text-center"><p className="text-[0.6875rem] font-medium tracking-[0.08em] text-muted-foreground uppercase">{day.toLocaleDateString("en-GB", { weekday: "short" })}</p><span className={`mx-auto mt-1 flex size-7 items-center justify-center rounded-full text-sm ${dateKey(day) === nowDay ? "bg-saffron font-semibold text-ink" : ""}`}>{day.getDate()}</span></div>)}</div>
     <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: VISIBLE_HOURS * HOUR_HEIGHT }}>
       <div className="grid" style={{ gridTemplateColumns: gridColumns }}><div className="relative" style={{ height: totalHeight }}>{Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className={`absolute left-0 w-full pr-2.5 text-right text-[0.65rem] text-muted-foreground ${index === 0 ? "" : "-translate-y-2"}`} style={{ top: index * HOUR_HEIGHT }}>{hourLabel(FIRST_HOUR + index)}</div>)}</div>{days.map((day) => <div key={dateKey(day)} onClick={(event) => { if (!onEmptySlot || (event.target as Element).closest("button")) return; const offset = event.clientY - event.currentTarget.getBoundingClientRect().top; const minutes = Math.max(FIRST_HOUR * 60, Math.min(LAST_HOUR * 60 - 15, FIRST_HOUR * 60 + Math.round((offset / HOUR_HEIGHT) * 4) * 15)); onEmptySlot(day, `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`); }} className={`relative border-l border-hairline bg-card ${onEmptySlot ? "cursor-pointer" : ""}`} style={{ height: totalHeight }}>
         {Array.from({ length: LAST_HOUR - FIRST_HOUR }, (_, index) => <div key={index} className="absolute inset-x-0 border-t border-hairline/80" style={{ top: index * HOUR_HEIGHT }} />)}
         {dateKey(day) === nowDay && activeNow && <div className="pointer-events-none absolute z-20 inset-x-0 border-t-2 border-red-500" style={{ top: nowTop }}><span className="absolute -left-1 -top-1.5 size-2.5 rounded-full bg-red-500" /></div>}
-        {(byDay.get(dateKey(day)) ?? []).map((session) => { const start = new Date(session.start_time); const end = new Date(session.end_time); const top = ((start.getHours() * 60 + start.getMinutes() - FIRST_HOUR * 60) / 60) * HOUR_HEIGHT; const height = Math.max(HOUR_HEIGHT - 3, ((end.getTime() - start.getTime()) / (60 * 60 * 1000)) * HOUR_HEIGHT - 3); if (top < -HOUR_HEIGHT || top > totalHeight) return null; return <button key={session.id} type="button" onClick={() => onSelect(session)} className={`absolute z-10 mx-1 block overflow-hidden rounded-md px-2 py-1.5 text-left shadow-md transition-opacity hover:opacity-80 ${session.status === "completed" ? "bg-muted text-foreground" : "bg-saffron text-white"}`} style={{ top: Math.max(0, top + 1), height: Math.min(height, totalHeight - Math.max(0, top) - 2), left: 0, right: 0 }}><span className="block truncate text-xs font-semibold">{session.lesson_name || subjectLabel(session.subject)}</span><span className="block truncate text-xs">{session.counterpartName}</span><span className={`block text-[0.65rem] ${session.status === "completed" ? "text-muted-foreground" : "text-white/80"}`}>{timeLabel(session.start_time)}</span></button>; })}
+        {(byDay.get(dateKey(day)) ?? []).map((session) => { const start = new Date(session.start_time); const end = new Date(session.end_time); const top = ((start.getHours() * 60 + start.getMinutes() - FIRST_HOUR * 60) / 60) * HOUR_HEIGHT; const height = Math.max(HOUR_HEIGHT - 3, ((end.getTime() - start.getTime()) / (60 * 60 * 1000)) * HOUR_HEIGHT - 3); if (top < -HOUR_HEIGHT || top > totalHeight) return null; return <button key={session.id} type="button" onClick={() => onSelect(session)} className={`absolute z-10 mx-1 block overflow-hidden rounded-md px-2 py-1.5 text-left shadow-md transition-opacity hover:opacity-80 ${session.status === "completed" ? "bg-muted text-foreground" : "bg-saffron text-ink"}`} style={{ top: Math.max(0, top + 1), height: Math.min(height, totalHeight - Math.max(0, top) - 2), left: 0, right: 0 }}><span className="block truncate text-xs font-semibold">{session.lesson_name || subjectLabel(session.subject)}</span><span className="block truncate text-xs">{session.counterpartName}</span><span className={`block text-[0.65rem] ${session.status === "completed" ? "text-muted-foreground" : "text-ink/70"}`}>{timeLabel(session.start_time)}</span></button>; })}
       </div>)}</div>
     </div>
   </div></div>;

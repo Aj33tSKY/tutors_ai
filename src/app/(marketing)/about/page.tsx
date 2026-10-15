@@ -3,23 +3,23 @@ import { Reveal } from "@/components/marketing/reveal";
 const POINTS = [
   {
     id: "dbs",
-    title: "DBS verification, mandatory",
-    body: "Every tutor uploads an enhanced DBS (Disclosure and Barring Service) certificate before their profile can go live. Admins review and approve manually.",
+    title: "Tutor verification",
+    body: "Only tutors approved by our team appear in public search. We review their identity and relevant safeguarding evidence before approving a profile.",
   },
   {
     id: "parents",
     title: "Parent linkage for under-18 students",
-    body: "Parents can link their account to a child's profile, giving them full visibility into every session's transcript, analytics and chatbot log.",
+    body: "Linked parent accounts can see their children's lesson schedule and completed session reviews. Private student conversations and revision chats remain private.",
   },
   {
     id: "privacy",
     title: "GDPR & data retention",
-    body: "Audio is streamed for live transcription and discarded immediately after — it is never stored. Raw transcripts are encrypted at rest.",
+    body: "When recording is enabled, lesson audio and shared screens are saved for review and automatically expire after 90 days. Session transcripts and notes remain available to authorised lesson participants.",
   },
   {
     id: "compliance",
     title: "UK exam board alignment",
-    body: "Topic mapping is aligned to official AQA, Edexcel, OCR A/B, WJEC and CIE specification points, not generic curricula.",
+    body: "Tutor profiles show the A-Level subjects and exam boards they teach. Session notes help students revisit what their own tutor covered.",
   },
 ];
 

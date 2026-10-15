@@ -82,15 +82,25 @@ export async function POST(req: Request) {
       .eq("id", chatId);
   }
 
-  const { data: embeddings } = await supabase
-    .from("session_embeddings")
-    .select("content, topic")
-    .eq("student_id", user.id)
-    .limit(12);
-
-  const grounding = (embeddings ?? [])
-    .map((e) => `[${e.topic ?? "session"}] ${e.content}`)
-    .join("\n\n");
+  const [{ count: completedCount }, { data: recentLessons }] = await Promise.all([
+    supabase.from("bookings").select("id", { count: "exact", head: true }).eq("student_id", user.id).eq("status", "completed"),
+    supabase.from("bookings").select("id, lesson_name, subject, exam_board, start_time")
+      .eq("student_id", user.id).eq("status", "completed")
+      .order("start_time", { ascending: false }).limit(12),
+  ]);
+  const lessons = recentLessons ?? [];
+  const { data: embeddings } = lessons.length
+    ? await supabase.from("session_embeddings").select("booking_id, content, topic")
+      .eq("student_id", user.id).in("booking_id", lessons.map((lesson) => lesson.id)).limit(24)
+    : { data: [] };
+  const lessonById = new Map(lessons.map((lesson) => [lesson.id, lesson]));
+  const grounding = (embeddings ?? []).map((excerpt) => {
+    const lesson = lessonById.get(excerpt.booking_id);
+    const source = lesson
+      ? `${lesson.lesson_name || lesson.subject || "Lesson"}, ${new Date(lesson.start_time).toLocaleDateString("en-GB")}`
+      : "Lesson";
+    return `[Source: ${source}; topic: ${excerpt.topic ?? "general"}] ${excerpt.content}`;
+  }).join("\n\n");
 
   const style = `You are Kindling's revision assistant, a UK A-Level STEM tutor talking with a student out loud, not writing them a document.
 
@@ -102,9 +112,10 @@ How you write:
 - Don't open with filler like "Great question", "Certainly", "I'd be happy to help", "Let's dive in", or close with "Let me know if you have any other questions" or "In conclusion". Just answer.
 - Sound like a person, not a search result.`;
 
+  const lessonContext = `The student has ${completedCount ?? 0} completed lesson${completedCount === 1 ? "" : "s"}. Only excerpts from up to 12 recent lessons are included below. Never invent a lesson, quote, source or progress measure.`;
   const instructions = grounding
-    ? `${style}\n\nGround every answer in the session excerpts below, reusing the same methods, terminology and exam board conventions the student's tutor used. If the excerpts don't cover what's asked, say so plainly before giving general A-Level guidance.\n\nSession excerpts:\n${grounding}`
-    : `${style}\n\nThis student has no completed tutoring sessions yet, so you have no transcript to ground answers in. Say that plainly and briefly, then still help with general A-Level exam-style guidance (mention the exam board when relevant), and nudge them to book a session so future answers can be grounded in their own tutor's explanations.`;
+    ? `${style}\n\n${lessonContext} For questions about their lesson history, use this count. Ground answers about past lessons in the excerpts below. Mention the source lesson name and date when using one. Reuse the tutor's methods and terminology. If the excerpts don't cover the question, say so plainly before giving general A-Level guidance.\n\nSession excerpts:\n${grounding}`
+    : `${style}\n\n${lessonContext} No transcript excerpts are available in this context. Say so briefly if asked about a past lesson, then help with general A-Level exam-style guidance. If the student has no completed lessons, suggest booking one for future transcript-grounded answers.`;
 
   // Bound the context sent to the model regardless of how long the thread
   // has grown — cost per turn stays flat instead of climbing with history.

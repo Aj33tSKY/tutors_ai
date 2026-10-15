@@ -2,7 +2,7 @@ import { ShieldCheck, Users, CalendarClock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { TutorReviewForm } from "./tutor-review-form";
 import type { Profile } from "@/lib/types";
 
 type PendingTutor = {
@@ -43,7 +43,7 @@ export default async function AdminDashboardPage() {
         {stats.map((s) => (
           <Card key={s.label}>
             <CardContent className="pt-6">
-              <s.icon className="size-4 text-saffron" />
+              <s.icon className="size-4 text-brand-strong" />
               <p className="mt-3 display-md">{s.value}</p>
               <p className="text-xs text-muted-foreground">{s.label}</p>
             </CardContent>
@@ -71,12 +71,8 @@ export default async function AdminDashboardPage() {
                       <p className="font-medium">{tutorProfile?.full_name}</p>
                       <p className="text-sm text-muted-foreground">{tutorProfile?.email}</p>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="secondary">Awaiting DBS</Badge>
-                      <Button size="sm">
-                        Review
-                      </Button>
-                    </div>
+                    <Badge variant="secondary">Awaiting review</Badge>
+                    <TutorReviewForm tutorId={t.id} />
                   </li>
                 );
               })}
