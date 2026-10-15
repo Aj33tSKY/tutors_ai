@@ -29,15 +29,25 @@ const markdownComponents: Components = {
  * Replaces the old separate summary / topics / action-point / misconception
  * cards with one editable markdown document. Everyone on the booking can
  * read it; only the tutor can switch to editing it, and their draft is kept
- * in local state until they explicitly save, with an undo that discards it.
+ * in local state until they explicitly save.
+ *
+ * Two different "give up on this" actions, because they discard different
+ * things: Cancel discards only the current edit, back to whatever is saved
+ * (which may itself already be a past edit). Reset goes further, back to
+ * originalMarkdown — the AI's own output, recomputed fresh from summary_notes
+ * on every render (see page.tsx) rather than read from notes_markdown, since
+ * notes_markdown is overwritten by each save and so can't be used to get back
+ * past more than one save.
  */
 export function SessionNotes({
   bookingId,
   initialMarkdown,
+  originalMarkdown,
   canEdit,
 }: {
   bookingId: string;
   initialMarkdown: string;
+  originalMarkdown: string;
   canEdit: boolean;
 }) {
   const [state, formAction, pending] = useActionState(updateSessionNotesAction, {});
@@ -63,15 +73,20 @@ export function SessionNotes({
     setEditing(true);
   }
 
-  function discardChanges() {
+  function cancelEditing() {
     setDraft(saved);
     setEditing(false);
   }
 
+  function resetToOriginal() {
+    setDraft(originalMarkdown);
+  }
+
   const dirty = draft !== saved;
+  const atOriginal = draft === originalMarkdown;
 
   return (
-    <Card className="flex max-h-[32rem] flex-col lg:max-h-[42rem]">
+    <Card className="flex h-[32rem] flex-col lg:h-[42rem]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <FileText className="size-4 text-saffron" /> Session notes
@@ -86,23 +101,25 @@ export function SessionNotes({
       </CardHeader>
       <CardContent className="min-h-0 flex-1 overflow-y-auto">
         {editing ? (
-          <form action={formAction} className="space-y-3">
+          <form action={formAction} className="flex h-full flex-col gap-3">
             <input type="hidden" name="booking_id" value={bookingId} />
             <textarea
               name="notes_markdown"
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
-              rows={18}
               aria-label="Session notes (markdown)"
-              className="w-full resize-y rounded-lg border border-input bg-background p-3 font-mono text-xs leading-5 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
+              className="w-full flex-1 resize-none rounded-lg border border-input bg-background p-3 font-mono text-xs leading-5 outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
             />
             {state.error && <p role="alert" className="text-xs text-destructive">{state.error}</p>}
-            <div className="flex items-center gap-2">
+            <div className="flex shrink-0 items-center gap-2">
               <Button type="submit" size="sm" disabled={pending || !dirty}>
                 {pending ? "Saving…" : "Save"}
               </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={discardChanges} disabled={pending}>
-                <RotateCcw className="size-3.5" /> {dirty ? "Undo changes" : "Cancel"}
+              <Button type="button" variant="ghost" size="sm" onClick={cancelEditing} disabled={pending}>
+                Cancel
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={resetToOriginal} disabled={pending || atOriginal}>
+                <RotateCcw className="size-3.5" /> Reset to AI version
               </Button>
             </div>
           </form>
