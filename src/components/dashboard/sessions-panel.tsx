@@ -28,7 +28,7 @@ const QUARTER_HOUR_OPTIONS = Array.from({ length: 96 }, (_, index) => {
   const minutes = (index % 4) * 15;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 });
-const MOBILE_QUERY = "(max-width: 639px)";
+const MOBILE_QUERY = "(max-width: 649px)";
 function subscribeToViewport(change: () => void) {
   const query = window.matchMedia(MOBILE_QUERY);
   query.addEventListener("change", change);
@@ -149,15 +149,15 @@ export function SessionsPanel({ sessions, initialRange, counterpartLabel = "Tuto
       <CardContent>
         {/* Laid out like Google Calendar: Today, previous/next and the period on the left; search and the view picker on the right. */}
         <div className="mb-5 flex flex-wrap items-center gap-x-2 gap-y-3">
-          {canCreateSession && <Button type="button" className="h-9 rounded-full px-4" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}
-          <Button type="button" variant="ghost" className="h-9 rounded-full border-border px-4" onClick={() => setAnchor(new Date())}>Today</Button>
+          {canCreateSession && <Button type="button" className="h-9 rounded-md px-4" onClick={() => setNewSessionStart(nextQuarterHour())}><CalendarPlus className="size-4" />New session</Button>}
+          <Button type="button" variant="ghost" className="h-9 rounded-md border-border px-4" onClick={() => setAnchor(new Date())}>Today</Button>
           <div className="flex items-center"><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1) : addDays(anchor, view === "week" ? -7 : -1))} aria-label={`Previous ${view}`}><ChevronLeft className="size-5" /></Button><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) : addDays(anchor, view === "week" ? 7 : 1))} aria-label={`Next ${view}`}><ChevronRight className="size-5" /></Button></div>
           <h3 className="mr-auto font-heading text-lg font-semibold">{rangeLabel(anchor, view)}</h3>
           {!remoteCovers && !initialCovers && !loadError && <span role="status" className="text-xs text-muted-foreground">Loading sessions…</span>}
           {loadError && <button type="button" onClick={() => { setLoadError(false); setRetry((value) => value + 1); }} className="text-xs text-destructive underline">Couldn&apos;t load sessions. Retry</button>}
-          <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${counterpartLabel.toLowerCase()}`} aria-label={`Search by ${counterpartLabel.toLowerCase()} name`} className="h-9 w-44 rounded-full pl-8" /></label>
+          <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${counterpartLabel.toLowerCase()}`} aria-label={`Search by ${counterpartLabel.toLowerCase()} name`} className="h-9 w-44 rounded-md pl-8" /></label>
           <DropdownMenu>
-            <DropdownMenuTrigger asChild><Button type="button" variant="ghost" className="h-9 rounded-full border-border pr-3 pl-4 capitalize">{view}<ChevronDown className="size-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
+            <DropdownMenuTrigger asChild><Button type="button" variant="ghost" className="h-9 rounded-md border-border pr-3 pl-4 capitalize">{view}<ChevronDown className="size-4 text-muted-foreground" /></Button></DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36"><DropdownMenuRadioGroup value={view} onValueChange={(value) => setView(value as CalendarView)}>{VIEWS.map((option) => <DropdownMenuRadioItem key={option} value={option} className="py-2 pl-3 capitalize">{option}</DropdownMenuRadioItem>)}</DropdownMenuRadioGroup></DropdownMenuContent>
           </DropdownMenu>
         </div>

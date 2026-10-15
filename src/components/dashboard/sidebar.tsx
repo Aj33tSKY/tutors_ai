@@ -59,7 +59,7 @@ export function DashboardNav({
             aria-current={active ? "page" : undefined}
             title={collapsed ? item.label : undefined}
             className={cn(
-              "flex items-center gap-3 rounded-full px-3.5 py-2.5 text-sm font-medium transition-colors duration-200",
+              "flex items-center gap-3 rounded-md px-3.5 py-2.5 text-sm font-medium transition-colors duration-200",
               collapsed && "justify-center px-0",
               active
                 ? "bg-sidebar-accent text-sidebar-accent-foreground"
