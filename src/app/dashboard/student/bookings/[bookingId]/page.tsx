@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { Play, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { ReturnToDashboardLink } from "@/components/dashboard/return-to-dashboard-link";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
@@ -10,6 +10,7 @@ import { formatSessionNotesMarkdown } from "@/lib/session-notes";
 import { MAX_TRANSCRIBE_ATTEMPTS } from "@/lib/transcription";
 import type { Booking, SessionAnalytics, SessionRecording } from "@/lib/types";
 import { LessonPlayer, type ScreenSegment } from "./lesson-player";
+import { RecordingCard } from "./recording-card";
 import { SessionNotes } from "./session-notes";
 
 const RECORDINGS_BUCKET = "session-recordings";
@@ -106,7 +107,12 @@ export default async function StudentSessionReviewPage({
   // existed (or mid-regeneration after a reopen) — fall back to formatting
   // the structured summary the same way the cron seeds it, so those reviews
   // still render without a backfill migration.
-  const notesMarkdown = analytics?.notes_markdown ?? (summary ? formatSessionNotesMarkdown(summary) : "");
+  // The AI's own output, recomputed fresh every time: summary_notes is never
+  // touched again once generated (see summarize-sessions), so this is always
+  // the pristine original the tutor can reset back to, no matter how many
+  // times they've since saved over notes_markdown.
+  const originalMarkdown = summary ? formatSessionNotesMarkdown(summary) : "";
+  const notesMarkdown = analytics?.notes_markdown ?? originalMarkdown;
   const startedAt = new Date(booking.start_time).toLocaleString("en-GB", {
     weekday: "long",
     day: "numeric",
@@ -131,7 +137,7 @@ export default async function StudentSessionReviewPage({
             <PaymentBadge booking={booking} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            {startedAt} · {boardLabel(booking.exam_board)}
+            {booking.exam_board ? `${startedAt} · ${boardLabel(booking.exam_board)}` : startedAt}
           </p>
         </header>
       </div>
@@ -141,54 +147,47 @@ export default async function StudentSessionReviewPage({
           drop below instead. */}
       <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
         <div className="min-w-0 flex-1">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Video className="size-4 text-saffron" /> Session recording
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasAnyRecording ? (
-                <div className="space-y-5">
-                  {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
-                  {audioPlayers.map((recording, index) => (
-                    <div key={recording.id}>
-                      {/* A lone recording needs no label — the card title
-                          already says "Session recording". Multiple segments
-                          (a tutor who left and rejoined) still need telling apart. */}
-                      {audioPlayers.length > 1 && (
-                        <p className="mb-2 text-sm font-medium">
-                          Recording segment {index + 1} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
-                        </p>
-                      )}
-                      {/* Recordings made before audio-only recording are MP4 video and stay playable until they expire. */}
-                      {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <LessonPlayer audioSrc={recording.url} audioStartMs={Date.parse(recording.startedAt)} audioDurationMs={recording.endedAt ? Date.parse(recording.endedAt) - Date.parse(recording.startedAt) : undefined} screens={screenSegments.filter((screen) => overlaps(screen, recording))} />}
-                    </div>
-                  ))}
-                  {unpairedScreens.map((screen, index) => (
-                    <div key={screen.id}>
-                      <p className="mb-2 text-sm font-medium">Screen share {index + 1} · {new Date(screen.startMs).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
-                      <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={screen.src} type={screen.type} />Your browser does not support session video playback.</video>
-                    </div>
-                  ))}
-                </div>
-              ) : hasPendingRecordings ? (
-                <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
-                  <Play className="size-7 text-muted-foreground" />
-                  <p className="mt-3 font-medium">Recording is being finalized</p>
-                  <p className="mt-1 max-w-md text-sm text-muted-foreground">The session audio will appear here once LiveKit has finished saving it. Refresh this page shortly.</p>
-                </div>
-              ) : (
-                <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
-                  <Play className="size-7 text-muted-foreground" />
-                  <p className="mt-3 font-medium">No recording is available</p>
-                  <p className="mt-1 max-w-md text-sm text-muted-foreground">
-                    Recordings appear here when recording was enabled for this session.
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <RecordingCard title="Session recording" icon={<Video className="size-4 text-saffron" />}>
+            {hasAnyRecording ? (
+              <div className="space-y-5">
+                {hasPendingRecordings && <p className="text-sm text-muted-foreground">The latest recording segment is still being finalized.</p>}
+                {audioPlayers.map((recording, index) => (
+                  <div key={recording.id}>
+                    {/* A lone recording needs no label — the card title
+                        already says "Session recording". Multiple segments
+                        (a tutor who left and rejoined) still need telling apart. */}
+                    {audioPlayers.length > 1 && (
+                      <p className="mb-2 text-sm font-medium">
+                        Recording segment {index + 1} · {new Date(recording.startedAt).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </p>
+                    )}
+                    {/* Recordings made before audio-only recording are MP4 video and stay playable until they expire. */}
+                    {!recording.url ? <p className="rounded-md bg-muted p-3 text-sm text-muted-foreground">This recording is not available right now.</p> : recording.path.endsWith(".mp4") ? <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={recording.url} type="video/mp4" />Your browser does not support session video playback.</video> : <LessonPlayer audioSrc={recording.url} audioStartMs={Date.parse(recording.startedAt)} audioDurationMs={recording.endedAt ? Date.parse(recording.endedAt) - Date.parse(recording.startedAt) : undefined} screens={screenSegments.filter((screen) => overlaps(screen, recording))} />}
+                  </div>
+                ))}
+                {unpairedScreens.map((screen, index) => (
+                  <div key={screen.id}>
+                    <p className="mb-2 text-sm font-medium">Screen share {index + 1} · {new Date(screen.startMs).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                    <video controls playsInline preload="metadata" className="aspect-video w-full bg-black"><source src={screen.src} type={screen.type} />Your browser does not support session video playback.</video>
+                  </div>
+                ))}
+              </div>
+            ) : hasPendingRecordings ? (
+              <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
+                <Play className="size-7 text-muted-foreground" />
+                <p className="mt-3 font-medium">Recording is being finalized</p>
+                <p className="mt-1 max-w-md text-sm text-muted-foreground">The session audio will appear here once LiveKit has finished saving it. Refresh this page shortly.</p>
+              </div>
+            ) : (
+              <div className="flex min-h-48 flex-col items-center justify-center rounded-2xl border border-dashed border-border px-6 text-center">
+                <Play className="size-7 text-muted-foreground" />
+                <p className="mt-3 font-medium">No recording is available</p>
+                <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                  Recordings appear here when recording was enabled for this session.
+                </p>
+              </div>
+            )}
+          </RecordingCard>
         </div>
 
         <div className="lg:w-[26rem] lg:shrink-0">
@@ -209,6 +208,7 @@ export default async function StudentSessionReviewPage({
             <SessionNotes
               bookingId={booking.id}
               initialMarkdown={notesMarkdown}
+              originalMarkdown={originalMarkdown}
               canEdit={canEditNotes}
             />
           )}
