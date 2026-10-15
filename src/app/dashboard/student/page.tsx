@@ -3,6 +3,7 @@ import { initialCalendarWindow } from "@/lib/calendar-window";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { SessionsPanel } from "@/components/dashboard/sessions-panel";
 import { RefreshDashboardOnHistoryNavigation } from "@/components/dashboard/refresh-dashboard-on-history-navigation";
+import { DashboardHighlights } from "@/components/dashboard/dashboard-highlights";
 
 export default async function StudentDashboardPage() {
   const range = initialCalendarWindow(new Date());
@@ -25,6 +26,8 @@ export default async function StudentDashboardPage() {
           <Link href="/tutors"><CalendarPlus className="size-4" /> Book a new session</Link>
         </Button>
       </div>
+      <DashboardHighlights sessions={sessions} role="student" />
+      <h3 className="text-xl font-semibold">All lessons</h3>
       <SessionsPanel
         sessions={sessions}
         initialRange={range}

@@ -56,7 +56,7 @@ function SignUpForm() {
             className={cn(
               "flex flex-col items-center gap-2 rounded-xl border p-4 text-center transition-colors duration-200",
               role === r.value
-                ? "border-saffron bg-saffron/10 text-saffron"
+                ? "border-saffron bg-saffron/10 text-brand-strong"
                 : "border-border bg-card text-muted-foreground hover:border-foreground/20 hover:bg-secondary/50 hover:text-foreground",
             )}
           >
@@ -98,7 +98,7 @@ function SignUpForm() {
 
       <p className="mt-8 text-sm text-muted-foreground">
         Already have an account?{" "}
-        <Link href="/sign-in" className="link-draw text-saffron">
+        <Link href="/sign-in" className="link-draw text-brand-strong">
           Sign in
         </Link>
       </p>

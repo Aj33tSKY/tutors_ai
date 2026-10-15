@@ -18,9 +18,11 @@ export default async function TutorProfilePage({
     .from("tutor_profiles")
     .select("*, profiles!tutor_profiles_id_fkey(full_name, avatar_url)")
     .eq("id", id)
+    .eq("dbs_verified", true)
+    .eq("is_demo", false)
     .maybeSingle<TutorProfile & { profiles: Profile | Profile[] }>();
 
-  if (!tutor) notFound();
+  if (!tutor || tutor.is_demo) notFound();
 
   const p = Array.isArray(tutor.profiles) ? tutor.profiles[0] : tutor.profiles;
   const subjects = tutor.subjects as StemSubject[];
@@ -32,9 +34,8 @@ export default async function TutorProfilePage({
     .returns<Availability[]>();
 
   const facts = [
-    { label: "Rating", value: String(tutor.rating) },
-    { label: "Experience", value: `${tutor.years_experience ?? 0} yrs` },
-    { label: "DBS", value: tutor.dbs_verified ? "Verified" : "Pending" },
+    { label: "Experience", value: tutor.years_experience ? `${tutor.years_experience} yrs` : "Ask tutor" },
+    { label: "Status", value: "Approved" },
     { label: "Rate", value: `£${(tutor.hourly_rate / 100).toFixed(0)}/hr` },
   ];
 
@@ -42,21 +43,25 @@ export default async function TutorProfilePage({
     <div className="shell py-20">
       <div className="grid grid-cols-1 gap-16 lg:grid-cols-[1fr_22rem] lg:gap-20">
         <div>
-          <h1 className="display-xl">{p?.full_name}</h1>
+          <div className="flex items-center gap-5">
+            {p?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={p.avatar_url} alt="" className="size-20 rounded-full object-cover sm:size-28" />
+            ) : <span aria-hidden className="flex size-20 items-center justify-center rounded-full bg-secondary text-3xl font-semibold sm:size-28">{p?.full_name?.charAt(0) ?? "T"}</span>}
+            <h1 className="display-xl">{p?.full_name}</h1>
+          </div>
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-muted-foreground">
             {tutor.headline}
           </p>
 
-          <dl className="mt-16 grid grid-cols-2 border-t border-hairline sm:grid-cols-4">
+          <dl className="mt-12 grid grid-cols-3 border-t border-hairline">
             {facts.map((f, i) => (
               <div
                 key={f.label}
-                className={`border-hairline py-7 pr-5 ${i % 2 === 1 ? "border-l pl-5" : ""} ${
-                  i < 2 ? "border-b sm:border-b-0" : ""
-                } sm:border-l sm:pl-5 sm:first:border-l-0 sm:first:pl-0`}
+                className={`border-hairline py-7 pr-3 ${i > 0 ? "border-l pl-3 sm:pl-5" : ""}`}
               >
                 <dt className="eyebrow">{f.label}</dt>
-                <dd className="display-md mt-3 text-saffron">{f.value}</dd>
+                <dd className="mt-3 text-lg font-semibold text-brand-strong sm:text-2xl">{f.value}</dd>
               </div>
             ))}
           </dl>
@@ -78,9 +83,9 @@ export default async function TutorProfilePage({
         </div>
 
         <aside className="h-fit rounded-3xl border border-border/70 bg-card p-7 shadow-md lg:sticky lg:top-24">
-          <h2 className="display-md">Book a session</h2>
+          <h2 className="display-md">Request a lesson</h2>
           <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Choose a subject and one of the tutor&apos;s available slots.
+            Your first lesson with this tutor is free. Later lessons are £{(tutor.hourly_rate / 100).toFixed(0)} per hour and invoiced after completion.
           </p>
           <div className="mt-7">
             <BookingForm

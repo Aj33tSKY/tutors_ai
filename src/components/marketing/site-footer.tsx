@@ -66,7 +66,7 @@ export function SiteFooter() {
           <p className="eyebrow">
             © {new Date().getFullYear()} Kindling Education Ltd
           </p>
-          <p className="eyebrow">DBS-checked · GDPR compliant · UK-based</p>
+          <p className="eyebrow">Tutor approval · Parent visibility · UK A-Level focus</p>
         </div>
       </div>
     </footer>

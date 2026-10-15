@@ -24,11 +24,11 @@ export function SubjectsStrip() {
                 <Link
                   href={`/tutors?subject=${s.value}`}
                   tabIndex={pass === 1 ? -1 : undefined}
-                  className="display-md px-8 text-muted-foreground transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:text-saffron"
+                  className="display-md px-8 text-muted-foreground transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:text-brand-strong"
                 >
                   {s.label}
                 </Link>
-                <span aria-hidden className="text-saffron">
+                <span aria-hidden className="text-brand-strong">
                   ✳
                 </span>
               </li>

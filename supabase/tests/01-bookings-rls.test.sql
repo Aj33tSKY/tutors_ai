@@ -11,7 +11,9 @@ insert into auth.users (id, email, raw_user_meta_data) values
   ('bbbbbbbb-0000-0000-0000-000000000002', 'tutor@test.local',   '{"role":"tutor","full_name":"Tutor"}'),
   ('cccccccc-0000-0000-0000-000000000003', 'parent@test.local',  '{"role":"parent","full_name":"Parent"}'),
   ('dddddddd-0000-0000-0000-000000000004', 'other@test.local',   '{"role":"student","full_name":"Stranger"}'),
-  ('eeeeeeee-0000-0000-0000-000000000005', 'admin@test.local',   '{"role":"admin","full_name":"Admin"}');
+  ('eeeeeeee-0000-0000-0000-000000000005', 'admin@test.local',   '{"role":"student","full_name":"Admin"}');
+-- Admin promotion is a trusted database operation, never signup metadata.
+update public.profiles set role = 'admin' where id = 'eeeeeeee-0000-0000-0000-000000000005';
 
 insert into public.student_profiles (id, parent_id)
 values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000003')

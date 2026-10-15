@@ -13,11 +13,13 @@ const getFeaturedTutors = unstable_cache(async () => {
   const { data: tutors, error } = await supabase
     .from("tutor_profiles")
     .select("*, profiles!tutor_profiles_id_fkey(full_name, avatar_url)")
-    .order("rating", { ascending: false })
+    .eq("dbs_verified", true)
+    .eq("is_demo", false)
+    .order("hourly_rate", { ascending: true })
     .limit(6)
     .returns<TutorRow[]>();
   if (error) throw new Error("Could not load featured tutors");
-  return tutors;
+  return tutors ?? [];
 }, ["featured-tutors"], { revalidate: 300 });
 
 export async function TutorShowcase() {
@@ -44,7 +46,7 @@ export async function TutorShowcase() {
           </div>
           <Link
             href="/tutors"
-            className="link-draw group flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.1em] text-saffron uppercase"
+            className="link-draw group flex items-center gap-2 font-mono text-[0.6875rem] tracking-[0.1em] text-brand-strong uppercase"
           >
             Browse all tutors
             <ArrowUpRight className="size-3.5 transition-transform duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
@@ -64,9 +66,13 @@ export async function TutorShowcase() {
                 className="group flex h-full flex-col p-7 transition-colors duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] hover:bg-secondary/50"
               >
                 <div className="flex items-start justify-between gap-4">
-                  <h3 className="display-md text-balance">{p?.full_name}</h3>
-                  <ArrowUpRight className="mt-1 size-5 shrink-0 text-muted-foreground transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:text-saffron md:group-hover:translate-x-1 md:group-hover:-translate-y-1" />
+                  {p?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={p.avatar_url} alt="" className="size-14 rounded-full object-cover" />
+                  ) : <span aria-hidden className="flex size-14 items-center justify-center rounded-full bg-secondary text-lg font-semibold">{p?.full_name?.charAt(0) ?? "T"}</span>}
+                  <ArrowUpRight className="mt-1 size-5 shrink-0 text-muted-foreground transition-all duration-500 ease-[cubic-bezier(0.19,1,0.22,1)] group-hover:text-brand-strong md:group-hover:translate-x-1 md:group-hover:-translate-y-1" />
                 </div>
+                <h3 className="display-md mt-4 text-balance">{p?.full_name}</h3>
 
                 <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
                   {tutor.headline}
@@ -80,9 +86,9 @@ export async function TutorShowcase() {
                     row lines up even when names wrap to two lines */}
                 <div className="mt-auto flex items-baseline justify-between border-t border-border/70 pt-5">
                   <span className="eyebrow">
-                    {tutor.dbs_verified ? "DBS verified" : "Verification pending"}
+                    Approved tutor
                   </span>
-                  <span className="font-heading text-2xl text-saffron tabular-nums">
+                  <span className="font-heading text-2xl text-brand-strong tabular-nums">
                     £{(tutor.hourly_rate / 100).toFixed(0)}
                     <span className="font-mono text-xs text-muted-foreground">/hr</span>
                   </span>

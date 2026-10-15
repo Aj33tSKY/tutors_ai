@@ -55,18 +55,19 @@
   --color-hairline: var(--hairline);
   --color-cream: var(--cream);
   --color-saffron: var(--saffron);
+  --color-brand-strong: var(--brand-strong);
   --color-rust: var(--rust);
   --color-violet: var(--violet);
 
-  /* soft, consumer-app radii — generous rounding throughout */
-  --radius-xs: 0.375rem;
-  --radius-sm: 0.5rem;
-  --radius-md: 0.75rem;
-  --radius-lg: 1rem;
-  --radius-xl: 1.25rem;
-  --radius-2xl: 1.5rem;
-  --radius-3xl: 2rem;
-  --radius-4xl: 3rem;
+  /* Restrained corners keep controls and content panels crisp. */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.625rem;
+  --radius-2xl: 0.75rem;
+  --radius-3xl: 0.875rem;
+  --radius-4xl: 1rem;
 
   --ease-expo: cubic-bezier(0.19, 1, 0.22, 1);
 
@@ -84,6 +85,7 @@
   --hairline: #e4e4e7;
   --cream: #fafafa;
   --saffron: #58cc02;
+  --brand-strong: #237000;
   --rust: #1272a0;
   --violet: #1cb0f6;
   --ember-flame: #0ea5e9;
@@ -121,7 +123,7 @@
   --chart-4: var(--rust);
   --chart-5: #9ca3af;
 
-  --radius: 0.75rem;
+  --radius: 0.5rem;
 
   --sidebar: #fafafa;
   --sidebar-foreground: var(--foreground);

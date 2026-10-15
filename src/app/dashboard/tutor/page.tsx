@@ -5,6 +5,7 @@ import { getCurrentProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
 import { loadCalendarSessions } from "@/app/dashboard/calendar-data";
 import { initialCalendarWindow } from "@/lib/calendar-window";
+import { DashboardHighlights } from "@/components/dashboard/dashboard-highlights";
 import type { LessonRequest, Profile } from "@/lib/types";
 
 export default async function TutorDashboardPage() {
@@ -42,8 +43,10 @@ export default async function TutorDashboardPage() {
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">Your lessons, all in one place.</p>
         </div>
-        <LessonRequests requests={requests ?? []} names={studentNames} />
+        <DashboardHighlights sessions={sessions} role="tutor" requestCount={requests?.length ?? 0} />
+        <div id="lesson-requests"><LessonRequests requests={requests ?? []} names={studentNames} /></div>
       </div>
+      <h3 className="text-xl font-semibold">All lessons</h3>
       <SessionsPanel
         initialRange={range}
         counterpartLabel="Student"

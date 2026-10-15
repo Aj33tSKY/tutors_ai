@@ -19,7 +19,7 @@ const markdownComponents: Components = {
   ol: (props: ComponentPropsWithoutRef<"ol">) => <ol className="mt-2 list-decimal space-y-1.5 pl-5 text-sm leading-6 text-muted-foreground" {...props} />,
   li: (props: ComponentPropsWithoutRef<"li">) => <li {...props} />,
   strong: (props: ComponentPropsWithoutRef<"strong">) => <strong className="font-semibold text-foreground" {...props} />,
-  a: (props: ComponentPropsWithoutRef<"a">) => <a className="text-foreground underline underline-offset-2 hover:text-saffron" target="_blank" rel="noreferrer" {...props} />,
+  a: (props: ComponentPropsWithoutRef<"a">) => <a className="text-foreground underline underline-offset-2 hover:text-brand-strong" target="_blank" rel="noreferrer" {...props} />,
   blockquote: (props: ComponentPropsWithoutRef<"blockquote">) => <blockquote className="mt-2 border-l-2 border-border pl-3 text-sm leading-6 text-muted-foreground italic" {...props} />,
   code: (props: ComponentPropsWithoutRef<"code">) => <code className="rounded bg-muted px-1 py-0.5 text-xs" {...props} />,
   hr: () => <hr className="my-4 border-border" />,
@@ -89,7 +89,7 @@ export function SessionNotes({
     <Card className="flex h-[32rem] flex-col lg:h-[42rem]">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <FileText className="size-4 text-saffron" /> Session notes
+          <FileText className="size-4 text-brand-strong" /> Session notes
         </CardTitle>
         {canEdit && !editing && (
           <CardAction>

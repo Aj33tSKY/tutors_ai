@@ -5,40 +5,29 @@ import { Reveal } from "@/components/marketing/reveal";
 const PLANS = [
   {
     name: "Pay as you go",
-    price: "From £35",
-    period: "per session",
+    highlighted: false,
+    price: "Tutor-set",
+    period: "hourly rate",
     features: [
-      "Book any tutor, any time",
-      "Full transcript & topic breakdown",
-      "Revision AI access for 30 days",
-      "No commitment",
+      "First lesson with a tutor is free",
+      "Pay for completed lessons by invoice",
+      "Session recording and notes when enabled",
+      "No subscription required",
     ],
     cta: "Browse tutors",
     href: "/tutors",
   },
   {
-    name: "Weekly subscription",
-    price: "Custom",
-    period: "per month",
-    highlighted: true,
-    features: [
-      "Recurring weekly slot with your tutor",
-      "Full analytics dashboard & coverage rings",
-      "Unlimited revision AI access",
-      "Priority rescheduling",
-    ],
-    cta: "Find your tutor",
-    href: "/tutors",
-  },
-  {
     name: "For tutors",
+    highlighted: false,
     price: "0%",
     period: "signup fee",
     features: [
       "Set your own hourly rate",
-      "Automated session notes save you hours",
-      "Fast payouts via Stripe Connect",
-      "Grow your student base",
+      "Set weekly availability and your hourly rate",
+      "Review and edit session notes",
+      "Connect Stripe for direct payouts",
+      "See students and lesson requests in one place",
     ],
     cta: "Apply to teach",
     href: "/sign-up?role=tutor",
@@ -55,12 +44,12 @@ export default function PricingPage() {
           Simple, transparent pricing
         </h1>
         <p className="mt-10 max-w-xl text-lg leading-relaxed text-muted-foreground">
-          Tutors set their own rates. Kindling adds analytics, transcription and a revision AI to
-          every session at no extra cost.
+          Tutors set their hourly rates, shown before you request a lesson. Your first lesson
+          with a tutor is free; later completed lessons are invoiced individually.
         </p>
       </Reveal>
 
-      <div className="mt-24 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm lg:grid-cols-3">
+      <div className="mt-16 grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border bg-border shadow-sm md:grid-cols-2">
         {PLANS.map((plan, i) => (
           <Reveal
             key={plan.name}
@@ -77,7 +66,7 @@ export default function PricingPage() {
                     feature list start at the same y across all three plans */}
                 <span
                   className={`display-lg block min-h-[1.9em] ${
-                    plan.highlighted ? "text-saffron" : "text-foreground"
+                    plan.highlighted ? "text-brand-strong" : "text-foreground"
                   }`}
                 >
                   {plan.price}
