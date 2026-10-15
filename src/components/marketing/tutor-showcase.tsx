@@ -1,20 +1,33 @@
 import Link from "next/link";
+import { unstable_cache } from "next/cache";
 import { ArrowUpRight } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { subjectLabel } from "@/lib/subjects";
 import { Reveal } from "./reveal";
 import type { Profile, StemSubject, TutorProfile } from "@/lib/types";
 
 type TutorRow = TutorProfile & { profiles: Profile | Profile[] };
 
-export async function TutorShowcase() {
-  const supabase = await createClient();
-  const { data: tutors } = await supabase
+const getFeaturedTutors = unstable_cache(async () => {
+  const supabase = createPublicClient();
+  const { data: tutors, error } = await supabase
     .from("tutor_profiles")
     .select("*, profiles!tutor_profiles_id_fkey(full_name, avatar_url)")
     .order("rating", { ascending: false })
     .limit(6)
     .returns<TutorRow[]>();
+  if (error) throw new Error("Could not load featured tutors");
+  return tutors;
+}, ["featured-tutors"], { revalidate: 300 });
+
+export async function TutorShowcase() {
+  let tutors: TutorRow[] | null;
+  try {
+    tutors = await getFeaturedTutors();
+  } catch {
+    // A catalogue outage must not take the landing page down with it.
+    return null;
+  }
 
   if (!tutors || tutors.length === 0) return null;
 

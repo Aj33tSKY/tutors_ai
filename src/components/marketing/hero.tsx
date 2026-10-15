@@ -1,7 +1,4 @@
-"use client";
-
 import Link from "next/link";
-import { motion, useReducedMotion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 
 const SUBJECTS = ["Physics", "Chemistry", "Mathematics", "Biology", "Computing"] as const;
@@ -9,9 +6,6 @@ const SUBJECTS = ["Physics", "Chemistry", "Mathematics", "Biology", "Computing"]
 // The in-flow sizer below reserves space for the longest entry, so the
 // rotating slot never has to guess a `ch` width.
 const WIDEST = SUBJECTS.reduce((a, b) => (b.length > a.length ? b : a));
-
-const HOLD = 3.6;
-const CYCLE = HOLD * SUBJECTS.length;
 
 const STATS = [
   { value: "6", label: "A-Level STEM subjects" },
@@ -94,8 +88,6 @@ export function Hero() {
  *     positioned on top, so it can't pull the baseline to its bottom edge.
  */
 function RotatingSubject() {
-  const reduceMotion = useReducedMotion();
-
   return (
     <span className="relative inline-block leading-[1.25] whitespace-nowrap text-saffron">
       <span className="sr-only">
@@ -107,35 +99,15 @@ function RotatingSubject() {
         {WIDEST}
       </span>
 
-      {/* Every subject is always rendered, in the same order, whatever the
-          motion preference: only `animate` and `transition` may branch, or
-          the server and client markup diverge and hydration fails. */}
       <span aria-hidden className="absolute inset-0 overflow-hidden">
         {SUBJECTS.map((word, i) => (
-          <motion.span
+          <span
             key={word}
-            className="absolute inset-x-0 top-0"
-            initial={{ y: "100%" }}
-            animate={
-              reduceMotion
-                ? { y: "0%", opacity: i === 0 ? 1 : 0 }
-                : { y: ["100%", "0%", "0%", "-100%"] }
-            }
-            transition={
-              reduceMotion
-                ? { duration: 0 }
-                : {
-                    duration: HOLD,
-                    times: [0, 0.18, 0.82, 1],
-                    ease: [0.19, 1, 0.22, 1],
-                    repeat: Infinity,
-                    repeatDelay: CYCLE - HOLD,
-                    delay: i * HOLD,
-                  }
-            }
+            className="hero-subject absolute inset-x-0 top-0"
+            style={{ animationDelay: `${i * 3.6}s` }}
           >
             {word}
-          </motion.span>
+          </span>
         ))}
       </span>
     </span>
@@ -169,13 +141,9 @@ function SessionPanel() {
         <p className="mt-1 text-sm text-muted-foreground">Auto-detected spec point</p>
         <div className="mt-4 flex items-center gap-3">
           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-hairline">
-            <motion.div
+            <div
               className="h-full rounded-full bg-saffron"
-              initial={{ scaleX: 0 }}
-              whileInView={{ scaleX: 0.72 }}
-              viewport={{ once: true }}
-              style={{ transformOrigin: "left" }}
-              transition={{ duration: 1.1, delay: 0.3, ease: [0.19, 1, 0.22, 1] }}
+              style={{ width: "72%" }}
             />
           </div>
           <span className="font-mono text-xs text-saffron tabular-nums">72%</span>

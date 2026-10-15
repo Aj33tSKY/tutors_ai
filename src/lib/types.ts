@@ -82,6 +82,18 @@ export interface Booking {
   invoice_sent_at?: string | null;
 }
 
+/** Fields needed to draw and act on a booking in the dashboard calendar. */
+export type CalendarBooking = Pick<Booking,
+  "id" | "student_id" | "tutor_id" | "subject" | "start_time" | "end_time" |
+  "status" | "lesson_name" | "is_trial" | "stripe_invoice_id" |
+  "amount_gbp_pence" | "started_at" | "recurrence_rule" | "recurrence_series_id"
+>;
+
+export type CalendarSession = CalendarBooking & {
+  counterpartName: string;
+  counterpartId: string;
+};
+
 export interface SessionRecording {
   id: string;
   booking_id: string;

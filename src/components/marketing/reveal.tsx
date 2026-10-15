@@ -1,11 +1,6 @@
 "use client";
 
-import { motion, useReducedMotion, type Variants } from "framer-motion";
-
-const variants: Variants = {
-  hidden: { opacity: 0, y: 28 },
-  visible: { opacity: 1, y: 0 },
-};
+import { useEffect, useRef, useState } from "react";
 
 export function Reveal({
   children,
@@ -18,30 +13,38 @@ export function Reveal({
   className?: string;
   as?: "div" | "li" | "section";
 }) {
-  const reduceMotion = useReducedMotion();
-  const Comp = motion[as];
+  const element = useRef<HTMLElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const node = element.current;
+    if (!node) return;
+    if (!window.IntersectionObserver) {
+      node.dataset.visible = "true";
+      return;
+    }
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setVisible(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "0px 0px -60px 0px" },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  const Comp = as;
 
   return (
     <Comp
-      // Marks the element for the <noscript> fallback in the root layout:
-      // these server-render with an inline opacity:0 that only the in-view
-      // observer clears, so without JS they would never appear.
+      ref={element as React.Ref<never>}
       data-reveal=""
+      data-visible={visible ? "true" : undefined}
       className={className}
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: "-60px" }}
-      variants={variants}
-      // Reduced motion may only affect the transition, never `variants` or
-      // `initial`: those decide the server-rendered inline style, and
-      // useReducedMotion() resolves differently on the server, so branching
-      // them produces a hydration mismatch.
-      // Reference easing: expo-out at 0.75s.
-      transition={
-        reduceMotion
-          ? { duration: 0, delay: 0 }
-          : { duration: 0.75, delay, ease: [0.19, 1, 0.22, 1] }
-      }
+      style={{ transitionDelay: `${delay}s` }}
     >
       {children}
     </Comp>

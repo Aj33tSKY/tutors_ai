@@ -53,7 +53,7 @@ export async function createTutorSessionAction(
   // before intentionally using the service client for the insert.
   const [{ data: tutor }, { data: existingBookings }, { data: relatedRequest }] = await Promise.all([
     supabase.from("tutor_profiles").select("id, hourly_rate").eq("id", user.id).maybeSingle(),
-    supabase.from("bookings").select("id, start_time").eq("tutor_id", user.id).eq("student_id", parsed.data.studentId).order("start_time", { ascending: false }),
+    supabase.from("bookings").select("id").eq("tutor_id", user.id).eq("student_id", parsed.data.studentId).limit(1),
     supabase.from("lesson_requests").select("id, subject, exam_board").eq("tutor_id", user.id).eq("student_id", parsed.data.studentId).eq("status", "pending").limit(1).maybeSingle(),
   ]);
   if (!tutor) return { error: "Only tutors can create sessions." };

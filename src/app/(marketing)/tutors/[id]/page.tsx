@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createPublicClient } from "@/lib/supabase/public";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
 import { BookingForm } from "./booking-form";
 import type { Availability, ExamBoard, Profile, StemSubject, TutorProfile } from "@/lib/types";
@@ -12,7 +12,7 @@ export default async function TutorProfilePage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const supabase = await createClient();
+  const supabase = createPublicClient();
 
   const { data: tutor } = await supabase
     .from("tutor_profiles")
