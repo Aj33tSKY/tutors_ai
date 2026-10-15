@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { unstable_cache } from "next/cache";
+import { createPublicClient } from "@/lib/supabase/public";
 import { boardLabel, subjectLabel, SUBJECTS, EXAM_BOARDS } from "@/lib/subjects";
 import { cn } from "@/lib/utils";
 import type { ExamBoard, Profile, StemSubject, TutorProfile } from "@/lib/types";
@@ -8,6 +9,19 @@ export const dynamic = "force-dynamic";
 export const metadata = { title: "Find a tutor" };
 
 type TutorRow = TutorProfile & { profiles: Profile | Profile[] };
+
+const getTutors = unstable_cache(async (subject?: string, board?: string) => {
+  const supabase = createPublicClient();
+  let query = supabase
+    .from("tutor_profiles")
+    .select("*, profiles!tutor_profiles_id_fkey(full_name, avatar_url)")
+    .order("rating", { ascending: false });
+  if (subject) query = query.contains("subjects", [subject]);
+  if (board) query = query.contains("boards", [board]);
+  const { data, error } = await query.returns<TutorRow[]>();
+  if (error) throw new Error("Could not load tutors");
+  return data;
+}, ["tutor-catalogue"], { revalidate: 300 });
 
 /** Builds a filter href without dropping the other active filter. */
 function filterHref(next: { subject?: string; board?: string }) {
@@ -24,17 +38,7 @@ export default async function TutorsPage({
   searchParams: Promise<{ subject?: string; board?: string }>;
 }) {
   const { subject, board } = await searchParams;
-  const supabase = await createClient();
-
-  let query = supabase
-    .from("tutor_profiles")
-    .select("*, profiles!tutor_profiles_id_fkey(full_name, avatar_url)")
-    .order("rating", { ascending: false });
-
-  if (subject) query = query.contains("subjects", [subject]);
-  if (board) query = query.contains("boards", [board]);
-
-  const { data: tutors } = await query.returns<TutorRow[]>();
+  const tutors = await getTutors(subject, board);
   const count = tutors?.length ?? 0;
 
   return (

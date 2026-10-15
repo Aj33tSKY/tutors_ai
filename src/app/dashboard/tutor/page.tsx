@@ -3,28 +3,28 @@ import { LessonRequests } from "@/components/dashboard/lesson-requests";
 import { RefreshDashboardOnHistoryNavigation } from "@/components/dashboard/refresh-dashboard-on-history-navigation";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
-import type { Booking, LessonRequest, Profile } from "@/lib/types";
+import { loadCalendarSessions } from "@/app/dashboard/calendar-data";
+import { initialCalendarWindow } from "@/lib/calendar-window";
+import type { LessonRequest, Profile } from "@/lib/types";
 
 export default async function TutorDashboardPage() {
   const { userId, profile } = await getCurrentProfile();
   const supabase = await createClient();
+  const range = initialCalendarWindow(new Date());
 
-  const { data: bookings } = await supabase
-    .from("bookings")
-    .select("*")
-    .eq("tutor_id", userId)
-    .order("start_time", { ascending: false })
-    .returns<Booking[]>();
+  const [sessions, { data: requests }, { data: relatedBookings }] = await Promise.all([
+    loadCalendarSessions(range.from, range.to),
+    supabase
+      .from("lesson_requests")
+      .select("id, student_id, subject, exam_board, requested_start_time, is_trial")
+      .eq("tutor_id", userId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false })
+      .returns<Pick<LessonRequest, "id" | "student_id" | "subject" | "exam_board" | "requested_start_time" | "is_trial">[]>(),
+    supabase.from("bookings").select("student_id").eq("tutor_id", userId),
+  ]);
 
-  const { data: requests } = await supabase
-    .from("lesson_requests")
-    .select("*")
-    .eq("tutor_id", userId)
-    .eq("status", "pending")
-    .order("created_at", { ascending: false })
-    .returns<LessonRequest[]>();
-
-  const studentIds = [...new Set([...(bookings ?? []).map((booking) => booking.student_id), ...(requests ?? []).map((request) => request.student_id)])];
+  const studentIds = [...new Set([...(relatedBookings ?? []).map((booking) => booking.student_id), ...(requests ?? []).map((request) => request.student_id)])];
   const { data: students } = studentIds.length
     ? await supabase.from("profiles").select("id, full_name").in("id", studentIds)
     : { data: [] as Pick<Profile, "id" | "full_name">[] };
@@ -45,16 +45,13 @@ export default async function TutorDashboardPage() {
         <LessonRequests requests={requests ?? []} names={studentNames} />
       </div>
       <SessionsPanel
+        initialRange={range}
         counterpartLabel="Student"
         canMarkComplete
         canSendInvoice
         canCreateSession
         students={(students ?? []).map((student) => ({ id: student.id, fullName: student.full_name }))}
-        sessions={(bookings ?? []).map((booking) => ({
-          ...booking,
-          counterpartName: studentNames.get(booking.student_id) ?? "Student",
-          counterpartId: booking.student_id,
-        }))}
+        sessions={sessions}
       />
     </div>
   );

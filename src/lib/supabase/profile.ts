@@ -1,4 +1,5 @@
 import "server-only";
+import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import type { Profile } from "@/lib/types";
 
@@ -8,11 +9,11 @@ import type { Profile } from "@/lib/types";
  * signup only writes `profiles` via the DB trigger, since email
  * confirmation may delay the first authenticated session.
  */
-export async function getCurrentProfile(): Promise<{
+export const getCurrentProfile = cache(async (): Promise<{
   userId: string;
   email: string;
   profile: Profile | null;
-}> {
+}> => {
   const supabase = await createClient();
   const {
     data: { user },
@@ -40,4 +41,4 @@ export async function getCurrentProfile(): Promise<{
   }
 
   return { userId: user.id, email: user.email ?? "", profile: profile as Profile | null };
-}
+});

@@ -5,9 +5,11 @@ import { createClient } from "@/lib/supabase/server";
 import { subjectLabel } from "@/lib/subjects";
 import { Button } from "@/components/ui/button";
 import { createParticipantToken, livekitConfigured, roomNameForBooking } from "@/lib/livekit";
-import { VideoRoom } from "./video-room";
+import { VideoRoomLoader } from "./video-room-loader";
 import { SessionLobby } from "./session-lobby";
 import type { Booking, Profile } from "@/lib/types";
+
+type RoomBooking = Pick<Booking, "id" | "student_id" | "tutor_id" | "subject" | "start_time" | "status" | "lesson_name" | "started_at">;
 
 export default async function SessionRoomPage({
   params,
@@ -24,9 +26,9 @@ export default async function SessionRoomPage({
 
   const { data: booking } = await supabase
     .from("bookings")
-    .select("*")
+    .select("id, student_id, tutor_id, subject, start_time, status, lesson_name, started_at")
     .eq("id", bookingId)
-    .maybeSingle<Booking>();
+    .maybeSingle<RoomBooking>();
 
   if (!booking) notFound();
 
@@ -70,22 +72,23 @@ export default async function SessionRoomPage({
     );
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name")
-    .eq("id", user.id)
-    .maybeSingle<Pick<Profile, "full_name">>();
-
-  const { data: recordingConsent } = await supabase
-    .from("session_recording_consents")
-    .select("booking_id")
-    .eq("booking_id", booking.id)
-    .maybeSingle();
+  const [{ data: profile }, { data: recordingConsent }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name")
+      .eq("id", user.id)
+      .maybeSingle<Pick<Profile, "full_name">>(),
+    supabase
+      .from("session_recording_consents")
+      .select("booking_id")
+      .eq("booking_id", booking.id)
+      .maybeSingle(),
+  ]);
 
   return (
     <main className="mx-auto min-h-screen w-full px-3 py-3 sm:px-5 sm:py-5 lg:px-8">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><Button asChild size="sm" variant="ghost"><Link href="/dashboard"><ArrowLeft className="size-4" />Back to dashboard</Link></Button><p className="text-sm text-muted-foreground">{booking.lesson_name || subjectLabel(booking.subject)} · {new Date(booking.start_time).toLocaleString("en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p></div>
-      {booking.started_at ? <VideoRoom
+      {booking.started_at ? <VideoRoomLoader
         token={await createParticipantToken({ bookingId: booking.id, identity: user.id, name: profile?.full_name ?? (isTutor ? "Tutor" : "Student"), role: isTutor ? "tutor" : "student" })}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
         roomName={roomNameForBooking(booking.id)}

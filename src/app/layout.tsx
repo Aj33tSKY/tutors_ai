@@ -1,7 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Roboto_Mono } from "next/font/google";
-import { Toaster } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 // One variable sans for both body copy and headings — mono is kept only for
@@ -45,13 +43,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <noscript>
-          {/* Scroll reveals are inline opacity:0 until the observer runs. */}
+          {/* Keep revealed content visible when JavaScript is unavailable. */}
           <style>{`[data-reveal]{opacity:1!important;transform:none!important}`}</style>
         </noscript>
       </head>
       <body className="flex min-h-full flex-col text-foreground">
-        <TooltipProvider delayDuration={150}>{children}</TooltipProvider>
-        <Toaster position="bottom-right" />
+        {children}
       </body>
     </html>
   );

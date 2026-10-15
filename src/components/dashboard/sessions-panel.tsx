@@ -10,11 +10,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { subjectLabel } from "@/lib/subjects";
-import type { Booking } from "@/lib/types";
 import { cancelSessionAction, markSessionCompleteAction, markSessionUpcomingAction, sendSessionInvoiceAction, updateSessionDetailsAction } from "@/app/dashboard/session-actions";
 import { createTutorSessionAction } from "@/app/dashboard/tutor/create-session-action";
+import { loadCalendarSessions } from "@/app/dashboard/calendar-data";
+import { calendarWindow, type CalendarWindow } from "@/lib/calendar-window";
+import type { CalendarSession } from "@/lib/types";
 
-type SessionRow = Pick<Booking, "id" | "subject" | "start_time" | "end_time" | "status" | "lesson_name" | "is_trial" | "stripe_invoice_id" | "amount_gbp_pence" | "started_at" | "recurrence_rule" | "recurrence_series_id"> & { counterpartName: string; counterpartId: string };
+type SessionRow = CalendarSession;
 type CalendarView = "day" | "week" | "month";
 const VIEWS: CalendarView[] = ["day", "week", "month"];
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -78,23 +80,55 @@ function rangeLabel(anchor: Date, view: CalendarView) {
   return `${start.toLocaleDateString("en-GB", { month: "long", year: sameYear ? undefined : "numeric" })} – ${end.toLocaleDateString("en-GB", { month: "long", year: "numeric" })}`;
 }
 
-export function SessionsPanel({ sessions, counterpartLabel = "Tutor", canMarkComplete = false, canSendInvoice = false, canCreateSession = false, students = [] }: { sessions: SessionRow[]; counterpartLabel?: string; canMarkComplete?: boolean; canSendInvoice?: boolean; canCreateSession?: boolean; students?: { id: string; fullName: string }[] }) {
+export function SessionsPanel({ sessions, initialRange, counterpartLabel = "Tutor", canMarkComplete = false, canSendInvoice = false, canCreateSession = false, students = [] }: { sessions: SessionRow[]; initialRange: CalendarWindow; counterpartLabel?: string; canMarkComplete?: boolean; canSendInvoice?: boolean; canCreateSession?: boolean; students?: { id: string; fullName: string }[] }) {
   const [query, setQuery] = useState("");
   const [view, setView] = useState<CalendarView>("week");
   const [anchor, setAnchor] = useState(() => new Date());
+  const [remote, setRemote] = useState<{ baseSessions: SessionRow[]; range: CalendarWindow; sessions: SessionRow[] } | null>(null);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
   const [selected, setSelected] = useState<SessionRow | null>(null);
   const [newSessionStart, setNewSessionStart] = useState<{ date: Date; time: string } | null>(null);
-  const visible = useMemo(() => sessions.filter((session) => {
+  const wanted = calendarWindow(anchor);
+  const wantedFrom = wanted.from;
+  const wantedTo = wanted.to;
+  const covers = (range: CalendarWindow) => range.from <= wanted.from && range.to >= wanted.to;
+  const remoteCovers = remote?.baseSessions === sessions && covers(remote.range);
+  const initialCovers = covers(initialRange);
+  const availableSessions = useMemo(
+    () => remoteCovers ? remote!.sessions : initialCovers ? sessions : [],
+    [remoteCovers, remote, initialCovers, sessions],
+  );
+
+  useEffect(() => {
+    if (remoteCovers || initialCovers) return;
+    let active = true;
+    loadCalendarSessions(wantedFrom, wantedTo)
+      .then((loaded) => {
+        if (!active) return;
+        setRemote({ baseSessions: sessions, range: { from: wantedFrom, to: wantedTo }, sessions: loaded });
+        setLoadError(false);
+      })
+      .catch(() => {
+        if (active) setLoadError(true);
+      });
+    return () => { active = false; };
+  }, [wantedFrom, wantedTo, remoteCovers, initialCovers, sessions, retry]);
+
+  const visible = useMemo(() => availableSessions.filter((session) => {
     // Upcoming and completed sessions share the calendar, told apart by colour.
     const matchesName = session.counterpartName.toLowerCase().includes(query.trim().toLowerCase());
     return matchesName && session.status !== "cancelled";
-  }), [query, sessions]);
+  }), [query, availableSessions]);
   const byDay = useMemo(() => {
     const result = new Map<string, SessionRow[]>();
     visible.forEach((session) => {
       const key = dateKey(new Date(session.start_time));
-      result.set(key, [...(result.get(key) ?? []), session].sort((a, b) => a.start_time.localeCompare(b.start_time)));
+      const day = result.get(key) ?? [];
+      day.push(session);
+      result.set(key, day);
     });
+    result.forEach((day) => day.sort((a, b) => a.start_time.localeCompare(b.start_time)));
     return result;
   }, [visible]);
   const cells = monthCells(anchor);
@@ -109,6 +143,8 @@ export function SessionsPanel({ sessions, counterpartLabel = "Tutor", canMarkCom
           <Button type="button" variant="ghost" className="h-9 rounded-full border-border px-4" onClick={() => setAnchor(new Date())}>Today</Button>
           <div className="flex items-center"><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() - 1, 1) : addDays(anchor, view === "week" ? -7 : -1))} aria-label={`Previous ${view}`}><ChevronLeft className="size-5" /></Button><Button type="button" size="icon-lg" variant="ghost" className="size-9" onClick={() => setAnchor(view === "month" ? new Date(anchor.getFullYear(), anchor.getMonth() + 1, 1) : addDays(anchor, view === "week" ? 7 : 1))} aria-label={`Next ${view}`}><ChevronRight className="size-5" /></Button></div>
           <h3 className="mr-auto font-heading text-lg font-semibold">{rangeLabel(anchor, view)}</h3>
+          {!remoteCovers && !initialCovers && !loadError && <span role="status" className="text-xs text-muted-foreground">Loading sessions…</span>}
+          {loadError && <button type="button" onClick={() => { setLoadError(false); setRetry((value) => value + 1); }} className="text-xs text-destructive underline">Couldn&apos;t load sessions. Retry</button>}
           <label className="relative block"><Search className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-muted-foreground" /><Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder={`Search ${counterpartLabel.toLowerCase()}`} aria-label={`Search by ${counterpartLabel.toLowerCase()} name`} className="h-9 w-44 rounded-full pl-8" /></label>
           <DropdownMenu>
             <DropdownMenuTrigger asChild><Button type="button" variant="ghost" className="h-9 rounded-full border-border pr-3 pl-4 capitalize">{view}<ChevronDown className="size-4 text-muted-foreground" /></Button></DropdownMenuTrigger>

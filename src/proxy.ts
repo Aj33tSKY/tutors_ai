@@ -6,5 +6,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  // Only authenticated app pages need the proxy's token refresh and redirect.
+  // Public pages, webhooks, cron jobs and health checks should not make an
+  // additional Supabase Auth request before their own work begins.
+  matcher: ["/dashboard/:path*", "/session/:path*"],
 };

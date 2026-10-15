@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import { Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Wordmark } from "./wordmark";
@@ -13,9 +12,10 @@ const LINKS = [
   { href: "/how-it-works", label: "How it works" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "Safeguarding" },
+  { href: "/dashboard", label: "Dashboard" },
 ];
 
-export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
+export function SiteHeader() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -55,20 +55,12 @@ export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
         </nav>
 
         <div className="hidden items-center gap-2 lg:flex">
-          {userEmail ? (
-            <Button asChild size="md">
-              <Link href="/dashboard">Dashboard</Link>
-            </Button>
-          ) : (
-            <>
-              <Button asChild size="md" variant="ghost">
-                <Link href="/sign-in">Sign in</Link>
-              </Button>
-              <Button asChild size="md">
-                <Link href="/sign-up">Get started</Link>
-              </Button>
-            </>
-          )}
+          <Button asChild size="md" variant="ghost">
+            <Link href="/sign-in">Sign in</Link>
+          </Button>
+          <Button asChild size="md">
+            <Link href="/sign-up">Get started</Link>
+          </Button>
         </div>
 
         <button
@@ -83,15 +75,9 @@ export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
         </button>
       </div>
 
-      <AnimatePresence initial={false}>
         {open && (
-          <motion.div
+          <div
             id="mobile-nav"
-            key="mobile-nav"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.45, ease: [0.19, 1, 0.22, 1] }}
             className="overflow-hidden border-t border-border/70 bg-background lg:hidden"
           >
             <nav aria-label="Primary" className="shell flex flex-col py-2">
@@ -106,31 +92,20 @@ export function SiteHeader({ userEmail }: { userEmail?: string | null }) {
                 </Link>
               ))}
               <div className="flex flex-col gap-2 py-5">
-                {userEmail ? (
-                  <Button asChild size="lg">
-                    <Link href="/dashboard" onClick={() => setOpen(false)}>
-                      Dashboard
-                    </Link>
-                  </Button>
-                ) : (
-                  <>
-                    <Button asChild size="lg" variant="outline">
-                      <Link href="/sign-in" onClick={() => setOpen(false)}>
-                        Sign in
-                      </Link>
-                    </Button>
-                    <Button asChild size="lg">
-                      <Link href="/sign-up" onClick={() => setOpen(false)}>
-                        Get started
-                      </Link>
-                    </Button>
-                  </>
-                )}
+                <Button asChild size="lg" variant="outline">
+                  <Link href="/sign-in" onClick={() => setOpen(false)}>
+                    Sign in
+                  </Link>
+                </Button>
+                <Button asChild size="lg">
+                  <Link href="/sign-up" onClick={() => setOpen(false)}>
+                    Get started
+                  </Link>
+                </Button>
               </div>
             </nav>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
     </header>
   );
 }
