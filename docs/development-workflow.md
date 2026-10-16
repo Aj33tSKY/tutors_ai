@@ -57,6 +57,8 @@ For a database change, create the file with `npx supabase migration new describe
 
 Prefer additive database changes. Migrations run before the new app deploys, so the old app briefly runs against the new schema; removing or renaming a column in the same release can break it.
 
+The workflow lint check also compares the PR's merge result with its base commit. Existing SQL migration files must keep their path and contents: edits, deletions, and renames fail CI. You can freely edit a new migration on your feature branch until it merges.
+
 CI only validates migrations when your change could affect the result, so an app-only pull request finishes that check in seconds and says so in its run summary. That is expected, not a check that failed to run.
 
 ## Release to customers
@@ -69,7 +71,7 @@ gh workflow run "Deploy production" --ref main -f confirm=deploy
 
 The typed confirmation is the gate — there is no approval rule to click. The release then:
 
-1. Checks it is allowed at all: confirmation, branch, baseline flag, credentials. Seconds, before anything remote is touched.
+1. Checks confirmation, branch, baseline flag, credentials, and a successful staging workflow run for this exact commit. If staging is still running or failed, production stops before touching its services; dispatch it again after staging succeeds.
 2. Re-runs the full check suite against that exact commit, always validating migrations.
 3. Verifies production's migration history matches the repository, and refuses if it does not.
 4. Prints the migration plan, then applies it.
