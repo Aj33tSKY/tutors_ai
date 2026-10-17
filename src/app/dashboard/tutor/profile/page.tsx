@@ -26,6 +26,14 @@ export default async function TutorMyProfilePage() {
     return <div className="max-w-3xl rounded-lg border border-border bg-card p-6"><h1 className="display-md">My profile</h1><p className="mt-3 text-sm text-muted-foreground">We couldn&apos;t load your profile right now. Please refresh the page.</p></div>;
   }
 
+  const isPublic = tutor.dbs_verified && !tutor.is_demo;
+  const listingStatus = tutor.is_demo ? "Demo account" : isPublic ? "Approved" : "Awaiting approval";
+  const listingDescription = tutor.is_demo
+    ? "Demo accounts are hidden from tutor search, even when approved."
+    : isPublic
+      ? "Your profile is visible to students in tutor search."
+      : "The Kindling team will review your account before it appears in tutor search.";
+
   return <div className="max-w-5xl space-y-8 pb-12">
     <header className="flex flex-wrap items-end justify-between gap-4">
       <div>
@@ -33,7 +41,7 @@ export default async function TutorMyProfilePage() {
         <h1 className="display-md mt-2">My profile</h1>
         <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">Manage what students see, how they can book you and where your account updates go.</p>
       </div>
-      {tutor.dbs_verified && !tutor.is_demo ? <Button asChild variant="outline" size="sm"><Link href={`/tutors/${userId}`} target="_blank" rel="noreferrer">View public profile <ArrowUpRight className="size-4" /></Link></Button> : <Badge variant="secondary">Awaiting approval</Badge>}
+      <div className="flex flex-wrap items-center gap-3"><Badge variant={isPublic ? "secondary" : "outline"}>{listingStatus}</Badge>{isPublic && <Button asChild variant="outline" size="sm"><Link href={`/tutors/${userId}`} target="_blank" rel="noreferrer">View public profile <ArrowUpRight className="size-4" /></Link></Button>}</div>
     </header>
 
     <nav aria-label="Profile sections" className="flex flex-wrap gap-2 border-b border-border pb-4 text-sm">
@@ -49,7 +57,7 @@ export default async function TutorMyProfilePage() {
       <div className="flex items-center gap-2"><BadgeCheck className="size-5 text-brand-strong" /><h2 className="text-xl font-semibold">Tutor listing</h2></div>
       <Card>
         <CardHeader><CardTitle>Your public information</CardTitle><p className="text-sm text-muted-foreground">Students use this to decide whether you are the right fit. Changes to your rate apply to future lessons.</p></CardHeader>
-        <CardContent className="space-y-6"><div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-secondary/40 px-4 py-3 text-sm"><Badge variant={tutor.dbs_verified ? "secondary" : "outline"}>{tutor.dbs_verified ? "Approved" : "Pending approval"}</Badge><span className="text-muted-foreground">Approval is managed by the Kindling team.</span></div><TutorListingForm tutor={tutor} /></CardContent>
+        <CardContent className="space-y-6"><div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-secondary/40 px-4 py-3 text-sm"><Badge variant={isPublic ? "secondary" : "outline"}>{listingStatus}</Badge><span className="text-muted-foreground">{listingDescription}</span></div><TutorListingForm tutor={tutor} /></CardContent>
       </Card>
     </section>
 
