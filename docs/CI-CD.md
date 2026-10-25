@@ -222,7 +222,7 @@ The failure this guards against is quiet: production running test keys accepts i
 
 ### LiveKit
 
-One project, `kindling`, currently serves local development, staging and production.
+Each environment is meant to run its own self-hosted LiveKit server, set up from `infra/livekit/` (see its README for the step-by-step, rollback and upgrade notes). Until an environment has been moved, it still uses the LiveKit Cloud project `kindling`, which currently serves local development, staging and production.
 
 - [ ] Create a second LiveKit project so production has its own credentials.
 - [ ] Point each environment's `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `NEXT_PUBLIC_LIVEKIT_URL` at its own project, and give each its own webhook pointing at that environment's `/api/webhooks/livekit`.
