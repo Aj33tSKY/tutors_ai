@@ -3,10 +3,20 @@ redis:
 api_key: ${LIVEKIT_API_KEY}
 api_secret: ${LIVEKIT_API_SECRET}
 ws_url: wss://${LIVEKIT_DOMAIN}
-# Egress refuses a job when its estimated CPU cost would exceed the machine.
-# The default cost for a track job (1.0) assumes transcoding, but the app
-# records screen shares as PASSTHROUGH (no decode or re-encode), which LiveKit
-# documents as cheap enough for hundreds per instance. Left at the default, a
-# 3-4 vCPU server would turn away the second concurrent call's screen share.
+# Egress refuses a job when its estimated CPU cost would not fit in what is
+# left of the machine (80% of its cores), and holds that estimate for 15 s after
+# accepting the job. The app only starts "media" jobs, which are priced by type:
+#   - the stereo audio mix (no preset)   -> participant_cpu_cost, default 2.0
+#   - a screen share (PASSTHROUGH)       -> track_cpu_cost,       default 0.5
+# At the default a 2-vCPU server is "full" after one audio job, so the same
+# call's screen share, or any second call's audio, is turned away (the app sees
+# a 10 s "request canceled" and marks the recording failed). Measured on the
+# real workload: the stereo mix averages 0.08-0.14 cores (peak 0.57), a
+# passthrough screen share 0.03 (peak 0.12). Every accepted job also reserves its
+# full estimate for 15 s, so calls that start together need room for all of
+# their reservations at once: at 0.3/0.2 only two of four simultaneous screen
+# shares were admitted on a 2-vCPU server. Actual usage is still tracked once a
+# job is running.
 cpu_cost:
-  track_cpu_cost: 0.2
+  participant_cpu_cost: 0.2
+  track_cpu_cost: 0.1
