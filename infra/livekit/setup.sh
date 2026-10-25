@@ -83,8 +83,11 @@ vars='${LIVEKIT_DOMAIN} ${TURN_DOMAIN} ${WEBHOOK_URL} ${LIVEKIT_API_KEY} ${LIVEK
 for name in livekit egress caddy; do
   envsubst "$vars" < "$SRC_DIR/$name.yaml.template" > "$INSTALL_DIR/$name.yaml"
 done
-# livekit.yaml and egress.yaml carry the API secret.
-chmod 600 "$INSTALL_DIR/livekit.yaml" "$INSTALL_DIR/egress.yaml"
+# livekit.yaml and egress.yaml carry the API secret. The livekit container runs
+# as root; the egress image runs as uid 1001 in group root (gid 0), so it can
+# only read its config through the group bit. 640 keeps other host users out.
+chmod 600 "$INSTALL_DIR/livekit.yaml"
+chmod 640 "$INSTALL_DIR/egress.yaml"
 # The containers run as other users and must still read their own config.
 chmod 644 "$INSTALL_DIR/caddy.yaml"
 cp "$SRC_DIR/redis.conf" "$SRC_DIR/docker-compose.yaml" "$INSTALL_DIR/"
