@@ -93,6 +93,7 @@ Variables — non-sensitive configuration, visible in the UI:
 | `PRODUCTION_SUPABASE_BASELINE_VERSION` / `STAGING_SUPABASE_BASELINE_VERSION` | Last migration verified as already present in that database |
 | `PRODUCTION_MIGRATIONS_BASELINED` / `STAGING_MIGRATIONS_BASELINED` | Must be `true` before that environment will deploy |
 | `PRODUCTION_URL` / `STAGING_URL` | Optional stable domain for the post-deploy smoke check |
+| `PRODUCTION_LIVEKIT_*` / `STAGING_LIVEKIT_*` | `DEPLOY_HOST`, `HOST_KEY`, `DOMAIN`, `TURN_DOMAIN` for the self-hosted LiveKit server, used only by the manual **Deploy LiveKit** workflow. The matching `*_LIVEKIT_DEPLOY_KEY` is a secret. See `infra/livekit/README.md`, "Updating the server" |
 
 Set them with the CLI rather than pasting into a browser:
 

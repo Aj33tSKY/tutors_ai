@@ -103,6 +103,59 @@ alone is not enough. The webhook is already configured on the server by
 - Reload the server (`sudo reboot`) and confirm everything comes back by
   itself.
 
+## Updating the server
+
+Changes to anything in this directory reach a server through the **Deploy
+LiveKit** workflow (`.github/workflows/deploy-livekit.yml`), run by hand from
+the Actions tab:
+
+- **target:** `staging` or `production`. Staging can run from any branch, so an
+  infrastructure change can be tried before it merges; production only from
+  `main`, and only after typing `deploy`.
+- **force:** off by default. The server counts the people connected to its
+  rooms and refuses to restart while anyone is in a call, because installing a
+  configuration restarts LiveKit, Egress and Caddy and drops every call. Tick
+  it only when dropping calls is acceptable.
+
+It packs this directory, sends it over SSH, runs `setup.sh` there (which keeps
+the existing keys and domains) and then runs `check.sh` against the server,
+retrying for two minutes while certificates settle. A red run means the server
+needs a look, not that the change was necessarily wrong; the previous files are
+kept in `/root/livekit.previous`.
+
+The workflow reads only its own target's settings:
+
+| Name | Kind | Value |
+| --- | --- | --- |
+| `STAGING_LIVEKIT_DEPLOY_KEY` | secret | Private half of the deploy key |
+| `STAGING_LIVEKIT_DEPLOY_HOST` | variable | The server's DNS name |
+| `STAGING_LIVEKIT_HOST_KEY` | variable | Its `ssh-keyscan -t ed25519` line (pins the server) |
+| `STAGING_LIVEKIT_DOMAIN` / `STAGING_LIVEKIT_TURN_DOMAIN` | variables | The two names, for the post-deploy check |
+
+`PRODUCTION_*` are the same five for the production server.
+
+### Setting it up for a new server (once)
+
+The deploy key can run exactly one thing on the server, `deploy.sh`, and cannot
+open a shell, forward ports or run anything else. From your machine, after the
+first `setup.sh` run (which installs `/usr/local/bin/livekit-deploy`):
+
+```sh
+ssh-keygen -t ed25519 -N "" -C "github-actions livekit-production deploy" -f ./deploy-key
+ssh root@<server> "echo 'restrict,command=\"/usr/local/bin/livekit-deploy\" $(cat deploy-key.pub)' >> /root/.ssh/authorized_keys"
+
+gh secret set PRODUCTION_LIVEKIT_DEPLOY_KEY < deploy-key
+ssh-keyscan -t ed25519 <livekit-domain> | gh variable set PRODUCTION_LIVEKIT_HOST_KEY
+gh variable set PRODUCTION_LIVEKIT_DEPLOY_HOST --body <livekit-domain>
+gh variable set PRODUCTION_LIVEKIT_DOMAIN --body <livekit-domain>
+gh variable set PRODUCTION_LIVEKIT_TURN_DOMAIN --body <turn-domain>
+rm deploy-key deploy-key.pub
+```
+
+To revoke it, delete that line from `authorized_keys`. If the server is ever
+rebuilt, its host key changes: update `*_LIVEKIT_HOST_KEY` or the workflow will
+(correctly) refuse to connect.
+
 ## Rolling back
 
 Put the three Vercel variables back to the LiveKit Cloud values and redeploy.
@@ -120,8 +173,8 @@ one LiveKit project" gap in `docs/CI-CD.md`.
 ## Operating it
 
 - **Upgrade:** change the pinned image versions in `docker-compose.yaml`
-  through a pull request, then on the server `git pull && sudo ./setup.sh`.
-  Read LiveKit's release notes first. Keep Egress at or above v1.15.0.
+  through a pull request, merge it, then run the **Deploy LiveKit** workflow
+  (see below). Read LiveKit's release notes first. Keep Egress at or above v1.15.0.
 - **Logs:** `cd /opt/livekit && docker compose logs -f livekit` (or `egress`, `caddy`).
 - **Monitoring:** point an uptime check at `https://<livekit-domain>/` (returns
   200). An outage means no calls, so alert someone who can act.
