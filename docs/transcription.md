@@ -82,8 +82,9 @@ The timestamp is what lets `summarize-sessions` cite evidence for a claim in the
 | `DEEPGRAM_API_KEY` | Vercel, both environments |
 | `DEEPGRAM_MODEL` | Optional override; defaults to `nova-3` |
 | LiveKit webhook → `/api/webhooks/livekit` | Signed with that environment's API key pair, for `participant_joined`, `participant_left`, `track_published`, `track_unpublished` and `egress_ended`. LiveKit Cloud sends every event type by default |
-| `session-recordings` bucket | Private, provisioned per environment by hand (same bucket the old video recording used) |
-| `SUPABASE_STORAGE_S3_*` credentials | Egress writes to this bucket over Supabase Storage's S3 API |
+| Cloudflare R2 bucket | Private, one per environment, provisioned by hand. Recordings are in R2, not Supabase Storage |
+| `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | Egress writes to the bucket over R2's S3 API; the app signs playback URLs and deletes expired files with the same credentials (`src/lib/recordings-storage.ts`) |
+| R2 bucket CORS | Must allow `GET` from each environment's app origin. The lesson player loads audio with `crossOrigin="anonymous"` for the stereo-to-mono mix; without CORS the browser plays silence |
 
 `LIVEKIT_AGENT_NAME` is not used by anything and can be removed from both environments.
 

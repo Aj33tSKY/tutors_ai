@@ -181,14 +181,14 @@ plays in order, with each screen share shown at the point in the audio it happen
 is what the `transcribe-sessions` cron sends to Deepgram — see
 [transcription setup](docs/transcription.md) for why one audio file per call (not one per
 participant) is the point, and how screen shares are recorded. A daily cron deletes each recording
-after 90 days. Playback uses short-lived signed URLs and Storage RLS; no public recording URL is
-stored.
+after 90 days. Recordings are stored in a private Cloudflare R2 bucket; playback uses short-lived presigned
+URLs issued only after the booking's RLS check passes, and no public recording URL is stored.
 
 Before enabling this in a deployment:
 
-1. Create a private `session-recordings` bucket in Supabase Storage and generate S3 connection
-   credentials. Set `SUPABASE_STORAGE_S3_ACCESS_KEY_ID`, `SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY`,
-   and `SUPABASE_STORAGE_S3_REGION` in the app environment.
+1. Create a private Cloudflare R2 bucket for the environment, an API token scoped to it, and a CORS
+   rule allowing `GET` from the app's origin. Set `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`
+   and `R2_SECRET_ACCESS_KEY` in the app environment (see [transcription setup](docs/transcription.md)).
 2. Set `DEEPGRAM_API_KEY` in that Vercel project for batch transcription.
 3. Configure LiveKit Cloud to POST its signed webhook events to `/api/webhooks/livekit`
    using that environment's API key pair.
