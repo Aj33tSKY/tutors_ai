@@ -13,7 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - [docs/development-workflow.md](docs/development-workflow.md) — which branch to start from, how to open a pull request, how to write a migration. Read this first.
 - [docs/CI-CD.md](docs/CI-CD.md) — the pipeline itself, environment configuration, and what is still outstanding.
 - [docs/transcription.md](docs/transcription.md) — how session transcripts are produced.
-- [infra/livekit/README.md](infra/livekit/README.md) — the self-hosted LiveKit stack: server setup, firewall, DNS, rollback and upgrades.
+- [infra/livekit/README.md](infra/livekit/README.md) — the self-hosted LiveKit stack: server setup, firewall, DNS, sizing, rollback, upgrades and the Deploy LiveKit workflow.
 - [docs/testing-plan.md](docs/testing-plan.md) — proposed application and database upgrade coverage, repeatable fixtures, and defects found during design.
 - [docs/backlog.md](docs/backlog.md) — known work deliberately not done yet, and why.
 - [docs/mvp_plan.md](docs/mvp_plan.md) — product scope.
@@ -29,4 +29,7 @@ Each of these cost real debugging time. They are not obvious from reading the co
 - **A `track_published` webhook carries no participant metadata** — only sid, name and identity. Roles come from the booking, never from token metadata. Reading metadata there silently discards every event, which is invisible because the handler still returns 200.
 - **There is no transcription agent.** Transcription is batch: audio-only per-track egress, then `/api/cron/transcribe-sessions`. The old always-on LiveKit agent under `agent/` was deleted deliberately; do not reintroduce it.
 - **A wrong webhook path returns 200.** Next.js answers an unknown POST path with a page, so LiveKit records a successful delivery and never retries. If webhook-driven behaviour is missing, check the configured path before suspecting the handler.
+- **Merging a change under `infra/livekit/` does not update the video server.** The manual `Deploy LiveKit` workflow does, and installing restarts LiveKit, which drops every call in progress. It refuses while anyone is connected unless forced. Never run `setup.sh` on a server by hand during a lesson.
+- **Egress silently refuses jobs it thinks will not fit.** The stock CPU cost for the stereo audio mix fills a 2-vCPU server, so the same call's screen share, or another call's audio, is turned away; LiveKit reports it 10 s later as `request canceled` and the recording is marked `failed`. `egress.yaml.template` sets the costs; read its comment and the infra README's capacity section before touching them or resizing the server.
+- **`NEXT_PUBLIC_LIVEKIT_URL` is baked in at build time.** Changing it in Vercel does nothing until the app is redeployed.
 - **Adding a permission to `ci.yml` breaks its callers.** `staging.yml` and `production.yml` call it as a reusable workflow, and a called workflow cannot request more permissions than its caller grants. `scripts/ci/verify-workflow-permissions.mjs` checks this in CI.
