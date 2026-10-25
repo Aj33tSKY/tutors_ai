@@ -34,22 +34,28 @@
       "purpose": "Bypasses RLS. Server-side only: webhooks, crons, the health probe."
     },
     {
-      "name": "SUPABASE_STORAGE_S3_ACCESS_KEY_ID",
-      "required": true,
-      "secret": true,
-      "purpose": "LiveKit Egress writes recordings and transcript audio over Supabase Storage's S3 API."
-    },
-    {
-      "name": "SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY",
-      "required": true,
-      "secret": true,
-      "purpose": "Pairs with the S3 access key id."
-    },
-    {
-      "name": "SUPABASE_STORAGE_S3_REGION",
+      "name": "R2_ENDPOINT",
       "required": true,
       "secret": false,
-      "purpose": "Storage region for the S3 endpoint. Defaults to us-east-1 in code if unset, which is usually wrong."
+      "purpose": "Cloudflare R2 S3 endpoint (https://<account-id>.r2.cloudflarestorage.com) for session recordings."
+    },
+    {
+      "name": "R2_BUCKET",
+      "required": true,
+      "secret": false,
+      "purpose": "Private R2 bucket holding session recordings. Separate bucket per environment."
+    },
+    {
+      "name": "R2_ACCESS_KEY_ID",
+      "required": true,
+      "secret": true,
+      "purpose": "R2 API token key id, scoped to the recordings bucket. LiveKit Egress writes with it; the app signs and deletes with it."
+    },
+    {
+      "name": "R2_SECRET_ACCESS_KEY",
+      "required": true,
+      "secret": true,
+      "purpose": "Pairs with the R2 access key id."
     },
     {
       "name": "NEXT_PUBLIC_LIVEKIT_URL",

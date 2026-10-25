@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { ReturnToDashboardLink } from "@/components/dashboard/return-to-dashboard-link";
 import { Card, CardContent } from "@/components/ui/card";
 import { boardLabel, subjectLabel } from "@/lib/subjects";
+import { signRecordingUrl } from "@/lib/recordings-storage";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { formatSessionNotesMarkdown } from "@/lib/session-notes";
@@ -12,8 +13,6 @@ import type { Booking, SessionAnalytics, SessionRecording } from "@/lib/types";
 import { LessonPlayer, type ScreenSegment } from "./lesson-player";
 import { RecordingCard } from "./recording-card";
 import { SessionNotes } from "./session-notes";
-
-const RECORDINGS_BUCKET = "session-recordings";
 
 export default async function StudentSessionReviewPage({
   params,
@@ -47,8 +46,8 @@ export default async function StudentSessionReviewPage({
     .order("started_at", { ascending: true })
     .returns<SessionRecording[]>();
 
-  const signedUrl = async (path: string) =>
-    (await supabase.storage.from(RECORDINGS_BUCKET).createSignedUrl(path, 60 * 60)).data?.signedUrl ?? null;
+  // Access was already decided above by booking RLS; this only signs paths of recordings that query returned.
+  const signedUrl = async (path: string) => signRecordingUrl(path, 60 * 60).catch(() => null);
 
   const isPending = (recording: SessionRecording) => ["starting", "active", "stopping"].includes(recording.status);
   const hasPendingRecordings = recordings?.some(isPending) ?? false;

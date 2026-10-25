@@ -1,6 +1,5 @@
+import { deleteRecording } from "@/lib/recordings-storage";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-const RECORDINGS_BUCKET = "session-recordings";
 
 export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
@@ -19,8 +18,9 @@ export async function GET(request: Request) {
 
   let deleted = 0;
   for (const recording of expired ?? []) {
-    const { error: removeError } = await admin.storage.from(RECORDINGS_BUCKET).remove([recording.storage_path]);
-    if (removeError) {
+    try {
+      await deleteRecording(recording.storage_path);
+    } catch (removeError) {
       console.error(`Failed to delete expired recording ${recording.id}:`, removeError);
       return Response.json({ error: "Could not delete an expired recording" }, { status: 500 });
     }

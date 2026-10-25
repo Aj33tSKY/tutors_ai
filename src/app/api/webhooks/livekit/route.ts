@@ -9,16 +9,14 @@ import {
   FileOutput,
   MediaSource,
   Output,
-  S3Upload,
   StartEgressRequest,
   StorageConfig,
   TrackSource,
   TrackType,
   WebhookReceiver,
 } from "livekit-server-sdk";
+import { recordingsUpload } from "@/lib/recordings-storage";
 import { createAdminClient } from "@/lib/supabase/admin";
-
-const RECORDINGS_BUCKET = "session-recordings";
 
 function livekitHost() {
   const url = process.env.NEXT_PUBLIC_LIVEKIT_URL;
@@ -39,23 +37,6 @@ function clients() {
   return {
     egress: new EgressClient(host, key, secret),
   };
-}
-
-function storageUpload() {
-  const accessKey = process.env.SUPABASE_STORAGE_S3_ACCESS_KEY_ID;
-  const secretKey = process.env.SUPABASE_STORAGE_S3_SECRET_ACCESS_KEY;
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!accessKey || !secretKey || !supabaseUrl) {
-    throw new Error("Supabase Storage S3 credentials are not configured");
-  }
-  return new S3Upload({
-    accessKey,
-    secret: secretKey,
-    endpoint: `${new URL(supabaseUrl).origin}/storage/v1/s3`,
-    region: process.env.SUPABASE_STORAGE_S3_REGION || "us-east-1",
-    bucket: RECORDINGS_BUCKET,
-    forcePathStyle: true,
-  });
 }
 
 /**
@@ -174,7 +155,7 @@ async function startRecording(
             },
           }),
         ],
-        storage: new StorageConfig({ provider: { case: "s3", value: storageUpload() } }),
+        storage: new StorageConfig({ provider: { case: "s3", value: recordingsUpload() } }),
       }),
     );
     const { error } = await admin
@@ -281,7 +262,7 @@ async function startScreenRecording(bookingId: string, roomName: string, trackSi
             },
           }),
         ],
-        storage: new StorageConfig({ provider: { case: "s3", value: storageUpload() } }),
+        storage: new StorageConfig({ provider: { case: "s3", value: recordingsUpload() } }),
       }),
     );
     const { error } = await admin

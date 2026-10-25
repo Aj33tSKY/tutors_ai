@@ -1,8 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { verifyCronRequest } from "@/lib/cron";
+import { signRecordingUrl } from "@/lib/recordings-storage";
 import { formatTranscript, transcribeStereoRecording, MAX_TRANSCRIBE_ATTEMPTS } from "@/lib/transcription";
 
-const RECORDINGS_BUCKET = "session-recordings";
 const MAX_SEGMENTS_PER_RUN = 10;
 const SIGNED_URL_TTL_SECONDS = 900;
 
@@ -30,12 +30,7 @@ async function transcribeSegment(
     .update({ transcribe_attempts: segment.transcribe_attempts + 1 })
     .eq("id", segment.id);
 
-  const { data: signed, error: signError } = await admin.storage
-    .from(RECORDINGS_BUCKET)
-    .createSignedUrl(segment.storage_path, SIGNED_URL_TTL_SECONDS);
-  if (signError || !signed?.signedUrl) {
-    throw new Error(`Could not sign ${segment.storage_path}: ${signError?.message ?? "no URL returned"}`);
-  }
+  const signedUrl = await signRecordingUrl(segment.storage_path, SIGNED_URL_TTL_SECONDS);
 
   // Puts a resumed session's later segment on the same clock as the first,
   // rather than restarting its timestamps at 0 — see formatTranscript.
@@ -49,7 +44,7 @@ async function transcribeSegment(
     ? Math.max(0, (new Date(segment.started_at).getTime() - new Date(sessionStart).getTime()) / 1000)
     : 0;
 
-  const turns = await transcribeStereoRecording(signed.signedUrl);
+  const turns = await transcribeStereoRecording(signedUrl);
   const transcript = formatTranscript(turns, offsetSeconds);
 
   if (transcript.trim().length > 0) {
