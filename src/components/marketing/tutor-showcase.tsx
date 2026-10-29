@@ -20,7 +20,7 @@ const getFeaturedTutors = unstable_cache(async () => {
     .returns<TutorRow[]>();
   if (error) throw new Error("Could not load featured tutors");
   return tutors ?? [];
-}, ["featured-tutors"], { revalidate: 300 });
+}, ["featured-tutors"], { revalidate: 300, tags: ["tutor-catalogue"] });
 
 export async function TutorShowcase() {
   let tutors: TutorRow[] | null;
