@@ -1,0 +1,53 @@
+# Self-hosted LiveKit for one environment (staging or production). Runs on a
+# single Linux VM; every service uses host networking because WebRTC needs the
+# server's real ports. Do not run this on macOS or Windows.
+#
+# Versions are pinned on purpose: bump them in a pull request, never `latest`.
+# The app's recording code relies on Egress features, so keep egress at or
+# above the version it was tested with.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  caddy:
+    image: livekit/caddyl4@sha256:9dd090159a6042a907dbff0ce9dda27a21d2a559dc7b03b60a8e6b1b60b8348e
+    command: run --config /etc/caddy.yaml --adapter yaml
+    restart: unless-stopped
+    network_mode: host
+    logging: *logging
+    volumes:
+      - ./caddy.yaml:/etc/caddy.yaml:ro
+      - ./caddy_data:/data
+
+  livekit:
+    image: livekit/livekit-server:v1.13.11
+    command: --config /etc/livekit.yaml
+    restart: unless-stopped
+    network_mode: host
+    logging: *logging
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server /etc/redis.conf
+    restart: unless-stopped
+    network_mode: host
+    logging: *logging
+    volumes:
+      - ./redis.conf:/etc/redis.conf:ro
+
+  egress:
+    image: livekit/egress:v1.15.0
+    restart: unless-stopped
+    network_mode: host
+    logging: *logging
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/egress.yaml
+    volumes:
+      - ./egress.yaml:/etc/egress.yaml:ro
+    cap_add:
+      - CAP_SYS_ADMIN

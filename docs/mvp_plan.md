@@ -1,5 +1,7 @@
 # MVP Implementation Plan: UK A-Level STEM Tutor Management & Learning Platform
 
+> **This is the original product plan.** It records scope and intent, not the current implementation, and some technology choices below were changed while building. In particular: video is **LiveKit** (not Daily.co), self-hosted on Hetzner for staging; session recordings live in **Cloudflare R2** (Supabase Storage keeps only avatars, attachments and similar files); transcription is a **batch** job over a recorded stereo file rather than a real-time pipe; and deployment is GitHub Actions to Vercel and Supabase. For what exists today see the [README](../README.md), [CI-CD.md](CI-CD.md) and [transcription.md](transcription.md).
+
 ## 1. Executive Summary & Tech Stack
 
 An all-in-one tutor management agency and learning platform tailored for UK A-Level STEM students (Mathematics, Further Maths, Computing, Physics, Chemistry, Biology). The platform handles discovery, scheduling, live video sessions over WebRTC with real-time transcription, automated key topic extraction, student analytics tracking, and a lightweight RAG-enabled chatbot for continuous post-session revision.

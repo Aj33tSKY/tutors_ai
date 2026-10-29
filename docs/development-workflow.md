@@ -35,7 +35,8 @@ The cost is that anything merged is immediately eligible for a production dispat
 ## First day on the project
 
 1. Clone the repository and run `npm ci` with Node 24.
-2. Get **development** environment variables from the owner into an ignored `.env.local`. Check that `NEXT_PUBLIC_SUPABASE_URL` is the development project's URL. Never copy production keys. Do not run `vercel env pull .env.local` blindly: the local Vercel link currently points to `tutors`, and a pull from that project could replace your development credentials.
+2. Get **development** environment variables from the owner into an ignored `.env.local` (`.env.example` lists every name). Check that `NEXT_PUBLIC_SUPABASE_URL` is the development project's URL. Never copy production keys. Do not run `vercel link` or `vercel env pull` without checking which project you are linking: `vercel link` overwrites `.env.local`, and a pull from the production project would replace your development credentials. The local link should point at `tutors-dev`.
+   Local sessions use the **staging** video server and recording bucket, so a test call on your laptop writes a real recording to staging.
 3. Run `npm run dev` and open `http://localhost:3000`.
 4. For SQL changes, start the local Supabase stack with `npx supabase start`. Your local database is separate from both cloud projects.
 
@@ -58,6 +59,16 @@ For a database change, create the file with `npx supabase migration new describe
 Prefer additive database changes. Migrations run before the new app deploys, so the old app briefly runs against the new schema; removing or renaming a column in the same release can break it.
 
 CI only validates migrations when your change could affect the result, so an app-only pull request finishes that check in seconds and says so in its run summary. That is expected, not a check that failed to run.
+
+## Change the video server
+
+The LiveKit server lives in `infra/livekit/` and is changed through a pull request like any other code. Merging does not update the server: run the **Deploy LiveKit** workflow from the Actions tab when you want it applied.
+
+```bash
+gh workflow run "Deploy LiveKit" --ref main -f target=staging
+```
+
+It refuses while anyone is in a call (tick `force` to override and drop them), installs the new files, then checks the server from outside. Staging can also be deployed from a branch, to try a change before merging it; production only from `main` with `-f target=production -f confirm=deploy`. Server setup, sizing and the Egress cost settings are in [infra/livekit/README.md](../infra/livekit/README.md).
 
 ## Release to customers
 
@@ -90,10 +101,11 @@ As a new contributor you should not need to configure anything. You need Docker 
 
 ## What is not set up
 
-- **A second LiveKit project.** Staging and production share one, so they share API keys — and a LiveKit key can mint a token for any room in its project, including a live lesson. This is the largest remaining isolation gap.
+- **A production LiveKit server.** Staging has its own self-hosted server; production is still on LiveKit Cloud. A LiveKit key can mint a token for any room on its server, so the two environments must never share one.
+- **Production is behind `main`.** It was last released on 2026-09-26. The next release applies the migrations since then and moves recordings to R2; confirm the production bucket's CORS rule first.
 - **`STRIPE_WEBHOOK_SECRET` on `tutors-dev`**, so Stripe webhooks fail on staging.
 - **An application test suite.** Database authorisation is covered by `supabase/tests/`; the Next.js layer is not.
 
-Before the first paying student there is a separate checklist — Stripe live mode, a second LiveKit project, Auth redirect URLs and the data-protection questions. See [Before taking real payments](CI-CD.md#before-taking-real-payments). Everything on it is safe to defer now and unsafe to defer past launch.
+Before the first paying student there is a separate checklist — Stripe live mode, the production video server, Auth redirect URLs and the data-protection questions. See [Before taking real payments](CI-CD.md#before-taking-real-payments). Everything on it is safe to defer now and unsafe to defer past launch.
 
 Full detail, including every secret and variable name, is in [CI-CD.md](CI-CD.md). Keep production credentials out of feature branches and local files.
