@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { LessonSignal } from "./lesson-signal";
 
 const SUBJECTS = ["Physics", "Chemistry", "Mathematics", "Biology", "Computing"] as const;
-
-// The in-flow sizer below reserves space for the longest entry, so the
-// rotating slot never has to guess a `ch` width.
 const WIDEST = SUBJECTS.reduce((a, b) => (b.length > a.length ? b : a));
 
 const STATS = [
@@ -16,29 +14,25 @@ const STATS = [
 
 export function Hero() {
   return (
-    <section className="relative isolate overflow-hidden">
-      <div aria-hidden className="grain absolute inset-0 -z-10" />
+    <>
+      <section className="marketing-hero relative isolate overflow-hidden bg-[#070b12] text-white">
+        <div className="shell relative z-10 grid min-h-[680px] items-center gap-8 py-16 sm:py-20 lg:min-h-[740px] lg:grid-cols-[0.9fr_1.1fr] lg:gap-4">
+          <div className="relative z-10 min-w-0 max-w-xl">
+            <p className="eyebrow mb-6 flex items-center gap-2 text-white/55">
+              <span className="fluid-hero__signal-dot" />
+              A-Level STEM · tutoring that remembers
+            </p>
+            <h1 className="display-xl max-w-[12ch] text-white">
+              Tutoring that <span className="hero-brand-word">remembers</span> every lesson.
+            </h1>
+            <p className="mt-4 text-sm text-white/55">AQA / Edexcel / OCR / WJEC / CIE</p>
 
-      <div className="shell pt-16 pb-[var(--section-y)] sm:pt-24">
-        <h1 className="display-xl max-w-[13ch]">
-          Tutoring that{" "}
-          <span className="text-brand-strong">remembers</span> every lesson.
-        </h1>
-        <p className="mt-4 text-sm text-muted-foreground">
-          A-Level STEM · AQA / Edexcel / OCR / WJEC / CIE
-        </p>
-
-        <div className="mt-14 grid grid-cols-1 gap-10 lg:grid-cols-[1fr_auto] lg:items-start lg:gap-16">
-          <div className="min-w-0 max-w-xl">
-            {/* The rotating slot ends its own line on purpose: it reserves the
-                width of the longest subject, and any slack is invisible at a
-                line end rather than showing as a gap mid-sentence. */}
-            <p className="font-heading text-2xl leading-[1.25] sm:text-3xl">
+            <p className="mt-12 font-heading text-2xl leading-[1.25] text-white sm:text-3xl">
               Book vetted A-Level tutors for
               <br />
               <RotatingSubject />
             </p>
-            <p className="mt-6 text-lg leading-relaxed text-muted-foreground">
+            <p className="mt-6 max-w-lg text-lg leading-relaxed text-white/65">
               Review lesson recordings and notes, then practise with a revision assistant
               that can use your session transcripts.
             </p>
@@ -47,107 +41,58 @@ export function Hero() {
               <Button asChild size="lg">
                 <Link href="/tutors">Find your tutor</Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
+              <Button
+                asChild
+                size="lg"
+                variant="outline"
+                className="border-white/35 text-white hover:border-white hover:bg-white hover:text-ink"
+              >
                 <Link href="/sign-up?role=tutor">Become a tutor</Link>
               </Button>
             </div>
           </div>
 
-          <SessionPanel />
+          <LessonSignal />
         </div>
-      </div>
+      </section>
 
-      {/* Stat rail — soft cards on a tinted strip. */}
-      <div className="border-y border-border/70 bg-secondary/60">
+      <div className="hero-stats border-y border-white/10 bg-[#0d1720] text-white">
         <div className="shell">
-          <dl className="grid grid-cols-2 gap-4 py-10 lg:grid-cols-4">
-            {STATS.map((s) => (
-              <div key={s.label} className="rounded-2xl bg-card p-5 shadow-sm">
-                <dt className="sr-only">{s.label}</dt>
+          <dl className="grid grid-cols-2 gap-3 py-6 sm:gap-4 sm:py-8 lg:grid-cols-4">
+            {STATS.map((stat) => (
+              <div key={stat.label} className="hero-stat border-l border-white/15 py-2 pl-4 sm:pl-6">
+                <dt className="sr-only">{stat.label}</dt>
                 <dd>
-                  <span className="display-md block text-brand-strong">{s.value}</span>
-                  <span className="eyebrow mt-2 block">{s.label}</span>
+                  <span className="display-md block text-[#c4f17a]">{stat.value}</span>
+                  <span className="eyebrow mt-2 block text-white/60">{stat.label}</span>
                 </dd>
               </div>
             ))}
           </dl>
         </div>
       </div>
-    </section>
+    </>
   );
 }
 
-/**
- * Rotating subject word.
- *
- * Two things keep it from clipping or drifting off the baseline:
- *  1. An in-flow, invisible copy of the longest subject sets the width, so no
- *     word is ever cut off horizontally.
- *  2. That same copy — not an `overflow-hidden` box — is what the surrounding
- *     line takes its baseline from. The clipping layer is absolutely
- *     positioned on top, so it can't pull the baseline to its bottom edge.
- */
 function RotatingSubject() {
   return (
-    <span className="relative inline-block leading-[1.25] whitespace-nowrap text-brand-strong">
+    <span className="relative inline-block leading-[1.25] whitespace-nowrap text-[#c4f17a]">
       <span className="sr-only">
         maths, further maths, physics, chemistry, biology and computing
       </span>
-
-      {/* width + baseline source */}
-      <span aria-hidden className="invisible">
-        {WIDEST}
-      </span>
-
+      <span aria-hidden className="invisible">{WIDEST}</span>
       <span aria-hidden className="absolute inset-0 overflow-hidden">
-        {SUBJECTS.map((word, i) => (
+        {SUBJECTS.map((word, index) => (
           <span
             key={word}
             className="hero-subject absolute inset-x-0 top-0"
-            style={{ animationDelay: `${i * 3.6}s` }}
+            style={{ animationDelay: `${index * 3.6}s` }}
           >
             {word}
           </span>
         ))}
       </span>
     </span>
-  );
-}
-
-function SessionPanel() {
-  return (
-    <div className="w-full min-w-0 max-w-md overflow-hidden rounded-3xl border border-border/70 bg-card shadow-lg lg:w-[26rem]">
-      <div className="flex items-center justify-between border-b border-border/70 px-5 py-4">
-        <span className="eyebrow flex items-center gap-2 text-foreground">
-          <span className="size-1.5 rounded-full bg-saffron" />
-          Example lesson · Physics
-        </span>
-        <span className="font-mono text-xs text-muted-foreground">Lesson review</span>
-      </div>
-
-      <div className="space-y-4 px-5 py-5">
-        <TranscriptLine speaker="Tutor" text="So for the particle accelerator question…" />
-        <TranscriptLine speaker="Student" text="Is that the same as the centripetal force equation?" />
-        <TranscriptLine speaker="Tutor" text="Exactly — let's derive it together." />
-      </div>
-
-      <div className="border-t border-border/70 bg-secondary/50 px-5 py-5">
-        <p className="font-heading text-lg font-semibold">Particle accelerators</p>
-        <p className="mt-1 text-sm text-muted-foreground">After a lesson, return to its recording, transcript and notes.</p>
-      </div>
-    </div>
-  );
-}
-
-function TranscriptLine({ speaker, text }: { speaker: "Tutor" | "Student"; text: string }) {
-  return (
-    <p className="grid grid-cols-[4.5rem_1fr] gap-3 text-sm">
-      <span
-        className={`eyebrow pt-1 ${speaker === "Tutor" ? "text-brand-strong" : "text-violet"}`}
-      >
-        {speaker}
-      </span>
-      <span className="leading-relaxed text-muted-foreground">{text}</span>
-    </p>
   );
 }
