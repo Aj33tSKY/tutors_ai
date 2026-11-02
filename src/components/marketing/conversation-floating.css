@@ -1,0 +1,83 @@
+/* Opt-in presentation. Set USE_FLOATING_INSIGHTS to false in lesson-signal.tsx to roll back. */
+.conversation-insight-link, .conversation-insight-icon { display: none; }
+.conversation-stage[data-presentation="floating"] {
+  --annotation-surface: #131b23;
+  border-color: #ffffff09;
+  box-shadow: 0 20px 70px #00000012;
+  overflow: visible;
+}
+:root:not(.dark) .conversation-stage[data-presentation="floating"] {
+  --annotation-surface: #fff;
+  border-color: #00000007;
+  box-shadow: 0 20px 70px #00000005;
+}
+.conversation-stage[data-presentation="floating"]::before { opacity: .1; border-radius: inherit; }
+[data-presentation="floating"] .conversation-turn { position: relative; gap: 42px; border: 0; }
+[data-presentation="floating"] .conversation-analysis {
+  align-self: center;
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+[data-presentation="floating"] .conversation-analysis__insight {
+  width: 100%;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--conversation-line);
+  background: var(--annotation-surface);
+  box-shadow: 0 10px 28px #00000012;
+  position: relative;
+  z-index: 1;
+  transform: none;
+}
+[data-presentation="floating"] .conversation-analysis__insight[data-ready="true"] { transform: translate(0, 0); }
+[data-presentation="floating"] .conversation-analysis__signal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--conversation-text);
+}
+[data-presentation="floating"] .conversation-insight-icon { display: block; flex-shrink: 0; color: var(--conversation-subtle); }
+[data-presentation="floating"] .conversation-analysis p { font-size: 12px; line-height: 1.65; }
+[data-presentation="floating"] .conversation-insight-link {
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  overflow: visible;
+  color: var(--conversation-tutor);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .6s .15s;
+}
+[data-presentation="floating"] .conversation-turn--student .conversation-insight-link { color: var(--conversation-student); }
+[data-presentation="floating"] .conversation-insight-link[data-connected="true"] { opacity: .5; }
+.conversation-insight-link path { stroke: currentColor; stroke-width: 1; stroke-dasharray: 1; stroke-dashoffset: 1; }
+.conversation-insight-link circle { fill: currentColor; }
+[data-presentation="floating"] .conversation-insight-link[data-connected="true"] path { animation: conversation-insight-connect .8s .1s ease-out forwards; }
+.conversation-evidence {
+  padding: .1em 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--conversation-tutor) 13%, transparent);
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: conversation-evidence-reveal .7s ease-out;
+}
+.conversation-turn--student .conversation-evidence {
+  background: color-mix(in srgb, var(--conversation-student) 13%, transparent);
+}
+@keyframes conversation-insight-connect { to { stroke-dashoffset: 0; } }
+@keyframes conversation-evidence-reveal { from { background-color: transparent; box-shadow: none; } }
+@media (max-width: 480px) {
+  [data-presentation="floating"] .conversation-turn { gap: 0; }
+  [data-presentation="floating"] .conversation-turn + .conversation-turn { margin-top: 26px; }
+  [data-presentation="floating"] .conversation-analysis { min-height: 112px; padding: 8px 0 0 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-presentation="floating"] .conversation-analysis__insight { transform: none; transition: none; }
+  .conversation-insight-link, .conversation-evidence { animation: none !important; transition: none !important; }
+  .conversation-insight-link path { animation: none !important; stroke-dashoffset: 0; }
+}

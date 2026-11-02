@@ -1,0 +1,610 @@
+[
+  {
+    "subject": "MATHEMATICS",
+    "tutor": "Which part of differentiation should we focus on today?",
+    "student": "I know the rules, but worded questions trip me up.",
+    "turns": {
+      "tutor": {
+        "label": "Setting the focus",
+        "signal": "Session goals",
+        "review": "An open question lets the student identify where practice would help most.",
+        "evidence": "focus on today"
+      },
+      "student": {
+        "label": "Naming the difficulty",
+        "signal": "Areas for improvement",
+        "review": "The student identifies interpreting questions as the difficulty, rather than recalling the rules.",
+        "evidence": "worded questions trip me up"
+      }
+    }
+  },
+  {
+    "subject": "PHYSICS",
+    "tutor": "At the highest point, is the ball's acceleration zero?",
+    "student": "Yes, because it stops for a moment before falling.",
+    "turns": {
+      "tutor": {
+        "label": "Checking a concept",
+        "signal": "What we covered",
+        "review": "A diagnostic question checks whether the student distinguishes velocity from acceleration.",
+        "evidence": "is the ball's acceleration zero"
+      },
+      "student": {
+        "label": "A misconception surfaces",
+        "signal": "Areas for improvement",
+        "review": "The answer confuses zero velocity with zero acceleration. Gravity still acts at the highest point.",
+        "evidence": "because it stops for a moment"
+      }
+    }
+  },
+  {
+    "subject": "CHEMISTRY",
+    "tutor": "Start with the units. What does moles per litre tell you?",
+    "student": "Divide moles by volume. But do I convert millilitres first?",
+    "turns": {
+      "tutor": {
+        "label": "Offering a small prompt",
+        "signal": "Teaching approach",
+        "review": "The tutor uses units as a prompt, leaving the student to reconstruct the calculation.",
+        "evidence": "Start with the units"
+      },
+      "student": {
+        "label": "Partial understanding",
+        "signal": "Learning insights",
+        "review": "The student recovers the relationship with a prompt, but still needs help with volume conversion.",
+        "evidence": "do I convert millilitres first"
+      }
+    }
+  },
+  {
+    "subject": "PHYSICS",
+    "tutor": "The magnetic force changes direction, not the particle's speed.",
+    "student": "Oh, so it can accelerate without getting any faster!",
+    "turns": {
+      "tutor": {
+        "label": "Reframing the idea",
+        "signal": "Teaching approach",
+        "review": "Separating speed from direction offers a different way to explain acceleration.",
+        "evidence": "changes direction"
+      },
+      "student": {
+        "label": "Making the connection",
+        "signal": "Key breakthrough",
+        "review": "The student expresses the distinction in their own words, showing understanding in this example.",
+        "evidence": "accelerate without getting any faster"
+      }
+    }
+  },
+  {
+    "subject": "BIOLOGY",
+    "tutor": "Would a diagram or a verbal explanation help here?",
+    "student": "Could we draw it? I'm losing track of the stages.",
+    "turns": {
+      "tutor": {
+        "label": "Adapting the explanation",
+        "signal": "Teaching approach",
+        "review": "The tutor offers a choice of explanation instead of repeating the same approach.",
+        "evidence": "a diagram or a verbal explanation"
+      },
+      "student": {
+        "label": "Asking for another approach",
+        "signal": "Learning insights",
+        "review": "The student asks for a diagram to follow the sequence. This is a useful cue for this topic.",
+        "evidence": "Could we draw it"
+      }
+    }
+  },
+  {
+    "subject": "MATHEMATICS",
+    "tutor": "Now try differentiating x cubed without any hints.",
+    "student": "Three x squared. Multiply by the power, then subtract one.",
+    "turns": {
+      "tutor": {
+        "label": "Removing the scaffold",
+        "signal": "What we covered",
+        "review": "An unprompted attempt checks whether the student can apply the method independently.",
+        "evidence": "without any hints"
+      },
+      "student": {
+        "label": "Explaining the method",
+        "signal": "What went well",
+        "review": "The student gives the correct derivative and explains the rule, without a hint in this turn.",
+        "evidence": "Multiply by the power"
+      }
+    }
+  },
+  {
+    "subject": "CHEMISTRY",
+    "tutor": "Your calculation is right. What is missing from the final answer?",
+    "student": "The units. It should be moles per litre.",
+    "turns": {
+      "tutor": {
+        "label": "Checking exam technique",
+        "signal": "Areas for improvement",
+        "review": "The tutor separates a correct calculation from an incomplete final answer.",
+        "evidence": "What is missing"
+      },
+      "student": {
+        "label": "Correcting an omission",
+        "signal": "What went well",
+        "review": "The student supplies the missing units after a prompt. Checking units is a useful final step.",
+        "evidence": "The units"
+      }
+    }
+  },
+  {
+    "subject": "COMPUTING",
+    "tutor": "Before next time, trace binary search on two sorted lists.",
+    "student": "I'll write down the midpoint and bounds at each step.",
+    "turns": {
+      "tutor": {
+        "label": "Planning the practice",
+        "signal": "Next steps",
+        "review": "The tutor sets a concrete follow-up task: two traces on sorted lists.",
+        "evidence": "trace binary search on two sorted lists"
+      },
+      "student": {
+        "label": "Making a plan",
+        "signal": "Next steps",
+        "review": "The student describes how they will record the trace. Completion can be checked next session.",
+        "evidence": "midpoint and bounds"
+      }
+    }
+  },
+  {
+    "subject": "MATHEMATICS",
+    "tutor": "Why do we add a constant after indefinite integration?",
+    "student": "Different constants give the same derivative.",
+    "turns": {
+      "tutor": {
+        "label": "Checking the reason",
+        "signal": "What we covered",
+        "review": "The question checks the reason for the integration constant, beyond remembering a rule.",
+        "evidence": "add a constant"
+      },
+      "student": {
+        "label": "Explaining equivalence",
+        "signal": "What went well",
+        "review": "The student connects the constant to differentiation and explains why it is needed.",
+        "evidence": "same derivative"
+      }
+    }
+  },
+  {
+    "subject": "MATHEMATICS",
+    "tutor": "Can you combine these logarithms before solving?",
+    "student": "I added the arguments. Wait, I should multiply them.",
+    "turns": {
+      "tutor": {
+        "label": "Choosing a strategy",
+        "signal": "Teaching approach",
+        "review": "Combining logarithms offers a simpler first step before solving the equation.",
+        "evidence": "combine these logarithms"
+      },
+      "student": {
+        "label": "Catching an error",
+        "signal": "What went well",
+        "review": "The student corrects the addition error in the same turn, without another prompt.",
+        "evidence": "I should multiply them"
+      }
+    }
+  },
+  {
+    "subject": "MATHEMATICS",
+    "tutor": "What would one counterexample tell us about this claim?",
+    "student": "That it is false, even if lots of examples work.",
+    "turns": {
+      "tutor": {
+        "label": "Testing a claim",
+        "signal": "What we covered",
+        "review": "The tutor asks about the role of a counterexample in evaluating a mathematical claim.",
+        "evidence": "one counterexample"
+      },
+      "student": {
+        "label": "Reasoning about proof",
+        "signal": "Key breakthrough",
+        "review": "The student distinguishes disproving a claim from checking examples that support it.",
+        "evidence": "even if lots of examples work"
+      }
+    }
+  },
+  {
+    "subject": "MATHEMATICS",
+    "tutor": "What changes when we know the first card was a king?",
+    "student": "There are three kings left, out of fifty-one cards.",
+    "turns": {
+      "tutor": {
+        "label": "Updating the information",
+        "signal": "Teaching approach",
+        "review": "The tutor focuses attention on how new information changes the sample space.",
+        "evidence": "first card was a king"
+      },
+      "student": {
+        "label": "Applying a condition",
+        "signal": "What went well",
+        "review": "The student updates both the number of kings and the total number of remaining cards.",
+        "evidence": "three kings left"
+      }
+    }
+  },
+  {
+    "subject": "PHYSICS",
+    "tutor": "What does the area under a velocity-time graph give us?",
+    "student": "Displacement. The units become metres.",
+    "turns": {
+      "tutor": {
+        "label": "Connecting representations",
+        "signal": "What we covered",
+        "review": "The question links a graphical quantity to the motion it represents.",
+        "evidence": "area under"
+      },
+      "student": {
+        "label": "Checking with units",
+        "signal": "What went well",
+        "review": "The student identifies displacement and uses units to support the answer.",
+        "evidence": "units become metres"
+      }
+    }
+  },
+  {
+    "subject": "PHYSICS",
+    "tutor": "How does the current split at this junction?",
+    "student": "It splits equally, even if the resistances differ.",
+    "turns": {
+      "tutor": {
+        "label": "Checking a circuit",
+        "signal": "What we covered",
+        "review": "The tutor checks how the student reasons about current at a junction.",
+        "evidence": "current split"
+      },
+      "student": {
+        "label": "An overgeneralisation",
+        "signal": "Areas for improvement",
+        "review": "The student assumes an equal split despite unequal resistances. This needs further explanation.",
+        "evidence": "even if the resistances differ"
+      }
+    }
+  },
+  {
+    "subject": "PHYSICS",
+    "tutor": "Choose a positive direction before writing the forces.",
+    "student": "Then the weight is negative in my equation.",
+    "turns": {
+      "tutor": {
+        "label": "Making signs explicit",
+        "signal": "Teaching approach",
+        "review": "Setting a positive direction gives the force equation a consistent sign convention.",
+        "evidence": "positive direction"
+      },
+      "student": {
+        "label": "Using a convention",
+        "signal": "What went well",
+        "review": "The student assigns a sign to weight using the chosen direction. The full equation still needs checking.",
+        "evidence": "weight is negative"
+      }
+    }
+  },
+  {
+    "subject": "PHYSICS",
+    "tutor": "Which step still feels uncertain after that example?",
+    "student": "Choosing the equation. I can do the algebra after that.",
+    "turns": {
+      "tutor": {
+        "label": "Checking confidence",
+        "signal": "Learning insights",
+        "review": "A specific question invites the student to identify what remains uncertain.",
+        "evidence": "still feels uncertain"
+      },
+      "student": {
+        "label": "Locating the difficulty",
+        "signal": "Areas for improvement",
+        "review": "The student identifies equation selection as the sticking point, rather than algebra.",
+        "evidence": "Choosing the equation"
+      }
+    }
+  },
+  {
+    "subject": "CHEMISTRY",
+    "tutor": "Does a catalyst change the equilibrium position?",
+    "student": "Yes, it makes more product by speeding up the reaction.",
+    "turns": {
+      "tutor": {
+        "label": "Probing an assumption",
+        "signal": "What we covered",
+        "review": "The question checks whether the student distinguishes reaction rate from equilibrium position.",
+        "evidence": "equilibrium position"
+      },
+      "student": {
+        "label": "Separating two ideas",
+        "signal": "Areas for improvement",
+        "review": "The answer confuses faster equilibration with a change in yield. A catalyst affects both reaction directions.",
+        "evidence": "makes more product"
+      }
+    }
+  },
+  {
+    "subject": "CHEMISTRY",
+    "tutor": "What must you include when describing ionic bonding?",
+    "student": "The attraction between oppositely charged ions.",
+    "turns": {
+      "tutor": {
+        "label": "Practising precise language",
+        "signal": "Teaching approach",
+        "review": "The tutor asks for the defining feature of ionic bonding rather than only electron transfer.",
+        "evidence": "describing ionic bonding"
+      },
+      "student": {
+        "label": "Giving the key idea",
+        "signal": "What went well",
+        "review": "The student identifies attraction between opposite charges as the central bonding idea.",
+        "evidence": "oppositely charged ions"
+      }
+    }
+  },
+  {
+    "subject": "CHEMISTRY",
+    "tutor": "What observation tells you the titration has reached its endpoint?",
+    "student": "A colour change that stays after swirling.",
+    "turns": {
+      "tutor": {
+        "label": "Linking method to evidence",
+        "signal": "What we covered",
+        "review": "The tutor checks the observable sign used to judge the titration endpoint.",
+        "evidence": "What observation"
+      },
+      "student": {
+        "label": "Describing an observation",
+        "signal": "What went well",
+        "review": "The student describes a persistent colour change, including the check after swirling.",
+        "evidence": "stays after swirling"
+      }
+    }
+  },
+  {
+    "subject": "CHEMISTRY",
+    "tutor": "What will you practise before our next organic lesson?",
+    "student": "Reagents and conditions. I keep mixing those up.",
+    "turns": {
+      "tutor": {
+        "label": "Planning retrieval",
+        "signal": "Next steps",
+        "review": "The tutor asks the student to choose a specific focus for independent practice.",
+        "evidence": "practise before"
+      },
+      "student": {
+        "label": "Choosing a revision target",
+        "signal": "Next steps",
+        "review": "The student selects reagents and conditions and identifies confusion between them.",
+        "evidence": "Reagents and conditions"
+      }
+    }
+  },
+  {
+    "subject": "BIOLOGY",
+    "tutor": "Explain osmosis without using the word concentration.",
+    "student": "Water moves from higher water potential to lower water potential.",
+    "turns": {
+      "tutor": {
+        "label": "Reworking a definition",
+        "signal": "Teaching approach",
+        "review": "The prompt encourages the student to use water potential when explaining osmosis.",
+        "evidence": "without using"
+      },
+      "student": {
+        "label": "Using technical vocabulary",
+        "signal": "What went well",
+        "review": "The student gives the direction of water movement using water potential. Membrane detail still needs checking.",
+        "evidence": "higher water potential"
+      }
+    }
+  },
+  {
+    "subject": "BIOLOGY",
+    "tutor": "Why does enzyme activity fall at very high temperatures?",
+    "student": "The active site changes shape, so fewer substrates bind.",
+    "turns": {
+      "tutor": {
+        "label": "Asking for a mechanism",
+        "signal": "What we covered",
+        "review": "The tutor asks for a causal explanation rather than a description of the graph.",
+        "evidence": "very high temperatures"
+      },
+      "student": {
+        "label": "Connecting structure to function",
+        "signal": "What went well",
+        "review": "The student links active-site shape to substrate binding, explaining the fall in activity.",
+        "evidence": "active site changes shape"
+      }
+    }
+  },
+  {
+    "subject": "BIOLOGY",
+    "tutor": "Does this correlation prove that the treatment caused the change?",
+    "student": "No. Another variable might explain both results.",
+    "turns": {
+      "tutor": {
+        "label": "Evaluating evidence",
+        "signal": "What we covered",
+        "review": "The question checks whether the student separates correlation from a causal conclusion.",
+        "evidence": "correlation prove"
+      },
+      "student": {
+        "label": "Recognising a limitation",
+        "signal": "What went well",
+        "review": "The student identifies another variable as a possible explanation for the association.",
+        "evidence": "Another variable"
+      }
+    }
+  },
+  {
+    "subject": "BIOLOGY",
+    "tutor": "Can you recall the stages without looking at your notes?",
+    "student": "Not yet. I recognise them, but cannot list them.",
+    "turns": {
+      "tutor": {
+        "label": "Checking retrieval",
+        "signal": "Teaching approach",
+        "review": "Removing the notes checks recall rather than familiarity with the material.",
+        "evidence": "without looking"
+      },
+      "student": {
+        "label": "A recall gap",
+        "signal": "Areas for improvement",
+        "review": "The student distinguishes recognising the stages from retrieving them independently.",
+        "evidence": "cannot list them"
+      }
+    }
+  },
+  {
+    "subject": "COMPUTING",
+    "tutor": "What happens if this recursive function has no base case?",
+    "student": "It keeps calling itself until the stack runs out.",
+    "turns": {
+      "tutor": {
+        "label": "Testing a boundary",
+        "signal": "What we covered",
+        "review": "The tutor asks about the consequence of omitting a stopping condition in recursion.",
+        "evidence": "no base case"
+      },
+      "student": {
+        "label": "Tracing a failure",
+        "signal": "What went well",
+        "review": "The student connects repeated recursive calls to exhausting the call stack.",
+        "evidence": "stack runs out"
+      }
+    }
+  },
+  {
+    "subject": "COMPUTING",
+    "tutor": "Try the empty list. What does your function return?",
+    "student": "It crashes. I access the first item before checking.",
+    "turns": {
+      "tutor": {
+        "label": "Testing an edge case",
+        "signal": "Teaching approach",
+        "review": "An empty input tests a case that the normal example did not cover.",
+        "evidence": "empty list"
+      },
+      "student": {
+        "label": "Finding the cause",
+        "signal": "Key breakthrough",
+        "review": "The student identifies an access before the length check as the source of the crash.",
+        "evidence": "before checking"
+      }
+    }
+  },
+  {
+    "subject": "COMPUTING",
+    "tutor": "If the input doubles, how many times does this loop run?",
+    "student": "Twice as many. There is one pass through the list.",
+    "turns": {
+      "tutor": {
+        "label": "Reasoning about scaling",
+        "signal": "What we covered",
+        "review": "The tutor uses a larger input to probe how the loop scales.",
+        "evidence": "input doubles"
+      },
+      "student": {
+        "label": "Explaining the cost",
+        "signal": "What went well",
+        "review": "The student connects one pass through the list to a proportional increase in iterations.",
+        "evidence": "one pass through the list"
+      }
+    }
+  },
+  {
+    "subject": "COMPUTING",
+    "tutor": "What makes this a testable requirement?",
+    "student": "It needs a measurable result, not just easy to use.",
+    "turns": {
+      "tutor": {
+        "label": "Refining a requirement",
+        "signal": "Teaching approach",
+        "review": "The tutor asks what would let someone verify that a requirement has been met.",
+        "evidence": "testable requirement"
+      },
+      "student": {
+        "label": "Making a criterion concrete",
+        "signal": "What went well",
+        "review": "The student distinguishes a measurable result from a subjective description.",
+        "evidence": "measurable result"
+      }
+    }
+  },
+  {
+    "subject": "FURTHER MATHEMATICS",
+    "tutor": "What does multiplying by the imaginary unit do geometrically?",
+    "student": "A quarter turn anticlockwise on the complex plane.",
+    "turns": {
+      "tutor": {
+        "label": "Linking algebra and geometry",
+        "signal": "What we covered",
+        "review": "The tutor asks for a geometric interpretation of complex multiplication.",
+        "evidence": "geometrically"
+      },
+      "student": {
+        "label": "Connecting representations",
+        "signal": "What went well",
+        "review": "The student identifies the rotation associated with multiplying by the imaginary unit.",
+        "evidence": "quarter turn anticlockwise"
+      }
+    }
+  },
+  {
+    "subject": "FURTHER MATHEMATICS",
+    "tutor": "Would applying these two matrix transformations in reverse change the result?",
+    "student": "I thought the order did not matter. Can we test it?",
+    "turns": {
+      "tutor": {
+        "label": "Challenging an assumption",
+        "signal": "Teaching approach",
+        "review": "Reversing the transformations tests an assumption about the order of matrix multiplication.",
+        "evidence": "in reverse"
+      },
+      "student": {
+        "label": "Choosing to investigate",
+        "signal": "Learning insights",
+        "review": "The student identifies their assumption and asks to test it. The result has not yet been established.",
+        "evidence": "Can we test it"
+      }
+    }
+  },
+  {
+    "subject": "FURTHER MATHEMATICS",
+    "tutor": "Which earlier method could help with this differential equation?",
+    "student": "Separating the variables, if I can factor this first.",
+    "turns": {
+      "tutor": {
+        "label": "Prompting transfer",
+        "signal": "Teaching approach",
+        "review": "The tutor asks the student to choose a previously learned method for a new equation.",
+        "evidence": "earlier method"
+      },
+      "student": {
+        "label": "Selecting an approach",
+        "signal": "What went well",
+        "review": "The student proposes separating variables and identifies a possible preliminary step.",
+        "evidence": "Separating the variables"
+      }
+    }
+  },
+  {
+    "subject": "FURTHER MATHEMATICS",
+    "tutor": "What part of the induction argument still needs work?",
+    "student": "Showing the next case follows. I only checked the first.",
+    "turns": {
+      "tutor": {
+        "label": "Reviewing a proof",
+        "signal": "Areas for improvement",
+        "review": "The tutor asks the student to identify the incomplete part of the induction argument.",
+        "evidence": "still needs work"
+      },
+      "student": {
+        "label": "Identifying a missing step",
+        "signal": "Next steps",
+        "review": "The student recognises that checking the base case does not establish the inductive step.",
+        "evidence": "I only checked the first"
+      }
+    }
+  }
+]

@@ -18,10 +18,6 @@ export function Hero() {
       <section className="marketing-hero relative isolate overflow-hidden bg-[#070b12] text-white">
         <div className="shell relative z-10 grid min-h-[680px] items-center gap-8 py-16 sm:py-20 lg:min-h-[740px] lg:grid-cols-[0.9fr_1.1fr] lg:gap-4">
           <div className="relative z-10 min-w-0 max-w-xl">
-            <p className="eyebrow mb-6 flex items-center gap-2 text-white/55">
-              <span className="fluid-hero__signal-dot" />
-              A-Level STEM · tutoring that remembers
-            </p>
             <h1 className="display-xl max-w-[12ch] text-white">
               Tutoring that <span className="hero-brand-word">remembers</span> every lesson.
             </h1>
@@ -63,7 +59,7 @@ export function Hero() {
               <div key={stat.label} className="hero-stat border-l border-white/15 py-2 pl-4 sm:pl-6">
                 <dt className="sr-only">{stat.label}</dt>
                 <dd>
-                  <span className="display-md block text-[#c4f17a]">{stat.value}</span>
+                  <span className="display-md block text-primary">{stat.value}</span>
                   <span className="eyebrow mt-2 block text-white/60">{stat.label}</span>
                 </dd>
               </div>
@@ -77,7 +73,7 @@ export function Hero() {
 
 function RotatingSubject() {
   return (
-    <span className="relative inline-block leading-[1.25] whitespace-nowrap text-[#c4f17a]">
+    <span className="relative inline-block leading-[1.25] whitespace-nowrap text-primary">
       <span className="sr-only">
         maths, further maths, physics, chemistry, biology and computing
       </span>

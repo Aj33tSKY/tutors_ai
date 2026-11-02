@@ -1,0 +1,65 @@
+/* Rollback: set PLACE_NOTES_OUTSIDE to false in lesson-signal.tsx. */
+:root .conversation-stage[data-presentation="floating"][data-notes="outside"] {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(145px, .65fr);
+  column-gap: 34px;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  border-radius: 0;
+}
+.conversation-stage[data-presentation="floating"][data-notes="outside"]::before {
+  content: "";
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  position: relative;
+  inset: auto;
+  align-self: stretch;
+  border: 1px solid var(--conversation-line);
+  border-radius: 14px;
+  background: transparent;
+  box-shadow: 0 16px 50px #0000000a;
+  mask-image: none;
+  opacity: 1;
+}
+[data-notes="outside"] .conversation-turn { display: contents; position: static; }
+[data-notes="outside"] .conversation-turn .conversation-voice { grid-column: 1; padding: 32px 30px; }
+[data-notes="outside"] .conversation-turn--tutor .conversation-voice,
+[data-notes="outside"] .conversation-turn--tutor .conversation-analysis { grid-row: 1; }
+[data-notes="outside"] .conversation-turn--student .conversation-voice,
+[data-notes="outside"] .conversation-turn--student .conversation-analysis { grid-row: 2; }
+[data-notes="outside"] .conversation-turn .conversation-analysis { grid-column: 2; }
+[data-notes="outside"] .conversation-insight-link { z-index: 1; }
+[data-notes="outside"] .conversation-analysis__insight { z-index: 2; }
+@media (max-width: 480px) {
+  :root .conversation-stage[data-presentation="floating"][data-notes="outside"] { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+  [data-notes="outside"] .conversation-turn .conversation-analysis {
+    grid-column: 1;
+    min-height: 108px;
+    padding: 0;
+    margin-left: 24px;
+  }
+  [data-notes="outside"] .conversation-turn--tutor .conversation-analysis { grid-row: 3; margin-top: 30px; }
+  [data-notes="outside"] .conversation-turn--student .conversation-analysis { grid-row: 4; margin-top: 16px; }
+  [data-notes="outside"] .conversation-turn .conversation-voice { padding: 26px; }
+}
+
+/* Keep the figure's footprint fixed while the conversation makes room for notes. */
+[data-notes="outside"] .conversation-turn .conversation-voice,
+.conversation-stage[data-presentation="floating"][data-notes="outside"]::before {
+  width: 100%;
+  transition: width .85s cubic-bezier(.22, 1, .36, 1);
+}
+[data-notes="outside"][data-has-insights="false"] .conversation-turn .conversation-voice,
+.conversation-stage[data-presentation="floating"][data-notes="outside"][data-has-insights="false"]::before {
+  /* The first column is 1.35 / 2 of the space remaining after the 34px gap. */
+  width: calc(148.148148% + 34px);
+}
+@media (max-width: 480px) {
+  [data-notes="outside"][data-has-insights="false"] .conversation-turn .conversation-voice,
+  .conversation-stage[data-presentation="floating"][data-notes="outside"][data-has-insights="false"]::before { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-notes="outside"] .conversation-turn .conversation-voice,
+  .conversation-stage[data-presentation="floating"][data-notes="outside"]::before { transition: none; }
+}
