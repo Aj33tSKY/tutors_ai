@@ -1,0 +1,30 @@
+{
+  "layouts": [
+    {
+      "width": 320,
+      "overflow": false,
+      "portraitsLoaded": true
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "portraitsLoaded": true
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "portraitsLoaded": true
+    },
+    {
+      "width": 1100,
+      "overflow": false,
+      "portraitsLoaded": true
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "portraitsLoaded": true
+    }
+  ],
+  "consoleErrors": []
+}

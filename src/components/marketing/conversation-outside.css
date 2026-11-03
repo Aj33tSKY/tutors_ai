@@ -1,8 +1,8 @@
 /* Rollback: set PLACE_NOTES_OUTSIDE to false in lesson-signal.tsx. */
 :root .conversation-stage[data-presentation="floating"][data-notes="outside"] {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(145px, .65fr);
-  column-gap: 34px;
+  grid-template-columns: minmax(0, 1.4fr) minmax(190px, .8fr);
+  column-gap: 32px;
   padding: 0;
   border: 0;
   box-shadow: none;
@@ -31,7 +31,7 @@
 [data-notes="outside"] .conversation-turn .conversation-analysis { grid-column: 2; }
 [data-notes="outside"] .conversation-insight-link { z-index: 1; }
 [data-notes="outside"] .conversation-analysis__insight { z-index: 2; }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   :root .conversation-stage[data-presentation="floating"][data-notes="outside"] { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
   [data-notes="outside"] .conversation-turn .conversation-analysis {
     grid-column: 1;
@@ -52,10 +52,10 @@
 }
 [data-notes="outside"][data-has-insights="false"] .conversation-turn .conversation-voice,
 .conversation-stage[data-presentation="floating"][data-notes="outside"][data-has-insights="false"]::before {
-  /* The first column is 1.35 / 2 of the space remaining after the 34px gap. */
-  width: calc(148.148148% + 34px);
+  /* Fill the note column before the analysis appears: 2.2 / 1.4. */
+  width: calc(157.142857% + 32px);
 }
-@media (max-width: 480px) {
+@media (max-width: 640px) {
   [data-notes="outside"][data-has-insights="false"] .conversation-turn .conversation-voice,
   .conversation-stage[data-presentation="floating"][data-notes="outside"][data-has-insights="false"]::before { width: 100%; }
 }

@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Hero } from "@/components/marketing/hero";
-import { SubjectsStrip } from "@/components/marketing/subjects-strip";
+import { LearningConnection } from "@/components/marketing/learning-connection";
+import "@/components/marketing/landing-page.css";
 import { HowItWorks } from "@/components/marketing/how-it-works";
 import { FeatureShowcase } from "@/components/marketing/feature-showcase";
 import { TutorShowcase } from "@/components/marketing/tutor-showcase";
@@ -15,10 +16,10 @@ export default function HomePage() {
   return (
     <>
       <Hero />
-      <SubjectsStrip />
-      <HowItWorks />
+      <LearningConnection />
       <FeatureShowcase />
       <Suspense fallback={<TutorShowcaseFallback />}><TutorShowcase /></Suspense>
+      <HowItWorks />
       <CtaSection />
     </>
   );

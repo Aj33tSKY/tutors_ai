@@ -2,7 +2,7 @@
 
 import { useLayoutEffect, useRef } from "react";
 
-export function InsightConnector({ ready, revision }: { ready: boolean; revision: string }) {
+export function InsightConnector({ ready, revision, ribbon = false }: { ready: boolean; revision: string; ribbon?: boolean }) {
   const ref = useRef<SVGSVGElement>(null);
 
   useLayoutEffect(() => {
@@ -84,7 +84,9 @@ export function InsightConnector({ ready, revision }: { ready: boolean; revision
                 const y = u ** 3 * start.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t ** 3 * end.y;
                 length += Math.hypot(x - px, y - py);
                 px = x; py = y;
-                if (step > 2 && step < steps - 2 && obstacles.some(rect => x > rect.left - 0.5 && x < rect.right + 0.5 && y > rect.top - 0.5 && y < rect.bottom + 0.5)) {
+                const clearance = ribbon ? 3.5 : 0.5;
+                const attachment = ribbon ? 5 : 2;
+                if (step > attachment && step < steps - attachment && obstacles.some(rect => x > rect.left - clearance && x < rect.right + clearance && y > rect.top - clearance && y < rect.bottom + clearance)) {
                   blocked = true;
                   break;
                 }
@@ -101,10 +103,30 @@ export function InsightConnector({ ready, revision }: { ready: boolean; revision
       const y1 = start.y - bounds.top;
       const path = `M${x1} ${y1} C${c1.x - bounds.left} ${c1.y - bounds.top} ${c2.x - bounds.left} ${c2.y - bounds.top} ${end.x - bounds.left} ${end.y - bounds.top}`;
       svg.setAttribute("viewBox", `0 0 ${bounds.width} ${bounds.height}`);
-      svg.querySelector("path")?.setAttribute("d", path);
-      const dot = svg.querySelector("circle");
+      svg.querySelectorAll("path:not(.conversation-link-ribbon)").forEach(element => element.setAttribute("d", path));
+      if (ribbon) {
+        const left: string[] = [];
+        const right: string[] = [];
+        for (let i = 0; i <= 64; i++) {
+          const t = i / 64;
+          const u = 1 - t;
+          const x = u ** 3 * start.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t ** 3 * end.x - bounds.left;
+          const y = u ** 3 * start.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t ** 3 * end.y - bounds.top;
+          const dx = 3 * u * u * (c1.x - start.x) + 6 * u * t * (c2.x - c1.x) + 3 * t * t * (end.x - c2.x);
+          const dy = 3 * u * u * (c1.y - start.y) + 6 * u * t * (c2.y - c1.y) + 3 * t * t * (end.y - c2.y);
+          const length = Math.hypot(dx, dy) || 1;
+          const halfWidth = .6 + 2.6 * Math.sin(t * Math.PI / 2);
+          left.push(`${x - dy / length * halfWidth} ${y + dx / length * halfWidth}`);
+          right.push(`${x + dy / length * halfWidth} ${y - dx / length * halfWidth}`);
+        }
+        svg.querySelector(".conversation-link-ribbon")?.setAttribute("d", `M${left.join(" L")} L${right.reverse().join(" L")} Z`);
+      }
+      const dot = svg.querySelector(".conversation-link-source");
       dot?.setAttribute("cx", String(x1));
       dot?.setAttribute("cy", String(y1));
+      const terminal = svg.querySelector(".conversation-link-terminal");
+      terminal?.setAttribute("cx", String(end.x - bounds.left));
+      terminal?.setAttribute("cy", String(end.y - bounds.top));
       svg.setAttribute("data-connected", "true");
     };
     update();
@@ -124,12 +146,16 @@ export function InsightConnector({ ready, revision }: { ready: boolean; revision
       window.removeEventListener("resize", update);
       document.fonts.removeEventListener("loadingdone", update);
     };
-  }, [ready, revision]);
+  }, [ready, revision, ribbon]);
 
   return (
     <svg ref={ref} className="conversation-insight-link" data-connected="false" fill="none" aria-hidden="true">
-      <path pathLength="1" />
-      <circle r="1.75" />
+      {ribbon && <path className="conversation-link-ribbon" />}
+      <path className="conversation-link-halo" pathLength="1" />
+      <path className="conversation-link-line" pathLength="1" />
+      <path className="conversation-link-signal" pathLength="1" />
+      <circle className="conversation-link-source" r="2.5" />
+      <circle className="conversation-link-terminal" r="3.5" />
     </svg>
   );
 }

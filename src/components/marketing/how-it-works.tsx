@@ -1,46 +1,21 @@
+import { ArrowUpRight, CalendarDays, NotebookPen, Video } from "lucide-react";
+import Link from "next/link";
 import { Reveal } from "./reveal";
 
 const STEPS = [
-  {
-    n: "01",
-    title: "Match with a specialist",
-    body: "Compare approved tutors by subject, exam board, price and availability, then request a free first lesson.",
-  },
-  {
-    n: "02",
-    title: "Learn, live, in-browser",
-    body: "Meet in your browser with video and screen sharing. When recording is enabled, a transcript is prepared after the lesson.",
-  },
-  {
-    n: "03",
-    title: "Revise with your tutor's words",
-    body: "Review the recording and tutor notes, then ask the revision assistant about material from your lessons.",
-  },
+  { icon: CalendarDays, title: "Find your person", body: "Choose by subject, exam board, availability and price. Request a free first lesson to see how you get on." },
+  { icon: Video, title: "Make things click", body: "Meet online, work through the tricky parts and ask the questions you’ve been holding back." },
+  { icon: NotebookPen, title: "Take the lesson with you", body: "Return to recordings, tutor-editable notes and revision grounded in available lesson transcripts." },
 ];
 
 export function HowItWorks() {
   return (
-    <section className="section shell">
-      <Reveal>
-        <h2 className="display-lg max-w-[16ch]">
-          From booking to breakthrough
-        </h2>
-      </Reveal>
-
-      {/* Hairline-ruled rows, not floating cards. */}
-      <ol className="mt-20 border-t border-hairline">
-        {STEPS.map((step, i) => (
-          <Reveal as="li" key={step.n} delay={i * 0.08}>
-            <div className="group grid gap-4 border-b border-hairline py-10 md:grid-cols-[6rem_1fr_1.1fr] md:items-baseline md:gap-10">
-              <span className="font-mono text-sm text-brand-strong tabular-nums">{step.n}</span>
-              <h3 className="display-md transition-transform duration-700 ease-[cubic-bezier(0.19,1,0.22,1)] md:group-hover:translate-x-2">
-                {step.title}
-              </h3>
-              <p className="max-w-md leading-relaxed text-muted-foreground">{step.body}</p>
-            </div>
-          </Reveal>
-        ))}
-      </ol>
+    <section className="landing-how landing-shell" aria-labelledby="how-title">
+      <Reveal className="landing-how__heading"><div><p className="landing-kicker">A little easier, from the start</p><h2 id="how-title">From finding a tutor<br />to finding your feet.</h2></div><Link href="/how-it-works" className="landing-text-link">How Kindling works <ArrowUpRight size={15} /></Link></Reveal>
+      <div className="landing-how__steps">
+        {STEPS.map((step, index) => <Reveal key={step.title} delay={index * .06} className="landing-how__step"><span className="landing-how__icon"><step.icon size={21} strokeWidth={1.5} /></span><span className="landing-how__index">0{index + 1}</span><h3>{step.title}</h3><p>{step.body}</p></Reveal>)}
+      </div>
+      <p className="landing-how__practical">When recording is enabled, recordings and transcripts are prepared after the lesson. <Link href="/about#privacy">Your recordings &amp; privacy <ArrowUpRight size={12} /></Link></p>
     </section>
   );
 }

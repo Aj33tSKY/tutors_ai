@@ -51,11 +51,12 @@ function smoothProfile(profile: SpeechProfile): SpeechProfile {
   return { ...profile, frames: frames.map(([level, pitch]) => [level / peak, pitch]) };
 }
 
-export function AudioWaveform({ speaker, startedAt, profile, turnStart }: {
+export function AudioWaveform({ speaker, startedAt, profile, turnStart, pausedAt = null }: {
   speaker: Speaker;
   startedAt: number;
   profile: SpeechProfile;
   turnStart: number;
+  pausedAt?: number | null;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -85,7 +86,7 @@ export function AudioWaveform({ speaker, startedAt, profile, turnStart }: {
       color = getComputedStyle(canvas).color.match(/[\d.]+/g)?.slice(0, 3).join(", ") ?? "190, 239, 126";
     };
     const paint = (now: number) => {
-      const time = motion.matches ? profile.duration * 0.45 : (Math.max(0, now - startedAt) / 1000 - turnStart) * SPEECH_SPEED;
+      const time = motion.matches ? profile.duration * 0.45 : (Math.max(0, (pausedAt ?? now) - startedAt) / 1000 - turnStart) * SPEECH_SPEED;
       const signal = sampleSpeech(smoothedProfile, time);
       const delta = lastPaint ? Math.min(0.1, Math.max(0, (now - lastPaint) / 1000)) : 1 / 30;
       lastPaint = now;
@@ -93,7 +94,8 @@ export function AudioWaveform({ speaker, startedAt, profile, turnStart }: {
       visualLevel += (signal.level - visualLevel) * (1 - Math.exp(-delta / response));
       if (signal.pitch > 0) visualPitch += (signal.pitch - visualPitch) * (1 - Math.exp(-delta / 0.35));
       const level = motion.matches ? 0.8 : Math.pow(Math.max(0, visualLevel), 0.65);
-      const flow = now / 1000;
+      // Mirror the student's visual flow; speech measurements keep forward time.
+      const flow = (pausedAt ?? now) / 1000 * (speaker === "student" ? -1 : 1);
       const voice = canvas.closest<HTMLElement>(".conversation-voice");
       voice?.setAttribute("data-speaking", String(time >= 0 && time < profile.duration));
       voice?.style.setProperty("--speech-energy", level.toFixed(3));
@@ -102,17 +104,22 @@ export function AudioWaveform({ speaker, startedAt, profile, turnStart }: {
       const amplitude = height * (0.065 + level * 0.34);
       // Pitch subtly changes the whole ribbon; it never changes abruptly across x.
       const frequency = 5 + Math.max(-0.35, Math.min(0.35, (visualPitch - 160) / 300));
+      const outerContours: { x: number; y: number }[][] = [[], []];
       // Closely spaced contours form a translucent, sculptural voice ribbon.
       for (let strand = 0; strand < STRAND_COUNT; strand++) {
         const depth = strand / (STRAND_COUNT - 1);
         const gradient = context.createLinearGradient(0, 0, width, 0);
-        const alpha = 0.12 + Math.pow(Math.abs(depth - 0.5) * 2, 3) * 0.6;
+        const edge = strand === 0 || strand === STRAND_COUNT - 1;
+        const core = strand === Math.floor(STRAND_COUNT / 2);
+        const alpha = (core ? 0.34 : 0.13) + Math.pow(Math.abs(depth - 0.5) * 2, 3) * 0.62;
         gradient.addColorStop(0, `rgba(${color},0)`);
         gradient.addColorStop(0.18, `rgba(${color},${alpha})`);
         gradient.addColorStop(0.8, `rgba(${color},${alpha})`);
         gradient.addColorStop(1, `rgba(${color},0)`);
         context.strokeStyle = gradient;
-        context.lineWidth = strand === 0 || strand === STRAND_COUNT - 1 ? 1.5 : 0.8;
+        context.lineWidth = edge ? 1.65 : core ? 1.1 : 0.7;
+        context.shadowColor = `rgba(${color},${0.18 + level * 0.14})`;
+        context.shadowBlur = edge ? 5 : 0;
         context.beginPath();
         for (let point = 0; point <= 240; point++) {
           const x = point / 240;
@@ -121,18 +128,34 @@ export function AudioWaveform({ speaker, startedAt, profile, turnStart }: {
           const wave = Math.sin(x * Math.PI * frequency - flow * 2.3 + depth * 2.5 + phase)
             * 0.65 + Math.sin(x * Math.PI * 9 + flow * 1.4 + depth * 1.8) * 0.22;
           const y = height / 2 + envelope * (wave * amplitude * syllable + (depth - 0.5) * amplitude * 0.9);
+          if (edge) outerContours[strand === 0 ? 0 : 1].push({ x: x * width, y });
           if (point === 0) context.moveTo(x * width, y);
           else context.lineTo(x * width, y);
         }
         context.stroke();
       }
+      // A barely-there translucent membrane adds volume beneath the filaments.
+      // Reuse the outer contour points instead of doing more geometry per frame.
+      context.shadowBlur = 0;
+      context.globalCompositeOperation = "destination-over";
+      const surface = context.createLinearGradient(0, height * .2, 0, height * .8);
+      surface.addColorStop(0, `rgba(${color},0.02)`);
+      surface.addColorStop(.5, `rgba(${color},${0.035 + level * .035})`);
+      surface.addColorStop(1, `rgba(${color},0.01)`);
+      context.fillStyle = surface;
+      context.beginPath();
+      outerContours[0].forEach(({ x, y }, i) => i ? context.lineTo(x, y) : context.moveTo(x, y));
+      outerContours[1].reverse().forEach(({ x, y }) => context.lineTo(x, y));
+      context.closePath();
+      context.fill();
+      context.globalCompositeOperation = "source-over";
     };
     const tick = (now: number) => {
       if (!visible || document.hidden) return;
       if (now - lastFrame >= 1000 / 60) { paint(now); lastFrame = now; }
-      if (!motion.matches) frame = requestAnimationFrame(tick);
+      if (!motion.matches && pausedAt === null) frame = requestAnimationFrame(tick);
     };
-    const restart = () => { cancelAnimationFrame(frame); canvas.closest(".conversation-voice")?.setAttribute("data-animating", String(visible && !document.hidden)); lastFrame = 0; if (visible && !document.hidden) { paint(performance.now()); if (!motion.matches) frame = requestAnimationFrame(tick); } };
+    const restart = () => { cancelAnimationFrame(frame); canvas.closest(".conversation-voice")?.setAttribute("data-animating", String(visible && !document.hidden && pausedAt === null)); lastFrame = 0; if (visible && !document.hidden) { paint(performance.now()); if (!motion.matches && pausedAt === null) frame = requestAnimationFrame(tick); } };
     const observer = new IntersectionObserver(([entry]) => { visible = entry.isIntersecting; restart(); });
     const sizes = new ResizeObserver(() => { resize(); restart(); });
     const themeObserver = new MutationObserver(() => { resize(); restart(); });
@@ -144,7 +167,7 @@ export function AudioWaveform({ speaker, startedAt, profile, turnStart }: {
     resize();
     restart();
     return () => { cancelAnimationFrame(frame); observer.disconnect(); sizes.disconnect(); themeObserver.disconnect(); document.removeEventListener("visibilitychange", restart); motion.removeEventListener("change", restart); };
-  }, [speaker, startedAt, profile, turnStart]);
+  }, [speaker, startedAt, profile, turnStart, pausedAt]);
 
   return <canvas ref={canvasRef} className={`conversation-waveform conversation-waveform--${speaker}`} aria-hidden="true" />;
 }

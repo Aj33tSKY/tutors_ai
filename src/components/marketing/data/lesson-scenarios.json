@@ -8,13 +8,15 @@
         "label": "Setting the focus",
         "signal": "Session goals",
         "review": "An open question lets the student identify where practice would help most.",
-        "evidence": "focus on today"
+        "evidence": "focus on today",
+        "emphasis": "An open question"
       },
       "student": {
         "label": "Naming the difficulty",
         "signal": "Areas for improvement",
         "review": "The student identifies interpreting questions as the difficulty, rather than recalling the rules.",
-        "evidence": "worded questions trip me up"
+        "evidence": "worded questions trip me up",
+        "emphasis": "The student identifies interpreting questions"
       }
     }
   },
@@ -27,13 +29,15 @@
         "label": "Checking a concept",
         "signal": "What we covered",
         "review": "A diagnostic question checks whether the student distinguishes velocity from acceleration.",
-        "evidence": "is the ball's acceleration zero"
+        "evidence": "is the ball's acceleration zero",
+        "emphasis": "A diagnostic question"
       },
       "student": {
         "label": "A misconception surfaces",
         "signal": "Areas for improvement",
         "review": "The answer confuses zero velocity with zero acceleration. Gravity still acts at the highest point.",
-        "evidence": "because it stops for a moment"
+        "evidence": "because it stops for a moment",
+        "emphasis": "The answer confuses zero velocity with zero acceleration."
       }
     }
   },
@@ -46,13 +50,15 @@
         "label": "Offering a small prompt",
         "signal": "Teaching approach",
         "review": "The tutor uses units as a prompt, leaving the student to reconstruct the calculation.",
-        "evidence": "Start with the units"
+        "evidence": "Start with the units",
+        "emphasis": "The tutor uses units as a prompt"
       },
       "student": {
         "label": "Partial understanding",
         "signal": "Learning insights",
         "review": "The student recovers the relationship with a prompt, but still needs help with volume conversion.",
-        "evidence": "do I convert millilitres first"
+        "evidence": "do I convert millilitres first",
+        "emphasis": "The student recovers the relationship with a prompt"
       }
     }
   },
@@ -65,13 +71,15 @@
         "label": "Reframing the idea",
         "signal": "Teaching approach",
         "review": "Separating speed from direction offers a different way to explain acceleration.",
-        "evidence": "changes direction"
+        "evidence": "changes direction",
+        "emphasis": "Separating speed from direction"
       },
       "student": {
         "label": "Making the connection",
         "signal": "Key breakthrough",
         "review": "The student expresses the distinction in their own words, showing understanding in this example.",
-        "evidence": "accelerate without getting any faster"
+        "evidence": "accelerate without getting any faster",
+        "emphasis": "The student expresses the distinction in their own words"
       }
     }
   },
@@ -84,13 +92,15 @@
         "label": "Adapting the explanation",
         "signal": "Teaching approach",
         "review": "The tutor offers a choice of explanation instead of repeating the same approach.",
-        "evidence": "a diagram or a verbal explanation"
+        "evidence": "a diagram or a verbal explanation",
+        "emphasis": "The tutor offers a choice of explanation"
       },
       "student": {
         "label": "Asking for another approach",
         "signal": "Learning insights",
         "review": "The student asks for a diagram to follow the sequence. This is a useful cue for this topic.",
-        "evidence": "Could we draw it"
+        "evidence": "Could we draw it",
+        "emphasis": "The student asks for a diagram"
       }
     }
   },
@@ -103,13 +113,15 @@
         "label": "Removing the scaffold",
         "signal": "What we covered",
         "review": "An unprompted attempt checks whether the student can apply the method independently.",
-        "evidence": "without any hints"
+        "evidence": "without any hints",
+        "emphasis": "An unprompted attempt"
       },
       "student": {
         "label": "Explaining the method",
         "signal": "What went well",
         "review": "The student gives the correct derivative and explains the rule, without a hint in this turn.",
-        "evidence": "Multiply by the power"
+        "evidence": "Multiply by the power",
+        "emphasis": "The student gives the correct derivative and explains the rule"
       }
     }
   },
@@ -122,13 +134,15 @@
         "label": "Checking exam technique",
         "signal": "Areas for improvement",
         "review": "The tutor separates a correct calculation from an incomplete final answer.",
-        "evidence": "What is missing"
+        "evidence": "What is missing",
+        "emphasis": "The tutor separates a correct calculation"
       },
       "student": {
         "label": "Correcting an omission",
         "signal": "What went well",
         "review": "The student supplies the missing units after a prompt. Checking units is a useful final step.",
-        "evidence": "The units"
+        "evidence": "The units",
+        "emphasis": "The student supplies the missing units"
       }
     }
   },
@@ -141,13 +155,15 @@
         "label": "Planning the practice",
         "signal": "Next steps",
         "review": "The tutor sets a concrete follow-up task: two traces on sorted lists.",
-        "evidence": "trace binary search on two sorted lists"
+        "evidence": "trace binary search on two sorted lists",
+        "emphasis": "The tutor sets a concrete follow-up task"
       },
       "student": {
         "label": "Making a plan",
         "signal": "Next steps",
         "review": "The student describes how they will record the trace. Completion can be checked next session.",
-        "evidence": "midpoint and bounds"
+        "evidence": "midpoint and bounds",
+        "emphasis": "The student describes how they will record the trace."
       }
     }
   },
@@ -160,13 +176,15 @@
         "label": "Checking the reason",
         "signal": "What we covered",
         "review": "The question checks the reason for the integration constant, beyond remembering a rule.",
-        "evidence": "add a constant"
+        "evidence": "add a constant",
+        "emphasis": "The question checks the reason"
       },
       "student": {
         "label": "Explaining equivalence",
         "signal": "What went well",
         "review": "The student connects the constant to differentiation and explains why it is needed.",
-        "evidence": "same derivative"
+        "evidence": "same derivative",
+        "emphasis": "The student connects the constant to differentiation"
       }
     }
   },
@@ -179,13 +197,15 @@
         "label": "Choosing a strategy",
         "signal": "Teaching approach",
         "review": "Combining logarithms offers a simpler first step before solving the equation.",
-        "evidence": "combine these logarithms"
+        "evidence": "combine these logarithms",
+        "emphasis": "Combining logarithms"
       },
       "student": {
         "label": "Catching an error",
         "signal": "What went well",
         "review": "The student corrects the addition error in the same turn, without another prompt.",
-        "evidence": "I should multiply them"
+        "evidence": "I should multiply them",
+        "emphasis": "The student corrects the addition error"
       }
     }
   },
@@ -198,13 +218,15 @@
         "label": "Testing a claim",
         "signal": "What we covered",
         "review": "The tutor asks about the role of a counterexample in evaluating a mathematical claim.",
-        "evidence": "one counterexample"
+        "evidence": "one counterexample",
+        "emphasis": "The tutor asks about the role of a counterexample"
       },
       "student": {
         "label": "Reasoning about proof",
         "signal": "Key breakthrough",
         "review": "The student distinguishes disproving a claim from checking examples that support it.",
-        "evidence": "even if lots of examples work"
+        "evidence": "even if lots of examples work",
+        "emphasis": "The student distinguishes disproving a claim"
       }
     }
   },
@@ -217,13 +239,15 @@
         "label": "Updating the information",
         "signal": "Teaching approach",
         "review": "The tutor focuses attention on how new information changes the sample space.",
-        "evidence": "first card was a king"
+        "evidence": "first card was a king",
+        "emphasis": "The tutor focuses attention"
       },
       "student": {
         "label": "Applying a condition",
         "signal": "What went well",
         "review": "The student updates both the number of kings and the total number of remaining cards.",
-        "evidence": "three kings left"
+        "evidence": "three kings left",
+        "emphasis": "The student updates both the number of kings"
       }
     }
   },
@@ -236,13 +260,15 @@
         "label": "Connecting representations",
         "signal": "What we covered",
         "review": "The question links a graphical quantity to the motion it represents.",
-        "evidence": "area under"
+        "evidence": "area under",
+        "emphasis": "The question links a graphical quantity"
       },
       "student": {
         "label": "Checking with units",
         "signal": "What went well",
         "review": "The student identifies displacement and uses units to support the answer.",
-        "evidence": "units become metres"
+        "evidence": "units become metres",
+        "emphasis": "The student identifies displacement"
       }
     }
   },
@@ -255,13 +281,15 @@
         "label": "Checking a circuit",
         "signal": "What we covered",
         "review": "The tutor checks how the student reasons about current at a junction.",
-        "evidence": "current split"
+        "evidence": "current split",
+        "emphasis": "The tutor checks how the student reasons"
       },
       "student": {
         "label": "An overgeneralisation",
         "signal": "Areas for improvement",
         "review": "The student assumes an equal split despite unequal resistances. This needs further explanation.",
-        "evidence": "even if the resistances differ"
+        "evidence": "even if the resistances differ",
+        "emphasis": "The student assumes an equal split"
       }
     }
   },
@@ -274,13 +302,15 @@
         "label": "Making signs explicit",
         "signal": "Teaching approach",
         "review": "Setting a positive direction gives the force equation a consistent sign convention.",
-        "evidence": "positive direction"
+        "evidence": "positive direction",
+        "emphasis": "Setting a positive direction"
       },
       "student": {
         "label": "Using a convention",
         "signal": "What went well",
         "review": "The student assigns a sign to weight using the chosen direction. The full equation still needs checking.",
-        "evidence": "weight is negative"
+        "evidence": "weight is negative",
+        "emphasis": "The student assigns a sign to weight"
       }
     }
   },
@@ -293,13 +323,15 @@
         "label": "Checking confidence",
         "signal": "Learning insights",
         "review": "A specific question invites the student to identify what remains uncertain.",
-        "evidence": "still feels uncertain"
+        "evidence": "still feels uncertain",
+        "emphasis": "A specific question"
       },
       "student": {
         "label": "Locating the difficulty",
         "signal": "Areas for improvement",
         "review": "The student identifies equation selection as the sticking point, rather than algebra.",
-        "evidence": "Choosing the equation"
+        "evidence": "Choosing the equation",
+        "emphasis": "The student identifies equation selection"
       }
     }
   },
@@ -312,13 +344,15 @@
         "label": "Probing an assumption",
         "signal": "What we covered",
         "review": "The question checks whether the student distinguishes reaction rate from equilibrium position.",
-        "evidence": "equilibrium position"
+        "evidence": "equilibrium position",
+        "emphasis": "The question checks whether the student distinguishes"
       },
       "student": {
         "label": "Separating two ideas",
         "signal": "Areas for improvement",
         "review": "The answer confuses faster equilibration with a change in yield. A catalyst affects both reaction directions.",
-        "evidence": "makes more product"
+        "evidence": "makes more product",
+        "emphasis": "The answer confuses faster equilibration with a change in yield."
       }
     }
   },
@@ -331,13 +365,15 @@
         "label": "Practising precise language",
         "signal": "Teaching approach",
         "review": "The tutor asks for the defining feature of ionic bonding rather than only electron transfer.",
-        "evidence": "describing ionic bonding"
+        "evidence": "describing ionic bonding",
+        "emphasis": "The tutor asks for the defining feature"
       },
       "student": {
         "label": "Giving the key idea",
         "signal": "What went well",
         "review": "The student identifies attraction between opposite charges as the central bonding idea.",
-        "evidence": "oppositely charged ions"
+        "evidence": "oppositely charged ions",
+        "emphasis": "The student identifies attraction between opposite charges"
       }
     }
   },
@@ -350,13 +386,15 @@
         "label": "Linking method to evidence",
         "signal": "What we covered",
         "review": "The tutor checks the observable sign used to judge the titration endpoint.",
-        "evidence": "What observation"
+        "evidence": "What observation",
+        "emphasis": "The tutor checks the observable sign"
       },
       "student": {
         "label": "Describing an observation",
         "signal": "What went well",
         "review": "The student describes a persistent colour change, including the check after swirling.",
-        "evidence": "stays after swirling"
+        "evidence": "stays after swirling",
+        "emphasis": "The student describes a persistent colour change"
       }
     }
   },
@@ -369,13 +407,15 @@
         "label": "Planning retrieval",
         "signal": "Next steps",
         "review": "The tutor asks the student to choose a specific focus for independent practice.",
-        "evidence": "practise before"
+        "evidence": "practise before",
+        "emphasis": "The tutor asks the student to choose a specific focus"
       },
       "student": {
         "label": "Choosing a revision target",
         "signal": "Next steps",
         "review": "The student selects reagents and conditions and identifies confusion between them.",
-        "evidence": "Reagents and conditions"
+        "evidence": "Reagents and conditions",
+        "emphasis": "The student selects reagents and conditions"
       }
     }
   },
@@ -388,13 +428,15 @@
         "label": "Reworking a definition",
         "signal": "Teaching approach",
         "review": "The prompt encourages the student to use water potential when explaining osmosis.",
-        "evidence": "without using"
+        "evidence": "without using",
+        "emphasis": "The prompt encourages the student to use water potential"
       },
       "student": {
         "label": "Using technical vocabulary",
         "signal": "What went well",
         "review": "The student gives the direction of water movement using water potential. Membrane detail still needs checking.",
-        "evidence": "higher water potential"
+        "evidence": "higher water potential",
+        "emphasis": "The student gives the direction of water movement"
       }
     }
   },
@@ -407,13 +449,15 @@
         "label": "Asking for a mechanism",
         "signal": "What we covered",
         "review": "The tutor asks for a causal explanation rather than a description of the graph.",
-        "evidence": "very high temperatures"
+        "evidence": "very high temperatures",
+        "emphasis": "The tutor asks for a causal explanation"
       },
       "student": {
         "label": "Connecting structure to function",
         "signal": "What went well",
         "review": "The student links active-site shape to substrate binding, explaining the fall in activity.",
-        "evidence": "active site changes shape"
+        "evidence": "active site changes shape",
+        "emphasis": "The student links active-site shape to substrate binding"
       }
     }
   },
@@ -426,13 +470,15 @@
         "label": "Evaluating evidence",
         "signal": "What we covered",
         "review": "The question checks whether the student separates correlation from a causal conclusion.",
-        "evidence": "correlation prove"
+        "evidence": "correlation prove",
+        "emphasis": "The question checks whether the student separates correlation"
       },
       "student": {
         "label": "Recognising a limitation",
         "signal": "What went well",
         "review": "The student identifies another variable as a possible explanation for the association.",
-        "evidence": "Another variable"
+        "evidence": "Another variable",
+        "emphasis": "The student identifies another variable"
       }
     }
   },
@@ -445,13 +491,15 @@
         "label": "Checking retrieval",
         "signal": "Teaching approach",
         "review": "Removing the notes checks recall rather than familiarity with the material.",
-        "evidence": "without looking"
+        "evidence": "without looking",
+        "emphasis": "Removing the notes checks recall"
       },
       "student": {
         "label": "A recall gap",
         "signal": "Areas for improvement",
         "review": "The student distinguishes recognising the stages from retrieving them independently.",
-        "evidence": "cannot list them"
+        "evidence": "cannot list them",
+        "emphasis": "The student distinguishes recognising the stages"
       }
     }
   },
@@ -464,13 +512,15 @@
         "label": "Testing a boundary",
         "signal": "What we covered",
         "review": "The tutor asks about the consequence of omitting a stopping condition in recursion.",
-        "evidence": "no base case"
+        "evidence": "no base case",
+        "emphasis": "The tutor asks about the consequence"
       },
       "student": {
         "label": "Tracing a failure",
         "signal": "What went well",
         "review": "The student connects repeated recursive calls to exhausting the call stack.",
-        "evidence": "stack runs out"
+        "evidence": "stack runs out",
+        "emphasis": "The student connects repeated recursive calls"
       }
     }
   },
@@ -483,13 +533,15 @@
         "label": "Testing an edge case",
         "signal": "Teaching approach",
         "review": "An empty input tests a case that the normal example did not cover.",
-        "evidence": "empty list"
+        "evidence": "empty list",
+        "emphasis": "An empty input tests a case"
       },
       "student": {
         "label": "Finding the cause",
         "signal": "Key breakthrough",
         "review": "The student identifies an access before the length check as the source of the crash.",
-        "evidence": "before checking"
+        "evidence": "before checking",
+        "emphasis": "The student identifies an access before the length check"
       }
     }
   },
@@ -502,13 +554,15 @@
         "label": "Reasoning about scaling",
         "signal": "What we covered",
         "review": "The tutor uses a larger input to probe how the loop scales.",
-        "evidence": "input doubles"
+        "evidence": "input doubles",
+        "emphasis": "The tutor uses a larger input"
       },
       "student": {
         "label": "Explaining the cost",
         "signal": "What went well",
         "review": "The student connects one pass through the list to a proportional increase in iterations.",
-        "evidence": "one pass through the list"
+        "evidence": "one pass through the list",
+        "emphasis": "The student connects one pass through the list"
       }
     }
   },
@@ -521,13 +575,15 @@
         "label": "Refining a requirement",
         "signal": "Teaching approach",
         "review": "The tutor asks what would let someone verify that a requirement has been met.",
-        "evidence": "testable requirement"
+        "evidence": "testable requirement",
+        "emphasis": "The tutor asks what would let someone verify"
       },
       "student": {
         "label": "Making a criterion concrete",
         "signal": "What went well",
         "review": "The student distinguishes a measurable result from a subjective description.",
-        "evidence": "measurable result"
+        "evidence": "measurable result",
+        "emphasis": "The student distinguishes a measurable result"
       }
     }
   },
@@ -540,13 +596,15 @@
         "label": "Linking algebra and geometry",
         "signal": "What we covered",
         "review": "The tutor asks for a geometric interpretation of complex multiplication.",
-        "evidence": "geometrically"
+        "evidence": "geometrically",
+        "emphasis": "The tutor asks for a geometric interpretation"
       },
       "student": {
         "label": "Connecting representations",
         "signal": "What went well",
         "review": "The student identifies the rotation associated with multiplying by the imaginary unit.",
-        "evidence": "quarter turn anticlockwise"
+        "evidence": "quarter turn anticlockwise",
+        "emphasis": "The student identifies the rotation"
       }
     }
   },
@@ -559,13 +617,15 @@
         "label": "Challenging an assumption",
         "signal": "Teaching approach",
         "review": "Reversing the transformations tests an assumption about the order of matrix multiplication.",
-        "evidence": "in reverse"
+        "evidence": "in reverse",
+        "emphasis": "Reversing the transformations"
       },
       "student": {
         "label": "Choosing to investigate",
         "signal": "Learning insights",
         "review": "The student identifies their assumption and asks to test it. The result has not yet been established.",
-        "evidence": "Can we test it"
+        "evidence": "Can we test it",
+        "emphasis": "The student identifies their assumption"
       }
     }
   },
@@ -578,13 +638,15 @@
         "label": "Prompting transfer",
         "signal": "Teaching approach",
         "review": "The tutor asks the student to choose a previously learned method for a new equation.",
-        "evidence": "earlier method"
+        "evidence": "earlier method",
+        "emphasis": "The tutor asks the student to choose a previously learned method"
       },
       "student": {
         "label": "Selecting an approach",
         "signal": "What went well",
         "review": "The student proposes separating variables and identifies a possible preliminary step.",
-        "evidence": "Separating the variables"
+        "evidence": "Separating the variables",
+        "emphasis": "The student proposes separating variables"
       }
     }
   },
@@ -597,13 +659,15 @@
         "label": "Reviewing a proof",
         "signal": "Areas for improvement",
         "review": "The tutor asks the student to identify the incomplete part of the induction argument.",
-        "evidence": "still needs work"
+        "evidence": "still needs work",
+        "emphasis": "The tutor asks the student to identify the incomplete part"
       },
       "student": {
         "label": "Identifying a missing step",
         "signal": "Next steps",
         "review": "The student recognises that checking the base case does not establish the inductive step.",
-        "evidence": "I only checked the first"
+        "evidence": "I only checked the first",
+        "emphasis": "The student recognises that checking the base case"
       }
     }
   }

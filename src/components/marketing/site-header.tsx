@@ -13,7 +13,6 @@ const LINKS = [
   { href: "/how-it-works", label: "How it works" },
   { href: "/pricing", label: "Pricing" },
   { href: "/about", label: "Safeguarding" },
-  { href: "/dashboard", label: "Dashboard" },
 ];
 
 export function SiteHeader() {
@@ -23,7 +22,10 @@ export function SiteHeader() {
   const pathname = usePathname();
   const isDark = mounted && resolvedTheme === "dark";
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setMounted(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   // Don't let the page scroll behind the open panel.
   useEffect(() => {
@@ -74,7 +76,7 @@ export function SiteHeader() {
             <Link href="/sign-in">Sign in</Link>
           </Button>
           <Button asChild size="md">
-            <Link href="/sign-up">Get started</Link>
+            <Link href="/tutors">Find your tutor</Link>
           </Button>
         </div>
 
@@ -123,8 +125,8 @@ export function SiteHeader() {
                   </Link>
                 </Button>
                 <Button asChild size="lg">
-                  <Link href="/sign-up" onClick={() => setOpen(false)}>
-                    Get started
+                  <Link href="/tutors" onClick={() => setOpen(false)}>
+                    Find your tutor
                   </Link>
                 </Button>
               </div>

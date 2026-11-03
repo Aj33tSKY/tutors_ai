@@ -1,0 +1,98 @@
+{
+  "checks": [
+    {
+      "theme": "geist_ee340481-module__yIcsXq__variable roboto_mono_ff84cad7-module__itrPXG__variable h-full light",
+      "student": "#7188b8",
+      "wave": "rgb(113, 136, 184)",
+      "highlight": "linear-gradient(color(srgb 0.443137 0.533333 0.721569 / 0.34), color(srgb 0.443137 0.533333 0.721569 / 0.34))",
+      "recordIcon": "21px",
+      "recordText": "",
+      "oldControls": false
+    },
+    {
+      "theme": "geist_ee340481-module__yIcsXq__variable roboto_mono_ff84cad7-module__itrPXG__variable h-full dark",
+      "student": "#a5b6db",
+      "wave": "rgb(165, 182, 219)",
+      "highlight": "linear-gradient(color(srgb 0.647059 0.713726 0.858823 / 0.34), color(srgb 0.647059 0.713726 0.858823 / 0.34))",
+      "recordIcon": "21px",
+      "recordText": "",
+      "oldControls": false
+    },
+    {
+      "mic": "true"
+    },
+    {
+      "camera": "true"
+    },
+    {
+      "share": "true"
+    },
+    {
+      "ended": "true"
+    },
+    {
+      "replayed": "false"
+    },
+    {
+      "width": 320,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 390,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 480,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 600,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 640,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 641,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 768,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 1024,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 1100,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    },
+    {
+      "width": 1440,
+      "overflow": false,
+      "footerInCard": true,
+      "buttons": 4
+    }
+  ],
+  "errors": []
+}
