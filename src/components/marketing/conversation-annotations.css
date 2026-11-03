@@ -1,0 +1,22 @@
+/* Marginal notes: proximity and timing replace wiring and coloured edges. */
+.landing-hero__scene .conversation-stage[data-presentation="floating"][data-notes="outside"][data-annotation-style="aligned"]::before {
+  border-color: color-mix(in srgb, var(--foreground) 7%, transparent);
+  box-shadow: 0 1px 3px #17211c10, 0 18px 44px #17211c0d;
+}
+.landing-hero__scene .conversation-stage[data-annotation-style="aligned"] .conversation-analysis__insight {
+  background: color-mix(in srgb, var(--background) 70%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 7%, transparent);
+  box-shadow: 0 1px 2px #17211c10, 0 10px 26px #17211c0d;
+}
+:root.dark .landing-hero__scene .conversation-stage[data-presentation="floating"][data-notes="outside"][data-annotation-style="aligned"]::before {
+  box-shadow: 0 1px 3px #00000020, 0 18px 44px #00000020;
+}
+:root.dark .landing-hero__scene .conversation-stage[data-annotation-style="aligned"] .conversation-analysis__insight {
+  background: color-mix(in srgb, var(--background) 72%, transparent);
+  border-color: #ffffff12;
+  box-shadow: 0 1px 2px #00000030, 0 10px 26px #00000020;
+}
+
+.landing-hero__scene .conversation-stage[data-annotation-style="aligned"] .conversation-analysis__insight {
+  translate: 0 var(--dock-y, 0px);
+}

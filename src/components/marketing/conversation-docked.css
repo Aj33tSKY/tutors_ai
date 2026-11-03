@@ -1,0 +1,29 @@
+/* Rollback: set USE_DOCKED_ANNOTATIONS to false in lesson-signal.tsx. */
+.landing-hero__scene .conversation-stage[data-presentation="floating"][data-notes="outside"][data-annotation-style="docked"]::before {
+  box-shadow: 0 1px 3px #17211c14, 0 20px 48px #17211c12, inset 0 1px 0 #ffffffa0;
+}
+.landing-hero__scene .conversation-stage[data-annotation-style="docked"] .conversation-analysis__insight {
+  --note-accent: var(--conversation-tutor);
+  translate: var(--dock-x, 0px) var(--dock-y, 0px);
+  background: color-mix(in srgb, var(--background) 80%, transparent);
+  border: 1px solid #ffffff90;
+  border-left: 2px solid var(--note-accent);
+  box-shadow: 0 1px 2px #17211c18, 0 10px 26px #17211c12, inset 0 1px 0 #ffffffc0;
+}
+.landing-hero__scene .conversation-stage[data-annotation-style="docked"] .conversation-turn--student .conversation-analysis__insight { --note-accent: var(--conversation-student); }
+.landing-hero__scene .conversation-stage[data-annotation-style="docked"] .conversation-insight-icon { color: var(--note-accent); }
+:root.dark .landing-hero__scene .conversation-stage[data-presentation="floating"][data-notes="outside"][data-annotation-style="docked"]::before {
+  box-shadow: 0 1px 3px #00000030, 0 20px 48px #00000028, inset 0 1px 0 #ffffff28;
+}
+:root.dark .landing-hero__scene .conversation-stage[data-annotation-style="docked"] .conversation-analysis__insight {
+  background: color-mix(in srgb, var(--background) 76%, transparent);
+  border-color: #ffffff1c;
+  border-left-color: var(--note-accent);
+  box-shadow: 0 1px 2px #00000045, 0 10px 26px #00000026, inset 0 1px 0 #ffffff20;
+}
+@media (min-width: 641px) {
+  .landing-hero__scene .conversation-stage[data-annotation-style="docked"] .conversation-waveform {
+    width: calc(100% + 24px);
+    margin-inline: -12px;
+  }
+}

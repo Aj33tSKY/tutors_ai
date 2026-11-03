@@ -1,0 +1,332 @@
+{
+  "samples": 100,
+  "wholeWordSamples": [
+    [
+      "changes"
+    ],
+    [
+      "direction,"
+    ],
+    [
+      "direction,"
+    ],
+    [
+      "direction,"
+    ],
+    [
+      "direction,"
+    ],
+    [
+      "not"
+    ],
+    [
+      "not"
+    ],
+    [
+      "the"
+    ],
+    [
+      "particle's"
+    ],
+    [
+      "particle's"
+    ],
+    [
+      "particle's"
+    ],
+    [
+      "particle's"
+    ]
+  ],
+  "connections": [
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    },
+    {
+      "sourceOnHighlight": true,
+      "endOnNote": true
+    }
+  ],
+  "errors": []
+}
