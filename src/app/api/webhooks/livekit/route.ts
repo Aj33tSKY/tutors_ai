@@ -15,7 +15,9 @@ import {
   TrackType,
   WebhookReceiver,
 } from "livekit-server-sdk";
+import { after } from "next/server";
 import { recordingsUpload } from "@/lib/recordings-storage";
+import { NonRetryableError, retryWithDelays } from "@/lib/retry";
 import { createAdminClient } from "@/lib/supabase/admin";
 
 function livekitHost() {
@@ -241,48 +243,100 @@ async function startScreenRecording(bookingId: string, roomName: string, trackSi
     throw insertError ?? new Error("Could not reserve a screen recording");
   }
 
+  // Starting happens after the response: a busy Egress node turns a job away
+  // without saying so, LiveKit reports that 10 s later, and the retries below
+  // can take another minute — far longer than LiveKit should wait on a webhook.
+  after(() => startScreenEgress(recording.id, roomName, trackSid, storagePath));
+}
+
+// Egress holds a freshly accepted job's CPU estimate for 15 s, so a share that
+// starts alongside other recordings can be refused and then accepted moments
+// later. Waits are counted from the end of the previous attempt, which itself
+// takes up to 10 s to fail. Attempts: now, then roughly 15 s, 30 s and 70 s in.
+const SCREEN_START_RETRY_DELAYS_MS = [5_000, 15_000, 30_000] as const;
+
+async function startScreenEgress(recordingId: string, roomName: string, trackSid: string, storagePath: string) {
+  const admin = createAdminClient();
   try {
-    const { egress } = clients();
-    const result = await egress.startEgress(
-      new StartEgressRequest({
-        roomName,
-        source: {
-          case: "media",
-          value: new MediaSource({ video: { case: "videoTrackId", value: trackSid } }),
-        },
-        encoding: { case: "preset", value: EncodingOptionsPreset.PASSTHROUGH },
-        outputs: [
-          new Output({
-            config: {
-              case: "file",
-              // No fileType: with PASSTHROUGH, LiveKit rejects any explicit
-              // type ("invalid field: passthrough file_type") and picks the
-              // container from the track's codec itself.
-              value: new FileOutput({ filepath: storagePath, disableManifest: true }),
+    await retryWithDelays(
+      async () => {
+        const result = await clients().egress.startEgress(
+          new StartEgressRequest({
+            roomName,
+            source: {
+              case: "media",
+              value: new MediaSource({ video: { case: "videoTrackId", value: trackSid } }),
             },
+            encoding: { case: "preset", value: EncodingOptionsPreset.PASSTHROUGH },
+            outputs: [
+              new Output({
+                config: {
+                  case: "file",
+                  // No fileType: with PASSTHROUGH, LiveKit rejects any explicit
+                  // type ("invalid field: passthrough file_type") and picks the
+                  // container from the track's codec itself.
+                  value: new FileOutput({ filepath: storagePath, disableManifest: true }),
+                },
+              }),
+            ],
+            storage: new StorageConfig({ provider: { case: "s3", value: recordingsUpload() } }),
           }),
-        ],
-        storage: new StorageConfig({ provider: { case: "s3", value: recordingsUpload() } }),
-      }),
+        );
+        // Only the Egress request is retried: past this point a job exists, and
+        // repeating it would record the same share twice.
+        try {
+          const { data: claimed, error } = await admin
+            .from("session_recordings")
+            .update({ egress_id: result.egressId, status: "active" })
+            .eq("id", recordingId)
+            .eq("status", "starting")
+            .select("id");
+          if (error) throw error;
+          // The share ended while the job was starting; nothing is left to record.
+          if (!claimed?.length) await clients().egress.stopEgress(result.egressId);
+        } catch (error) {
+          console.error(`Screen egress ${result.egressId} started but could not be recorded:`, error);
+          await clients().egress.stopEgress(result.egressId).catch(() => {});
+          throw new NonRetryableError(error);
+        }
+      },
+      SCREEN_START_RETRY_DELAYS_MS,
+      {
+        // A share that has ended (track_unpublished) marks its row failed, which
+        // is what stops any retry still waiting.
+        shouldContinue: async () => {
+          const { data } = await admin.from("session_recordings").select("status").eq("id", recordingId).maybeSingle();
+          return data?.status === "starting";
+        },
+        onRetry: (error, attemptNumber, delayMs) =>
+          console.warn(
+            `Screen recording for ${trackSid} could not start (attempt ${attemptNumber}); retrying in ${delayMs / 1000}s:`,
+            error,
+          ),
+      },
     );
-    const { error } = await admin
-      .from("session_recordings")
-      .update({ egress_id: result.egressId, status: "active" })
-      .eq("id", recording.id)
-      .eq("status", "starting");
-    if (error) throw error;
   } catch (error) {
+    console.error(`Screen recording for ${trackSid} failed to start:`, error);
     await admin
       .from("session_recordings")
       .update({ status: "failed", ended_at: new Date().toISOString() })
-      .eq("id", recording.id);
-    throw error;
+      .eq("id", recordingId)
+      .eq("status", "starting");
   }
 }
 
 /** A single-track export ends by itself when its track goes away; this is the backstop. */
 async function stopScreenRecording(trackSid: string) {
   const admin = createAdminClient();
+  // A share that ends before its recording has started (still waiting on a
+  // busy Egress) has nothing to stop. Failing the row is what tells the start
+  // retries to give up.
+  await admin
+    .from("session_recordings")
+    .update({ status: "failed", ended_at: new Date().toISOString() })
+    .eq("track_sid", trackSid)
+    .eq("status", "starting");
+
   const { data: recording } = await admin
     .from("session_recordings")
     .select("id, egress_id")
