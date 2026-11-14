@@ -33,7 +33,7 @@ const getTutors = unstable_cache(async (): Promise<TutorCatalogue> => {
     if (!availableDays[slot.tutor_id].includes(slot.day_of_week)) availableDays[slot.tutor_id].push(slot.day_of_week);
   }
   return { tutors, availableDays };
-}, ["tutor-catalogue"], { revalidate: 300 });
+}, ["tutor-catalogue"], { revalidate: 300, tags: ["tutor-catalogue"] });
 
 /** Builds a filter href without dropping the other active filter. */
 function filterHref(next: { subject?: string; board?: string; maxPrice?: string; day?: string }) {

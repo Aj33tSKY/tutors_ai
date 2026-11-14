@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
-import { LayoutDashboard, Users, MessageCircle, Clock, Landmark, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { LayoutDashboard, Users, MessageCircle, UserRound, Landmark, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Wordmark } from "@/components/marketing/wordmark";
 import type { UserRole } from "@/lib/types";
@@ -29,7 +29,7 @@ export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
   tutor: [
     { href: "/dashboard/tutor", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/tutor/students", label: "My students", icon: Users },
-    { href: "/dashboard/tutor/availability", label: "Availability", icon: Clock },
+    { href: "/dashboard/tutor/profile", label: "My profile", icon: UserRound },
     { href: "/dashboard/tutor/payouts", label: "Payouts", icon: Landmark },
   ],
   admin: [{ href: "/dashboard/admin", label: "Overview", icon: LayoutDashboard }],
