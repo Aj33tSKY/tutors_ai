@@ -1,0 +1,57 @@
+/* Set USE_CALL_FRAME to false in lesson-signal.tsx to compare the audio-only card. */
+.conversation-stage[data-presentation="floating"][data-notes="outside"][data-call-frame="true"]::before { grid-row: 1 / span 3; }
+.lesson-call-controls {
+  position: relative;
+  grid-column: 1;
+  grid-row: 3;
+  width: 100%;
+  min-width: 0;
+  min-height: 76px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 20px 20px;
+  transition: width .85s cubic-bezier(.22, 1, .36, 1);
+}
+[data-notes="outside"][data-has-insights="false"] .lesson-call-controls { width: calc(157.142857% + 32px); }
+.lesson-call-control {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--conversation-text) 9%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--background) 65%, transparent);
+  color: var(--conversation-text);
+  cursor: pointer;
+  transition: background .2s, color .2s;
+}
+.lesson-call-control:hover { background: color-mix(in srgb, var(--background) 90%, transparent); }
+.lesson-call-control[aria-pressed="true"] { background: color-mix(in srgb, var(--conversation-text) 12%, var(--background)); }
+.lesson-call-control--end { border-color: transparent; background: #ce544d; color: white; }
+.lesson-call-control--end:hover { background: #b94a43; }
+.lesson-call-control__hangup { rotate: 135deg; }
+.lesson-call-control:focus-visible, .lesson-call-controls__replay:focus-visible { outline: 2px solid var(--conversation-text); outline-offset: 3px; }
+.lesson-call-controls__replay {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 13px;
+  font: 500 12px/18px var(--font-body);
+  color: var(--conversation-text);
+  background: color-mix(in srgb, var(--background) 75%, transparent);
+  border: 1px solid var(--conversation-line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+[data-call-ended="true"] .conversation-recording__icon { color: var(--conversation-subtle); }
+@media (max-width: 640px) {
+  [data-call-frame="true"][data-notes="outside"] .conversation-turn--tutor .conversation-analysis { grid-row: 4; }
+  [data-call-frame="true"][data-notes="outside"] .conversation-turn--student .conversation-analysis { grid-row: 5; }
+  [data-notes="outside"][data-has-insights="false"] .lesson-call-controls { width: 100%; }
+  .lesson-call-controls { padding-top: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .lesson-call-controls, .lesson-call-control { transition: none; } }

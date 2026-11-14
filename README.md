@@ -5,8 +5,9 @@ It explains the single repository, `tutors-dev` / `tutors` deployments and datab
 migrations. There is one long-lived branch: staging releases automatically on every
 merge to `main`, and production releases the same commits only when a human
 dispatches it. The pipeline itself is
-documented in [docs/CI-CD.md](docs/CI-CD.md), and transcription in
-[docs/transcription.md](docs/transcription.md).
+documented in [docs/CI-CD.md](docs/CI-CD.md), transcription in
+[docs/transcription.md](docs/transcription.md), and the self-hosted video server in
+[infra/livekit/README.md](infra/livekit/README.md).
 
 Implementation of `docs/mvp_plan.md`: tutor discovery & booking, live WebRTC sessions with
 transcription, post-session analytics, and a RAG revision chatbot — for UK A-Level Maths,
@@ -15,7 +16,8 @@ Further Maths, Physics, Chemistry, Biology and Computing.
 ## Stack
 
 Next.js 16 (App Router) · Tailwind v4 + shadcn/ui · Supabase (Postgres + Auth + pgvector) ·
-Vercel AI SDK (AI Gateway) · Framer Motion.
+Vercel AI SDK (AI Gateway) · Framer Motion · LiveKit (self-hosted on Hetzner) ·
+Cloudflare R2 (session recordings) · Deepgram (transcription) · Stripe.
 
 ## What's live
 
@@ -57,11 +59,13 @@ Vercel AI SDK (AI Gateway) · Framer Motion.
   its own review page. The session recording sits beside a single editable markdown notes panel
   (Session Goals, What We Covered, What Went Well, Areas for Improvement, Learning Insights, Key
   Breakthrough, Next Steps — seeded from the LLM summary above, with its timestamp citations),
-  scrollable independently of the recording and stacking below it on mobile; the tutor can rewrite it freely
-  and save, with an undo back to the last save before doing so — everyone on the booking sees the
-  same document. A collapsible section below both has the full transcript. When recording is
-  enabled, the recording panel plays the session audio from a private, short-lived URL, showing the
-  tutor's screen shares at the points in the lesson they happened.
+  scrollable independently of the recording and stacking below it on mobile, and holding the same
+  height in read and edit mode; the tutor can rewrite it freely and save. While editing, **Cancel**
+  discards the current edit and **Reset to AI version** goes back to the original generation however
+  many times it has been saved over — everyone on the booking sees the same saved document. A
+  collapsible section below both has the full transcript. When recording is enabled, the recording
+  card (which has a full-screen mode) plays the session audio from a private, short-lived URL,
+  showing the tutor's screen shares at the points in the lesson they happened.
 
 ### Chatbot cost controls
 
@@ -137,18 +141,26 @@ low-content test transcript that it returns empty results rather than hallucinat
 
 ### Video calling notes
 
-LiveKit isn't in the Vercel Marketplace (only Mux — video streaming, not real-time calls), so this
-needed a manual [LiveKit Cloud](https://cloud.livekit.io) project and three env vars:
-`LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `NEXT_PUBLIC_LIVEKIT_URL`. Until all three are set,
-`/session/[bookingId]` shows a "video isn't configured yet" state instead of erroring — checked
-via `livekitConfigured()` in `src/lib/livekit.ts`.
+LiveKit isn't in the Vercel Marketplace (only Mux — video streaming, not real-time calls), so the
+app needs three env vars pointing at a LiveKit server: `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`,
+`NEXT_PUBLIC_LIVEKIT_URL`. Until all three are set, `/session/[bookingId]` shows a "video isn't
+configured yet" state instead of erroring — checked via `livekitConfigured()` in
+`src/lib/livekit.ts`.
+
+Which server that is differs by environment: staging runs its own self-hosted server on Hetzner,
+set up and updated from [`infra/livekit/`](infra/livekit/README.md) (which also covers sizing,
+rollback and upgrades); production is still on a [LiveKit Cloud](https://cloud.livekit.io)
+project until its own server exists. The app code is the same either way.
+`NEXT_PUBLIC_LIVEKIT_URL` is baked in at build time, so changing it needs a redeploy.
 
 ## Local development
 
 ```bash
 npm install
-# Get development values for .env.local from the owner. The local Vercel link
-# currently points to tutors, so a blind env pull can fetch production values.
+# Get development values for .env.local from the owner (.env.example lists every
+# name). Use the staging (tutors-dev) values, never production's. Run
+# `vercel env pull` only after checking which project the repo is linked to:
+# `vercel link` overwrites .env.local.
 npm run dev
 ```
 
@@ -174,7 +186,7 @@ curl -H "Authorization: Bearer $CRON_SECRET" http://localhost:3000/api/cron/summ
 The tutor explicitly opts in on the session page, for the lesson audio and any screen they share
 (the camera is never recorded). When they join, a signed LiveKit webhook starts a single stereo
 Egress job, routing the tutor's track to the left channel and the student's to the right, and writes
-one OGG segment to the private `session-recordings` Supabase Storage bucket. While the tutor shares
+one OGG segment to the environment's private Cloudflare R2 bucket. While the tutor shares
 their screen, a second Egress job saves that share's video as-is (MP4) to the same bucket. When the
 tutor leaves, the webhook stops Egress; rejoining creates another segment, which the review page
 plays in order, with each screen share shown at the point in the audio it happened. The audio file
@@ -190,12 +202,14 @@ Before enabling this in a deployment:
    rule allowing `GET` from the app's origin. Set `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`
    and `R2_SECRET_ACCESS_KEY` in the app environment (see [transcription setup](docs/transcription.md)).
 2. Set `DEEPGRAM_API_KEY` in that Vercel project for batch transcription.
-3. Configure LiveKit Cloud to POST its signed webhook events to `/api/webhooks/livekit`
-   using that environment's API key pair.
+3. Make the LiveKit server POST its signed webhook events to `/api/webhooks/livekit` using that
+   environment's API key pair. On the self-hosted server that is the `WEBHOOK_URL` given to
+   `setup.sh`; on LiveKit Cloud it is set in the dashboard.
 4. Apply the Supabase migration and redeploy the app so the 90-day cleanup cron is active.
-5. Check LiveKit Cloud's concurrent-Egress limit against expected concurrent call volume — one
-   Egress job runs per concurrent call for the whole call's duration, plus one more while the tutor
-   shares their screen.
+5. Check the server's capacity against expected concurrent call volume — one Egress job runs per
+   concurrent call for the whole call's duration, plus one more while the tutor shares their screen.
+   On a self-hosted server that is CPU and Egress's admission costs, not a plan limit; see
+   [capacity and sizing](infra/livekit/README.md#capacity-and-sizing).
 
 ### Direct messages and homework attachments
 
@@ -219,7 +233,11 @@ edit a cloud database directly. See [the developer workflow](docs/development-wo
 `supabase/seed.mjs` seeds 6 demo tutors (run with `node supabase/seed.mjs`, reads
 `SUPABASE_SERVICE_ROLE_KEY` from `.env.local`). Demo tutor accounts:
 `priya.m@demo.kindling.app` (and 5 others, see `supabase/seed-data.mjs`), password
-`KindlingDemo2026!`.
+`KindlingDemo2026!`. `node supabase/create-demo-student.mjs [email]` creates or resets a confirmed
+demo student with the same password (it refuses to run unless `.env.local` points at the staging
+project), and `node supabase/create-test-booking.mjs <student-email>` creates a paid booking so a
+session can be tested without Stripe. The booking script does **not** check which project it is
+pointed at, so look at `NEXT_PUBLIC_SUPABASE_URL` first.
 
 ## Project structure
 
@@ -237,6 +255,11 @@ src/lib/supabase/            browser/server/proxy Supabase clients + profile boo
 src/lib/supabase/admin.ts    service-role client for the webhook (no user session to read cookies from)
 src/lib/stripe.ts            lazy Stripe client (avoids crashing `next build` before keys exist)
 src/lib/livekit.ts           token minting + room naming (one room per booking id)
+src/lib/recordings-storage.ts Cloudflare R2 client: upload target for Egress, presigned playback URLs, deletion
+src/app/api/webhooks/livekit/ starts/stops recording from LiveKit's signed webhooks
+infra/livekit/               the self-hosted LiveKit server: compose file, config templates, setup/deploy/check scripts
+scripts/ci/                  checks run by CI (env manifest, workflow permissions, migration history) and the LiveKit deploy
+.github/workflows/           ci, staging, production, and the manual Deploy LiveKit workflow
 supabase/migrations/          versioned schema and RLS changes deployed by GitHub Actions
 ```
 

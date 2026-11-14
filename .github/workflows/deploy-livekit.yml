@@ -1,0 +1,98 @@
+name: Deploy LiveKit
+
+# Deliberately manual, and separate from the app's pipelines. Installing a new
+# configuration restarts LiveKit, Egress and Caddy, which ends every call in
+# progress, so it must only ever happen when a person chooses. The server
+# itself refuses while anyone is connected unless "force" is ticked.
+#
+# Each target reads only its own prefixed secrets, same as staging.yml and
+# production.yml, so a staging run cannot reach the production server.
+#
+#   STAGING_LIVEKIT_DEPLOY_KEY (secret)  PRODUCTION_LIVEKIT_DEPLOY_KEY (secret)
+#   *_LIVEKIT_DEPLOY_HOST, *_LIVEKIT_HOST_KEY, *_LIVEKIT_DOMAIN,
+#   *_LIVEKIT_TURN_DOMAIN (variables)
+#
+# The deploy key can only run infra/livekit/deploy.sh on the server; see
+# infra/livekit/README.md ("Updating the server") for how it is created.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Which LiveKit server to update
+        type: choice
+        options: [staging, production]
+        default: staging
+      force:
+        description: Deploy even if people are in a call (their calls will drop)
+        type: boolean
+        default: false
+      confirm:
+        description: Production only - type "deploy" to confirm
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: livekit-deployment-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  staging:
+    name: Deploy to the staging server
+    if: ${{ inputs.target == 'staging' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the configuration
+        env:
+          DEPLOY_KEY: ${{ secrets.STAGING_LIVEKIT_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ vars.STAGING_LIVEKIT_DEPLOY_HOST }}
+          HOST_KEY: ${{ vars.STAGING_LIVEKIT_HOST_KEY }}
+          LIVEKIT_DOMAIN: ${{ vars.STAGING_LIVEKIT_DOMAIN }}
+          TURN_DOMAIN: ${{ vars.STAGING_LIVEKIT_TURN_DOMAIN }}
+          FORCE: ${{ inputs.force }}
+        run: scripts/ci/deploy-livekit.sh
+
+  production:
+    name: Deploy to the production server
+    if: ${{ inputs.target == 'production' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Require an explicit confirmation
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          if [ "$CONFIRM" != "deploy" ]; then
+            echo "::error::Type deploy in the confirmation field to update the production server."
+            exit 1
+          fi
+
+      - name: Limit production deployments to main
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          if [ "$DEPLOY_REF" != "refs/heads/main" ]; then
+            echo "::error::The production server can only be updated from main."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the configuration
+        env:
+          DEPLOY_KEY: ${{ secrets.PRODUCTION_LIVEKIT_DEPLOY_KEY }}
+          DEPLOY_HOST: ${{ vars.PRODUCTION_LIVEKIT_DEPLOY_HOST }}
+          HOST_KEY: ${{ vars.PRODUCTION_LIVEKIT_HOST_KEY }}
+          LIVEKIT_DOMAIN: ${{ vars.PRODUCTION_LIVEKIT_DOMAIN }}
+          TURN_DOMAIN: ${{ vars.PRODUCTION_LIVEKIT_TURN_DOMAIN }}
+          FORCE: ${{ inputs.force }}
+        run: scripts/ci/deploy-livekit.sh

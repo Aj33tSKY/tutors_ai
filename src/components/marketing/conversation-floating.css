@@ -1,0 +1,123 @@
+/* Opt-in presentation. Set USE_FLOATING_INSIGHTS to false in lesson-signal.tsx to roll back. */
+.conversation-insight-link, .conversation-insight-icon { display: none; }
+.conversation-stage[data-presentation="floating"] {
+  --annotation-surface: #131b23;
+  border-color: #ffffff09;
+  box-shadow: 0 20px 70px #00000012;
+  overflow: visible;
+}
+:root:not(.dark) .conversation-stage[data-presentation="floating"] {
+  --annotation-surface: #fff;
+  border-color: #00000007;
+  box-shadow: 0 20px 70px #00000005;
+}
+.conversation-stage[data-presentation="floating"]::before { opacity: .1; border-radius: inherit; }
+[data-presentation="floating"] .conversation-turn { position: relative; gap: 42px; border: 0; }
+[data-presentation="floating"] .conversation-analysis {
+  align-self: center;
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+[data-presentation="floating"] .conversation-analysis__insight {
+  width: 100%;
+  padding: 16px;
+  border-radius: 10px;
+  border: 1px solid var(--conversation-line);
+  background: var(--annotation-surface);
+  box-shadow: 0 10px 28px #00000012;
+  position: relative;
+  z-index: 1;
+  transform: none;
+  transition: opacity .35s ease, visibility 0s linear .35s;
+}
+[data-presentation="floating"] .conversation-analysis__insight[data-ready="true"] {
+  transform: translate(0, 0);
+  transition: opacity .6s ease, visibility 0s;
+}
+[data-presentation="floating"] .conversation-analysis__signal {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--conversation-text);
+}
+[data-presentation="floating"] .conversation-insight-icon { display: block; flex-shrink: 0; color: var(--conversation-subtle); }
+[data-presentation="floating"] .conversation-analysis p { font-size: 12px; line-height: 1.65; }
+[data-presentation="floating"] .conversation-insight-link {
+  position: absolute;
+  display: block;
+  width: 100%;
+  height: 100%;
+  inset: 0;
+  overflow: visible;
+  color: var(--conversation-tutor);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .35s ease;
+}
+[data-presentation="floating"] .conversation-turn--student .conversation-insight-link { color: var(--conversation-student); }
+[data-presentation="floating"] .conversation-insight-link[data-connected="true"] { opacity: .5; transition-delay: .18s; }
+.conversation-insight-link path { stroke: currentColor; stroke-width: 1; stroke-dasharray: 1; stroke-dashoffset: 0; }
+.conversation-insight-link circle { fill: currentColor; }
+[data-presentation="floating"] .conversation-insight-link[data-connected="true"] path { animation: conversation-insight-connect .8s .1s ease-out forwards; }
+.conversation-evidence {
+  padding: .1em 0;
+  color: inherit;
+  text-decoration: none;
+  border-radius: 3px;
+  --evidence-color: var(--conversation-tutor);
+  background: linear-gradient(color-mix(in srgb, var(--evidence-color) var(--evidence-opacity, 34%), transparent), color-mix(in srgb, var(--evidence-color) var(--evidence-opacity, 34%), transparent)) left center / 100% 100% no-repeat;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  animation: conversation-evidence-reveal .85s cubic-bezier(.22, 1, .36, 1) both;
+  transition: background-color .25s ease;
+}
+.conversation-turn--student .conversation-evidence {
+  --evidence-color: var(--conversation-student);
+}
+@keyframes conversation-insight-connect { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes conversation-evidence-reveal { from { background-size: 0% 100%; } to { background-size: 100% 100%; } }
+@media (max-width: 480px) {
+  [data-presentation="floating"] .conversation-turn { gap: 0; }
+  [data-presentation="floating"] .conversation-turn + .conversation-turn { margin-top: 26px; }
+  [data-presentation="floating"] .conversation-analysis { min-height: 112px; padding: 8px 0 0 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-presentation="floating"] .conversation-analysis__insight[data-ready] { transform: none; transition: none; }
+  .conversation-insight-link, .conversation-evidence { animation: none !important; transition: none !important; }
+  .conversation-insight-link path { animation: none !important; stroke-dashoffset: 0; }
+}
+
+/* The newest spoken word softly resolves into the settled transcript. */
+.conversation-caption__word { animation: conversation-word-arrive .24s ease-out both; }
+@keyframes conversation-word-arrive { from { opacity: .35; filter: blur(1.5px); } to { opacity: 1; filter: blur(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .conversation-caption__word { animation: none; filter: none; }
+}
+
+/* Layered annotation threads: a clear rail, soft halo and one arriving signal. */
+[data-presentation="floating"] .conversation-insight-link[data-connected="true"] { opacity: .9; }
+.conversation-insight-link path { stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.conversation-insight-link .conversation-link-halo { stroke-width: 7; opacity: .12; }
+.conversation-insight-link .conversation-link-line { stroke-width: 2; }
+.conversation-insight-link .conversation-link-source { fill: currentColor; }
+.conversation-insight-link .conversation-link-terminal {
+  fill: var(--annotation-surface);
+  stroke: currentColor;
+  stroke-width: 1.75;
+  vector-effect: non-scaling-stroke;
+}
+.conversation-insight-link .conversation-link-signal { stroke-width: 3; stroke: white; opacity: 0; }
+[data-presentation="floating"] .conversation-insight-link[data-connected="true"] .conversation-link-signal {
+  stroke-dasharray: .08 .92;
+  animation: conversation-signal-arrive .8s .2s ease-in-out both;
+}
+@keyframes conversation-signal-arrive {
+  0% { stroke-dashoffset: .08; opacity: 0; }
+  15% { opacity: .85; }
+  85% { opacity: .85; }
+  100% { stroke-dashoffset: -1; opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-presentation="floating"] .conversation-insight-link[data-connected="true"] .conversation-link-signal { animation: none; opacity: 0; }
+}

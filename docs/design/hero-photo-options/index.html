@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kindling — hero photo alternatives</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f4f3ee;color:#222;font:15px/1.6 system-ui,sans-serif}main{max-width:1460px;margin:auto;padding:32px 24px}h1{font-size:32px;letter-spacing:-.04em;margin:0 0 8px}p{max-width:850px;color:#62645f}nav{display:flex;gap:8px;flex-wrap:wrap;margin:26px 0 16px}button{border:1px solid #d4d5cf;border-radius:6px;background:transparent;padding:9px 15px;font:inherit;color:inherit;cursor:pointer}button[aria-pressed=true]{background:#202420;color:white;border-color:#202420}figure{margin:0;background:white;border:1px solid #d4d5cf;border-radius:10px;overflow:hidden}figcaption{padding:14px 18px;font-size:13px;border-bottom:1px solid #e5e5df}img{display:block;width:100%;height:auto}img.mobile{max-width:390px;margin:auto}small{display:block;color:#666;margin-top:20px}a{color:inherit}:focus-visible{outline:2px solid #58cc02;outline-offset:3px}
+</style>
+<main>
+<h1>A little more presence. A little more human.</h1>
+<p>Three photo treatments for the same hero. The full-bleed study scene is active in the application: no fade, no opacity reduction, covering the complete right half on desktop. The portraits are stock photographs illustrating the demo participants.</p>
+<nav aria-label="Compare hero designs">
+<button data-look="full-bleed" aria-pressed="true">01 · Full-bleed study scene</button>
+<button data-look="framed" aria-pressed="false">02 · Inset photo panel</button>
+<button data-look="human" aria-pressed="false">03 · Learning scene</button>
+<button data-look="full-bleed-dark" aria-pressed="false">Dark mode</button>
+<button data-look="mobile" aria-pressed="false">Mobile</button>
+</nav>
+<figure><figcaption id="description">Recommended: the full-bleed study scene gives the demo a clear photographic setting without competing faces behind the notes.</figcaption><a id="original" href="full-bleed.webp"><img id="preview" src="full-bleed.webp" alt="Kindling hero with an unfaded study photo filling the right half"></a></figure>
+<small>To switch the application treatment, change HERO_PHOTO_LOOK in src/components/marketing/hero.tsx. To restore the fluid avatar orbs, set USE_PHOTOGRAPHIC_PROFILES to false in lesson-signal.tsx. Photo sources are recorded in <a href="../marketing-image-sources.md">marketing-image-sources.md</a>.</small>
+</main>
+<script>
+const descriptions={"full-bleed":"Recommended: the full-bleed study scene gives the demo a clear photographic setting without competing faces behind the notes.",framed:"A large inset panel: a softer, contained composition, with the same unfaded photo.",human:"A full-height human learning scene: warmer and more personal, but the faces compete more with the floating lesson notes.","full-bleed-dark":"The full-bleed study scene in dark mode. The image retains its full colour; the foreground cards preserve contrast.",mobile:"On mobile, the photo fills the demo section below the headline. Portraits and notes remain legible without horizontal scrolling."};
+document.querySelectorAll('[data-look]').forEach(button=>button.addEventListener('click',()=>{const look=button.dataset.look;document.querySelectorAll('[data-look]').forEach(item=>item.setAttribute('aria-pressed',String(item===button)));document.getElementById('preview').src=look+'.webp';document.getElementById('preview').className=look==='mobile'?'mobile':'';document.getElementById('preview').alt=descriptions[look];document.getElementById('original').href=look+'.webp';document.getElementById('description').textContent=descriptions[look]}));
+</script>
+</html>

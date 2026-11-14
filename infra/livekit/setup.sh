@@ -112,6 +112,16 @@ docker compose restart livekit egress caddy >/dev/null
 sleep 5
 docker compose ps
 
+# Lets the CI deploy (deploy.sh) reuse this script without writing the API
+# secret into a build log; the values are unchanged on a re-run anyway.
+install -m 755 "$SRC_DIR/deploy.sh" /usr/local/bin/livekit-deploy
+
+if [ "${SETUP_QUIET:-0}" = "1" ]; then
+  echo
+  echo "LiveKit restarted. Keys are unchanged; they are in $INSTALL_DIR/.env."
+  exit 0
+fi
+
 cat <<DONE
 
 LiveKit is starting. Caddy needs a minute to obtain certificates.

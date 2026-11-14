@@ -44,6 +44,18 @@ Actions still on the old pattern:
 
 Needs a product decision first: is a subscription per student, per tutor, or per lesson block? That choice drives the schema.
 
+## Self-hosted LiveKit: what is not done yet
+
+The staging server works and has been load-tested with four simultaneous sessions, but it is not production-ready. Each of these is a real gap rather than polish.
+
+- **TURN over port 443 on a UDP-blocked network has never been tested.** This is the check that decides whether students on school networks can connect at all, and it is the main go/no-go for self-hosting. Do it before moving production.
+- **No one-hour soak test, and nothing beyond four sessions.** Per-job CPU looks flat over time, but memory growth, large screen-share files and upload time for a long lesson, and ten concurrent sessions, are untested. The harness used for the four-session test can be rerun for longer.
+- **No monitoring.** Nothing alerts if the server is down or if a recording stays `starting`/`active` for too long. An uptime check on `https://<livekit-domain>/` is the cheap first step.
+- **One server, no failover.** An outage means no calls until it is restarted or rebuilt. Take a snapshot after a known-good state, and rehearse the rollback to LiveKit Cloud.
+- **`setup.sh` restarts every service even when only one changed**, so a small config change still drops calls. Restarting only what changed would let more deploys be harmless.
+- **Dependabot does not watch `infra/livekit/docker-compose.yaml`.** Image versions are pinned by hand, with a rule that Egress stays at or above v1.15.0. Adding the `docker-compose` ecosystem would raise upgrade pull requests; version coupling between LiveKit and Egress means they need reviewing together.
+- **Production does not exist yet.** Server, domains, deploy key and the `PRODUCTION_LIVEKIT_*` settings are all still to create; steps are in the infra README.
+
 ## Application test coverage
 
 Database authorisation is covered by `supabase/tests/`. Nothing tests routing, cookies, or the Server Actions above. Designed in [testing-plan.md](testing-plan.md), not implemented.

@@ -28,16 +28,17 @@ Both environments release through the pipeline. A merge to `main` applies migrat
 | `main` | Protected: pull requests required, both CI checks required, admins included, no force pushes |
 | Staging app | `tutors-dev` at https://tutors-dev.vercel.app — deploys automatically on merge to `main` |
 | Production app | `tutors` at https://tutors-livid.vercel.app — released by manual dispatch, tagged `production-<date>-<run>` |
-| tutors_dev database | Reconciled, baseline `20260924143844`, all 12 migrations applied |
-| Production database | History matches the repository; `PRODUCTION_MIGRATIONS_BASELINED` deliberately still unset |
-| Secrets / variables | All four secrets and ten variables set at repository level |
+| tutors_dev database | Reconciled, baseline `20260924143844`; every migration in the repository is applied by the staging deploy |
+| Production database | Baselined (`PRODUCTION_MIGRATIONS_BASELINED=true`). Last released 2026-09-26 as `production-20260926-3`, so it is **behind `main`**: later migrations and the changes below have not been released |
+| Secrets / variables | Five secrets and sixteen variables set at repository level (the LiveKit deploy settings are the newest; see [Self-hosted LiveKit](#self-hosted-livekit)) |
 | Stripe | `acct_1UJIY5LiD2YF2ndY` ("New business"), **test mode only** — both projects use it, with a separate webhook secret each |
-| LiveKit | One project, `kindling`, shared by every environment — see the go-live checklist |
+| LiveKit | **Staging:** self-hosted on a Hetzner server (`livekit-staging.hybridtutors.co.uk`), set up from `infra/livekit/`. **Production:** still on the LiveKit Cloud project `kindling`, until its own server exists |
+| Recording storage | Cloudflare R2, one bucket per environment (`R2_*` variables, set in both Vercel projects). Production's bucket still needs a CORS rule for `https://tutors-livid.vercel.app` confirmed before a release, or playback is silent |
 
 Two things are configured deliberately and should not be "fixed":
 
 - **`tutors-dev` has no Git connection.** Deployments come from GitHub Actions, and `vercel.ts` disables Git deployment of `main` anyway, so connecting it would only add duplicate preview builds needing their own variables.
-- **`PRODUCTION_MIGRATIONS_BASELINED` is unset**, so production releases fail closed. Setting it is the deliberate act of confirming production's history — see the production release steps.
+- **The `*_MIGRATIONS_BASELINED` flags fail closed.** A release refuses to run unless its environment's flag is `true`. Setting it is the deliberate act of confirming that database's history, so do not set it for a new environment without checking.
 
 Local `.env.local` points at tutors_dev. Never copy its values into production. The project uses imperative SQL migrations under `supabase/migrations/`; there is no declarative `supabase/schemas/` workflow.
 
@@ -61,7 +62,7 @@ The method generalises: dump both schemas and diff them, fix only what is genuin
 4. Assign a stable domain to the staging project, such as `staging.<your-domain>`. The project's stable `.vercel.app` domain can be used if you do not have a custom domain. Configure tutors_dev Auth redirect/site URLs to allow this staging domain.
 5. For migration-before-deploy ordering, GitHub Actions applies staging migrations and then deploys to the staging project's production slot with Vercel CLI (`vercel deploy --prod --project <staging-project-id>`). Automatic Git deployment of `main` is already disabled in `vercel.ts` for every project built from this repository, so Vercel cannot race ahead of migration jobs; confirm the dashboard agrees. Keep PR checks and ephemeral previews separate; if enabled, their Preview variables must never point to production.
 6. Keep the production project's variables scoped to Production. The staging project should have its own copies of every required variable, populated with tutors_dev, staging LiveKit, Stripe test-mode, and staging Storage values.
-7. Use separate LiveKit credentials/webhooks and Stripe test-mode credentials for staging. Point the staging LiveKit webhook at the stable staging domain. Never put server secrets in `NEXT_PUBLIC_*` variables.
+7. Use separate LiveKit credentials/webhooks and Stripe test-mode credentials for staging. A self-hosted LiveKit server carries its own webhook URL (written by `setup.sh` from `WEBHOOK_URL`), so there is nothing to configure in a dashboard; point it at the stable staging domain. `NEXT_PUBLIC_LIVEKIT_URL` is baked into the build, so changing it needs a redeploy. Never put server secrets in `NEXT_PUBLIC_*` variables.
 
 See [Vercel projects](https://vercel.com/docs/projects), [Git deployments and production branches](https://vercel.com/docs/git), and [deploying from the CLI](https://vercel.com/docs/projects/deploy-from-cli).
 
@@ -93,6 +94,7 @@ Variables — non-sensitive configuration, visible in the UI:
 | `PRODUCTION_SUPABASE_BASELINE_VERSION` / `STAGING_SUPABASE_BASELINE_VERSION` | Last migration verified as already present in that database |
 | `PRODUCTION_MIGRATIONS_BASELINED` / `STAGING_MIGRATIONS_BASELINED` | Must be `true` before that environment will deploy |
 | `PRODUCTION_URL` / `STAGING_URL` | Optional stable domain for the post-deploy smoke check |
+| `PRODUCTION_LIVEKIT_*` / `STAGING_LIVEKIT_*` | `DEPLOY_HOST`, `HOST_KEY`, `DOMAIN`, `TURN_DOMAIN` for the self-hosted LiveKit server, used only by the manual **Deploy LiveKit** workflow. The matching `*_LIVEKIT_DEPLOY_KEY` is a secret. See `infra/livekit/README.md`, "Updating the server" |
 
 Set them with the CLI rather than pasting into a browser:
 
@@ -140,12 +142,12 @@ On merge to `main`:
 
 1. Re-run the full CI suite against the commit being released.
 2. Confirm the baseline flags and required credentials before touching tutors_dev.
-4. Run a migration dry-run against tutors_dev and stop if unexpected migrations appear.
-5. Apply only pending migrations to tutors_dev.
-6. Report any remaining schema drift (`supabase db diff --linked`) as a warning — at that point migrations are applied, so a diff means something changed tutors_dev outside this pipeline. tutors_dev has taken direct SQL fixes before, so expect this to fire until it is reconciled.
-7. Deploy the app to the `tutors-dev` Vercel project's Production slot using that project's ID. Its stable domain tracks the latest successful staging deployment.
-8. Poll `/api/health` on the new deployment to confirm it boots with staging variables and can reach tutors_dev.
-9. Run staging smoke tests by hand: sign-in, create/reschedule/cancel a session, join/leave, recording and transcript playback, DM upload, and invoice workflow as applicable.
+3. Run a migration dry-run against tutors_dev and stop if unexpected migrations appear.
+4. Apply only pending migrations to tutors_dev.
+5. Report any remaining schema drift (`supabase db diff --linked`) as a warning — at that point migrations are applied, so a diff means something changed tutors_dev outside this pipeline. tutors_dev has taken direct SQL fixes before, so expect this to fire until it is reconciled.
+6. Deploy the app to the `tutors-dev` Vercel project's Production slot using that project's ID. Its stable domain tracks the latest successful staging deployment.
+7. Poll `/api/health` on the new deployment to confirm it boots with staging variables and can reach tutors_dev.
+8. Run staging smoke tests by hand: sign-in, create/reschedule/cancel a session, join/leave, recording and transcript playback, DM upload, and invoice workflow as applicable.
 
 The staging app must use only tutors_dev and staging service integrations.
 
@@ -166,7 +168,7 @@ On an approved promotion to `main`:
 
 If the migration fails, stop the workflow before deploying the app. Prefer a forward fix for production data/schema changes; only use a rollback when it is known to be safe and tested. When a step fails *after* migrations were applied, the job says so explicitly and prints the `vercel rollback` command, because at that point the database is ahead of the running app.
 
-The repository workflows are in `.github/workflows/ci.yml`, `staging.yml`, and `production.yml`; dependency updates are configured in `.github/dependabot.yml`. The migration-history guard is `scripts/ci/verify-supabase-migration-history.mjs` and the post-deploy check is `scripts/ci/smoke-check-deployment.sh`, which polls the `/api/health` route handler. PR CI runs app lint, Next.js route type generation/typecheck/build, a clean local Supabase migration reset, a schema lint, and the pgTAP RLS suite. Each deployment workflow refuses to run until its own `*_MIGRATIONS_BASELINED` variable is `true`. Production additionally requires a manual run with a typed confirmation.
+The repository workflows are in `.github/workflows/ci.yml`, `staging.yml`, `production.yml` and `deploy-livekit.yml` (the last updates the video server, not the app; see [Self-hosted LiveKit](#self-hosted-livekit)); dependency updates are configured in `.github/dependabot.yml`. The migration-history guard is `scripts/ci/verify-supabase-migration-history.mjs` and the post-deploy check is `scripts/ci/smoke-check-deployment.sh`, which polls the `/api/health` route handler. PR CI runs app lint, Next.js route type generation/typecheck/build, a clean local Supabase migration reset, a schema lint, and the pgTAP RLS suite. Each deployment workflow refuses to run until its own `*_MIGRATIONS_BASELINED` variable is `true`. Production additionally requires a manual run with a typed confirmation.
 
 The migration-history guard refuses to deploy when the remote history is empty, the baseline is unset or absent from either side, a remote version is unknown to the checkout, a remote version is recorded twice, a repository migration at or before the baseline is missing remotely, a pending migration is stamped before the remote head (which `db push` would reject anyway), or any version is not a 14-digit timestamp — the last because every ordering comparison above depends on uniform version length.
 
@@ -176,10 +178,26 @@ Supabase's migration workflow tracks files in Git separately from each database'
 
 ## Transcription deployment requirements
 
-Session transcription runs inside the Next.js app (see [transcription.md](transcription.md)); there is no separate agent service to release. Two things are **not** carried by a deploy and must be set per environment before transcription works:
+Session transcription runs inside the Next.js app (see [transcription.md](transcription.md)); there is no separate agent service to release. Three things are **not** carried by a deploy and must be set per environment before recording and transcription work:
 
 1. `DEEPGRAM_API_KEY` in that environment's Vercel project. Use a separate key for staging.
-2. A LiveKit webhook pointed at `/api/webhooks/livekit`, signed with the same API key pair that environment's Vercel env holds. LiveKit has no per-event subscription — a webhook is a URL and a signing key, and every event type is delivered — so `track_published` needs no enabling. It was already arriving and being ignored. A signing key that does not match the environment's `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` fails signature verification and breaks recording and transcription together.
+2. A private Cloudflare R2 bucket for that environment, an API token scoped to it, a CORS rule allowing `GET` from the app's origin, and `R2_ENDPOINT`, `R2_BUCKET`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` in its Vercel project. The audio player loads recordings with `crossOrigin="anonymous"`; without the CORS rule the browser plays silence.
+3. A LiveKit webhook pointed at `/api/webhooks/livekit`, signed with the same API key pair that environment's Vercel env holds. On the self-hosted server this is the `WEBHOOK_URL` given to `setup.sh`; on LiveKit Cloud it is set in the dashboard. LiveKit has no per-event subscription — a webhook is a URL and a signing key, and every event type is delivered — so `track_published` needs no enabling. It was already arriving and being ignored. A signing key that does not match the environment's `LIVEKIT_API_KEY`/`LIVEKIT_API_SECRET` fails signature verification and breaks recording and transcription together.
+
+## Self-hosted LiveKit
+
+Each environment runs its own LiveKit server on Hetzner (LiveKit, Egress, Redis and Caddy in Docker), described in [infra/livekit/README.md](../infra/livekit/README.md). The application needs no code change to use it: `NEXT_PUBLIC_LIVEKIT_URL`, `LIVEKIT_API_KEY` and `LIVEKIT_API_SECRET` simply point at the server.
+
+The server is updated by the manual **Deploy LiveKit** workflow (`deploy-livekit.yml`), never automatically, because installing a configuration restarts LiveKit and drops every call in progress. It refuses to run while anyone is connected unless `force` is ticked, and a production run needs `main` and the typed word `deploy`.
+
+| Name | Kind | Purpose |
+| --- | --- | --- |
+| `STAGING_LIVEKIT_DEPLOY_KEY` / `PRODUCTION_LIVEKIT_DEPLOY_KEY` | secret | SSH key that can run one script on the server and nothing else |
+| `*_LIVEKIT_DEPLOY_HOST` | variable | The server's DNS name |
+| `*_LIVEKIT_HOST_KEY` | variable | Its `ssh-keyscan` line, pinning the server's identity. Update it if the server is rebuilt |
+| `*_LIVEKIT_DOMAIN` / `*_LIVEKIT_TURN_DOMAIN` | variables | The two names, for the health check that ends the run |
+
+The prefixes work as for the app pipelines: the staging job only reads `STAGING_*`. Setting up a new server, the sizing measured so far, and the Egress cost settings that stop recordings being refused are in the infra README.
 
 `LIVEKIT_AGENT_NAME` is no longer read by anything and can be removed from both environments.
 
@@ -222,12 +240,14 @@ The failure this guards against is quiet: production running test keys accepts i
 
 ### LiveKit
 
-Each environment is meant to run its own self-hosted LiveKit server, set up from `infra/livekit/` (see its README for the step-by-step, rollback and upgrade notes). Until an environment has been moved, it still uses the LiveKit Cloud project `kindling`, which currently serves local development, staging and production.
+Staging has its own self-hosted server and API key, so staging credentials can no longer join a production lesson. Production still uses the LiveKit Cloud project `kindling`.
 
-- [ ] Create a second LiveKit project so production has its own credentials.
-- [ ] Point each environment's `LIVEKIT_API_KEY` / `LIVEKIT_API_SECRET` / `NEXT_PUBLIC_LIVEKIT_URL` at its own project, and give each its own webhook pointing at that environment's `/api/webhooks/livekit`.
+- [x] Staging on its own server, local development pointed at it, and the staging webhook set on that server.
+- [ ] Stand up the production server from `infra/livekit/` (own names, own key, `WEBHOOK_URL` for `tutors-livid.vercel.app`), choosing a size from the infra README's capacity section, then set the `PRODUCTION_LIVEKIT_*` deploy settings and move the production Vercel variables over.
+- [ ] Test it with real students' networks first: **TURN over port 443 on a UDP-blocked network** is the check that decides whether self-hosting is viable for schools, and has not been run yet.
+- [ ] Add monitoring: an uptime check on the server and an alert for recordings stuck in `starting`/`active`.
 
-A LiveKit API key can mint an access token for **any room in its project**. While one project serves both, anyone holding staging's credentials can join a live production lesson between a tutor and a child. That is the most serious outstanding gap, and it is about ten minutes of work.
+A LiveKit API key can mint an access token for **any room on its server**. Never let two environments share one.
 
 ### Supabase Auth
 
@@ -254,9 +274,10 @@ These are deliberate and unresolved, not oversights. Read them before trusting a
 
 - **No application test suite.** There is no app `test` script, so nothing asserts UI or route-handler behaviour. Database authorisation *is* covered (see below), but the Next.js layer is not.
 - **The smoke check proves reachability, not correctness.** It confirms the build boots with real variables and can reach its database. If Vercel Deployment Protection intercepts the request with HTTP 401/403, the check fails. Set `PRODUCTION_URL`/`STAGING_URL` to a reachable stable domain or add an authenticated protection bypass.
-- **Staging shares one LiveKit project with production.** `kindling` serves both, so they share API keys, and a key that can mint tokens for any room in that project can join a live lesson. Splitting it into a second project is the largest outstanding isolation gap.
+- **Production video is still on LiveKit Cloud**, so it has none of the self-hosting work (own server, capacity testing, monitoring). Staging is done; the UDP-blocked-network test and a one-hour soak test have not been run.
+- **The LiveKit server is a single machine per environment.** No failover; a server outage means no calls until it is restarted or rebuilt. Rehearse the rollback (point the Vercel variables back at Cloud and redeploy) before relying on it.
 - **`STRIPE_WEBHOOK_SECRET` is not set on `tutors-dev`**, so Stripe webhooks fail on staging until a test-mode endpoint is created for the staging domain.
-- **Production has never been deployed by this pipeline.** Its first release applies every pending migration and puts `/api/health` live for the first time; until then that endpoint 404s there.
+- **Production is behind `main`.** It was last released on 2026-09-26. The next release applies every migration since and switches recording storage from Supabase Storage to R2 (its `R2_*` variables are already set; the bucket's CORS rule is the thing to confirm). Recordings made before the switch stay in Supabase Storage and will not play afterwards, which is acceptable only while there are no real recordings to keep.
 - **`supabase db diff --linked` reports drift after the push, not before.** Before the push it would flag every pending migration as a difference. This means out-of-band schema edits are surfaced in the release log rather than blocking the release.
 
 ## Database authorisation tests
@@ -270,7 +291,7 @@ RLS is this app's security boundary, so it is tested with pgTAP under `supabase/
 | `00-rls-coverage.test.sql` | Structural guard: every table in `public` has RLS enabled and at least one policy; the security-definer helpers stay out of `public`; `anon` cannot reach the `private` schema |
 | `01-bookings-rls.test.sql` | Lesson visibility for student, tutor, linked parent, admin, outsider and anonymous callers; booking in someone else's name; updating someone else's lesson |
 | `02-direct-messages-rls.test.sql` | Conversation scoping for reads; posting into a conversation you are not in; forging another person's `sender_id` |
-| `03-session-recordings-rls.test.sql` | Recording metadata and the private `session-recordings` object for participants, linked parent and outsiders; attachment uploads confined to `<conversation_id>/<uploader_id>/` |
+| `03-session-recordings-rls.test.sql` | Recording metadata for participants, linked parent and outsiders (and the legacy Supabase `session-recordings` object policy, which nothing writes to now that recordings live in R2); attachment uploads confined to `<conversation_id>/<uploader_id>/` |
 
 Each test authenticates by setting `role` to `authenticated` and `request.jwt.claims` to the user being impersonated, which is what `auth.uid()` reads — the same path a real PostgREST request takes. Fixtures are created as the table owner, which bypasses RLS deliberately; a test that needs to create fixtures after impersonating someone resets with `pg_temp.act_as_owner()` first.
 
@@ -285,7 +306,7 @@ npm run test:db
 
 Two notes on running them locally:
 
-- **Some suites create storage buckets themselves.** Migrations do not create `session-recordings` or `message-attachments`; those are provisioned per environment by hand, so the storage tests insert them into `storage.buckets` as fixtures.
+- **Some suites create storage buckets themselves.** Migrations do not create `session-recordings` or `message-attachments`; the second is provisioned per environment by hand, so the storage tests insert both into `storage.buckets` as fixtures. (Recording files themselves are in Cloudflare R2.)
 - **On macOS the Supabase CLI may fail to pull `pg_prove`** with `docker-credential-desktop: executable file not found in $PATH`. Docker Desktop installs that helper outside the default PATH; prefix the command with it:
 
   ```bash
@@ -300,8 +321,8 @@ Verifying the tests can actually fail is part of maintaining them. Weakening a p
 
 Database migrations can create SQL-managed schema objects, tables, indexes, functions, grants, and RLS policies. They do not automatically provision or copy all external resources. Maintain separate, documented setup for:
 
-- private Storage buckets and their S3 credentials;
-- LiveKit projects, webhook URLs, and the signing key pair those webhooks are verified against;
+- the private Supabase Storage bucket for message attachments, and the Cloudflare R2 recording bucket with its CORS rule and API token;
+- LiveKit servers (or projects), their webhook URLs, and the signing key pair those webhooks are verified against;
 - Vercel project setup, environment variables, domains, and Git integration settings;
 - Stripe accounts, mode-specific keys, and webhooks;
 - Auth email provider settings, redirect URLs, and SMTP;
@@ -331,13 +352,13 @@ Codex should not guess credentials, expose secret values, reset a remote databas
 
 ## What is left
 
-Staging is done. These remain before production can be released:
+Staging is done. These remain before the next production release:
 
-1. **Create a second LiveKit project** for production, move its URL, key and secret into the production Vercel project, and point each project's webhook at its own `/api/webhooks/livekit`. Until then staging and production share credentials that control live video rooms.
-2. **Add `STRIPE_WEBHOOK_SECRET` to `tutors-dev`** from a Stripe test-mode endpoint for the staging domain.
-3. **Re-check production's migration history** against the repository, then set `PRODUCTION_MIGRATIONS_BASELINED=true`. Its observed baseline is `20260924184118`; confirm it rather than trusting that number.
-4. **Confirm a production backup exists** before a release that applies migrations.
-5. **Release manually**: `gh workflow run "Deploy production" --ref main -f confirm=deploy`. Exercise it on a small additive migration before relying on it for a risky one.
+1. **Confirm production's R2 bucket allows `GET` from `https://tutors-livid.vercel.app`** (CORS). Its four `R2_*` variables are already set on the `tutors` project; without the CORS rule the audio player is silent.
+2. **Decide the production video server.** Either release against LiveKit Cloud as it stands, or stand up the production server first (see the LiveKit checklist above). The latter is what removes the monthly Cloud bill.
+3. **Add `STRIPE_WEBHOOK_SECRET` to `tutors-dev`** from a Stripe test-mode endpoint for the staging domain.
+4. **Confirm a production backup exists** before a release that applies migrations. Several are pending since the last release.
+5. **Release manually**: `gh workflow run "Deploy production" --ref main -f confirm=deploy`, and read the printed migration plan before letting it proceed.
 
 Worth considering rather than required:
 
