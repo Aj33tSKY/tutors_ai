@@ -104,6 +104,47 @@
       "required": true,
       "secret": true,
       "purpose": "Bearer token Vercel Cron presents to the cron routes. Must differ per environment."
+    },
+    {
+      "name": "APP_WEB_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Exact trusted frontend origin for API CORS, CSRF and authentication redirects.",
+      "requiredIn": [
+        "api"
+      ]
+    },
+    {
+      "name": "APP_COMMIT_SHA",
+      "required": false,
+      "secret": false,
+      "purpose": "Immutable commit identifier reported by the container health endpoint.",
+      "requiredIn": []
+    },
+    {
+      "name": "APP_JOBS_DATABASE_URL",
+      "required": false,
+      "secret": true,
+      "purpose": "Restricted private job-runtime role; direct or session PostgreSQL connection.",
+      "requiredIn": [
+        "worker"
+      ]
+    },
+    {
+      "name": "APP_JOBS_MIGRATION_DATABASE_URL",
+      "required": false,
+      "secret": true,
+      "purpose": "Job schema owner connection used only by the explicit release migration command.",
+      "requiredIn": [
+        "jobs-migration"
+      ]
+    },
+    {
+      "name": "VITE_API_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Browser-safe API origin; omit only for a tested same-origin proxy.",
+      "requiredIn": []
     }
   ]
 }

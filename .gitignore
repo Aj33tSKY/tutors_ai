@@ -33,6 +33,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 !.env.example
+!.env.portable.example
 
 # vercel
 .vercel
@@ -43,3 +44,9 @@ next-env.d.ts
 
 # Supabase CLI cache
 supabase/.temp/
+
+# Portable runtime build outputs
+/dist/
+apps/*/dist/
+apps/*/.wrangler/
+node_modules/

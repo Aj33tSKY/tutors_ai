@@ -8,7 +8,7 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join, extname } from "node:path";
 
 const MANIFEST = "config/required-env.json";
-const SOURCE_DIR = "src";
+const SOURCE_DIRS = ["src", "apps", "packages"];
 const CODE_EXTENSIONS = new Set([".ts", ".tsx", ".mts", ".cts", ".js", ".jsx", ".mjs"]);
 
 // Supplied by the platform or the framework, so they are never configured by hand.
@@ -31,6 +31,7 @@ function sourceFiles(dir) {
   const found = [];
   for (const entry of readdirSync(dir)) {
     const path = join(dir, entry);
+    if (["node_modules", "dist", ".wrangler"].includes(entry)) continue;
     if (statSync(path).isDirectory()) found.push(...sourceFiles(path));
     else if (CODE_EXTENSIONS.has(extname(entry))) found.push(path);
   }
@@ -38,9 +39,9 @@ function sourceFiles(dir) {
 }
 
 const used = new Map();
-for (const file of sourceFiles(SOURCE_DIR)) {
+for (const file of SOURCE_DIRS.flatMap(sourceFiles).concat(["scripts/migration/migrate-jobs.ts"])) {
   const contents = readFileSync(file, "utf8");
-  for (const match of contents.matchAll(/process\.env\.([A-Z_][A-Z0-9_]*)/g)) {
+  for (const match of contents.matchAll(/(?:process\.env|import\.meta\.env)\.([A-Z_][A-Z0-9_]*)/g)) {
     const name = match[1];
     if (PROVIDED_BY_PLATFORM.has(name)) continue;
     if (!used.has(name)) used.set(name, new Set());
@@ -62,7 +63,7 @@ for (const [name, files] of [...used].sort()) {
 for (const [name] of [...declared].sort()) {
   if (!used.has(name)) {
     problems.push(
-      `${name} is declared in ${MANIFEST} but nothing under ${SOURCE_DIR}/ reads it. ` +
+      `${name} is declared in ${MANIFEST} but nothing under ${SOURCE_DIRS.join(", ")}/ reads it. ` +
         `Remove it, or the manifest overstates what the app needs.`,
     );
   }
@@ -78,6 +79,10 @@ for (const variable of manifest.variables) {
   if (typeof variable.purpose === "string" && variable.purpose.trim().length < 10) {
     problems.push(`${variable.name} needs a real purpose, not "${variable.purpose}".`);
   }
+  if (variable.requiredIn !== undefined && (!Array.isArray(variable.requiredIn) ||
+      variable.requiredIn.some((runtime) => !["api", "worker", "jobs-migration"].includes(runtime)))) {
+    problems.push(`${variable.name} has invalid requiredIn runtime names.`);
+  }
 }
 
 if (problems.length > 0) {
@@ -88,5 +93,5 @@ if (problems.length > 0) {
 const required = manifest.variables.filter((v) => v.required).length;
 console.log(
   `Manifest matches the code: ${declared.size} variables declared (${required} required), ` +
-    `${used.size} read under ${SOURCE_DIR}/.`,
+    `${used.size} read under ${SOURCE_DIRS.join(", ")}/.`,
 );
