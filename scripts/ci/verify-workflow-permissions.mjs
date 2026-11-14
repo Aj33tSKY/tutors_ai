@@ -6,7 +6,7 @@
 // actionlint does not check this, so this does.
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import yaml from "js-yaml";
+import * as yaml from "js-yaml";
 
 const WORKFLOW_DIR = join(process.cwd(), ".github", "workflows");
 const LEVELS = { none: 0, read: 1, write: 2 };
