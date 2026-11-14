@@ -1,0 +1,13 @@
+{
+  "name": "@tutors/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "hono": "4.13.18",
+    "@hono/node-server": "2.1.8",
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.119.0",
+    "zod": "4.6.7"
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "tutors-web-staging",
+  "compatibility_date": "2026-11-14",
+  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" },
+  "env": { "production": { "name": "tutors-web", "assets": { "directory": "./dist", "not_found_handling": "single-page-application" } } }
+}

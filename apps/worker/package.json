@@ -1,0 +1,9 @@
+{
+  "name": "@tutors/worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "pg-boss": "12.38.2"
+  }
+}

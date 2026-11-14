@@ -1,0 +1,40 @@
+services:
+  api:
+    build:
+      context: ../..
+      dockerfile: infra/app/Dockerfile
+    environment:
+      PORT: "3001"
+      APP_WEB_ORIGIN: ${APP_WEB_ORIGIN:?Set the exact frontend origin}
+      APP_COMMIT_SHA: ${APP_COMMIT_SHA:-local}
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:?Set the development Supabase URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:?Set the public Supabase key}
+    ports: ["127.0.0.1:3001:3001"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 10s
+      retries: 3
+    stop_grace_period: 35s
+  worker:
+    build:
+      context: ../..
+      dockerfile: infra/app/Dockerfile
+    command: ["node", "dist/worker.mjs"]
+    environment:
+      PORT: "3002"
+      APP_JOBS_DATABASE_URL: ${APP_JOBS_DATABASE_URL:?Set the restricted runtime database URL}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3002').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    stop_grace_period: 35s
+  migrate-jobs:
+    profiles: ["release"]
+    build:
+      context: ../..
+      dockerfile: infra/app/Dockerfile
+    command: ["node", "dist/migrate-jobs.mjs"]
+    environment:
+      APP_JOBS_MIGRATION_DATABASE_URL: ${APP_JOBS_MIGRATION_DATABASE_URL:-}
