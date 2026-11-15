@@ -4,7 +4,7 @@
   "main": "src/worker.ts",
   "compatibility_date": "2026-11-14",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": { "directory": "../web/dist", "binding": "ASSETS", "not_found_handling": "none", "run_worker_first": ["/v1/*", "/health/*"] },
+  "assets": { "directory": "./.assets", "binding": "ASSETS", "not_found_handling": "none", "run_worker_first": ["/v1/*", "/health/*"] },
   "workers_dev": false,
   "routes": [{ "pattern": "cf-staging.hybridtutors.co.uk", "custom_domain": true }],
   "observability": { "enabled": true }

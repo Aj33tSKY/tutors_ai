@@ -24,11 +24,34 @@ candidate in the hosting bake-off against Google Cloud Run. Code: `apps/edge/`. 
 - Time to first byte, 25 requests, from a London client (Worker vs the Oracle staging VPS): `/health/ready` p50 108 vs 105 ms,
   `/v1/public/tutors` p50 102 vs 89 ms, `/` (static) p50 65 vs 35 ms. Roughly equal for API calls; static is slower on the Worker in this sample.
 
+## Round 2 (authenticated, streaming, headers, load)
+
+Test account: a pre-confirmed staging student created with the Supabase admin API (generated password kept in
+`~/.tutors-backups/cf-test/`, not in the repo). Delete it when the bake-off ends.
+
+- **Authenticated flows work on the Worker**: sign-in, HttpOnly session cookie, `/v1/auth/me`, `/v1/calendar`, `/v1/contacts`,
+  `/v1/student/chat/conversations`, `/v1/student/billing`. Latency within about 10-15% of the VPS (medians 90-124 ms vs 79-126 ms).
+- **CPU on real Cloudflare for those routes** (24 sampled requests): median 5-6 ms, sign-in 10 ms, max 21 ms; 4% were over the Free
+  plan's 10 ms and none failed. Borderline on Free, comfortable on Paid.
+- **Streaming**: a 20-chunk SSE stream arrived incrementally (about 251 ms gaps) and cost 6 ms CPU for 5 s wall time. A client disconnect
+  is observable: the request is reported `canceled` and the stream's `cancel()` runs, so the chat allowance can be settled on disconnect.
+- **Postgres over TCP on real Cloudflare**: 190 ms including connect.
+- **Headers**: static files are served without running the Worker, so they need `apps/edge/_headers` (built into `.assets/` by
+  `npm run build:edge-assets`). With it, static files, hashed assets (immutable), the SPA fallback and real 404s match the Caddy server.
+- **Load** (10 concurrent clients, 20 s, one machine, London): no errors on either host.
+
+  | Route | Worker rps / p50 / p95 / p99 | Oracle VPS rps / p50 / p95 / p99 |
+  | --- | --- | --- |
+  | `/health/ready` | 194 / 43 / 83 / 284 ms | 130 / 68 / 127 / 191 ms |
+  | `/v1/public/tutors` | 200 / 42 / 73 / 266 ms | 222 / 41 / 65 / 94 ms |
+  | `/v1/auth/me` (signed in) | 130 / 70 / 105 / 298 ms | 121 / 76 / 131 / 189 ms |
+
+  Worker medians and p95 are equal or better; its p99 is worse (about 270-300 ms vs 94-190 ms). One client machine may limit these rps figures.
+
 ## Not yet tested (must be before any decision)
-- Streaming chat (SSE) end to end, including a client disconnecting mid-stream.
-- CPU time per request on real Cloudflare (Free plan: 10 ms). Local runs do not enforce it.
+- Real chat against a model (needs an OpenAI key); the streaming mechanics above are proven with a synthetic stream.
+- Heavier routes (booking, lesson tokens, uploads) for CPU time, and a larger CPU sample than the 24 requests the tail log kept.
 - The black-box test suite against a deployed Worker (the current integration suite injects fakes in-process).
-- Security headers on static responses: the Caddy set (HSTS, frame, referrer, permissions policy) needs an assets `_headers` file.
 - Hyperdrive versus direct pooler connections, request and query limits under load.
 - Cost and latency from the UK, cold starts, deploy, rollback and secrets handling.
 
