@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
-import { getStripe } from "@/lib/stripe";
-import { subjectLabel } from "@/lib/subjects";
-import type { Booking, Profile, TutorProfile } from "@/lib/types";
+import { schedulingError } from "../../../packages/domain/src/calendar";
+import { AppError } from "../../../packages/domain/src/errors";
+import { legacyBilling, legacyBillingContext, legacyOutcome } from "@/lib/billing-adapter";
+import { sendLessonInvoice } from "../../../packages/domain/src/billing";
 
 const LessonNameSchema = z.string().trim().max(120);
 const SessionDetailsSchema = z.object({
@@ -72,39 +72,7 @@ export async function updateSessionDetailsAction(
   if (Number.isNaN(start.getTime()) || start.getMinutes() % 15 !== 0 || start.getSeconds() !== 0) return { error: "Choose a 15-minute start time." };
   if (start <= new Date()) return { error: "Choose a future date and time." };
 
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in again before saving." };
-  const { data: booking } = await supabase
-    .from("bookings")
-    .select("id, tutor_id, status, started_at, start_time, end_time")
-    .eq("id", parsed.data.bookingId)
-    .maybeSingle();
-  if (!booking || booking.tutor_id !== user.id) return { error: "Only the tutor can edit this session." };
-  if (booking.status !== "scheduled") return { error: "Completed sessions can’t be rescheduled." };
-  const duration = new Date(booking.end_time).getTime() - new Date(booking.start_time).getTime();
-  const end = new Date(start.getTime() + duration);
-  const { data: conflict } = await supabase
-    .from("bookings")
-    .select("id")
-    .eq("tutor_id", user.id)
-    .eq("status", "scheduled")
-    .neq("id", booking.id)
-    .lt("start_time", end.toISOString())
-    .gt("end_time", start.toISOString())
-    .limit(1)
-    .maybeSingle();
-  if (conflict) return { error: "That time overlaps with another session." };
-  const { data, error } = await supabase
-    .from("bookings")
-    .update({ lesson_name: parsed.data.lessonName, start_time: start.toISOString(), end_time: end.toISOString() })
-    .eq("id", booking.id)
-    .select("id")
-    .maybeSingle();
-  if (error || !data) return { error: "We couldn’t save the session. Please try again." };
-  revalidatePath("/dashboard/tutor");
-  revalidatePath("/dashboard/student");
-  return { success: true };
+  return runTutorChange(parsed.data.bookingId, "reschedule", { lessonName: parsed.data.lessonName, startTime: start.toISOString() });
 }
 
 export type MarkSessionCompleteActionState = { error?: string; success?: boolean };
@@ -113,61 +81,16 @@ export async function markSessionCompleteAction(
   _previous: MarkSessionCompleteActionState,
   formData: FormData,
 ): Promise<MarkSessionCompleteActionState> {
-  const bookingId = z.string().uuid().safeParse(formData.get("booking_id"));
-  if (!bookingId.success) return { error: "We couldn’t identify that session." };
-
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in again before completing the session." };
-
-  // Tutors, rather than room disconnects, are the source of truth for when a
-  // lesson is over. Select first so a student cannot complete a booking by
-  // posting a guessed id to this Server Action.
-  const { data: booking } = await supabase
-    .from("bookings")
-    .select("id, tutor_id, status, started_at")
-    .eq("id", bookingId.data)
-    .maybeSingle();
-  if (!booking || booking.tutor_id !== user.id || booking.status !== "scheduled" || !booking.started_at) return { error: "Only a started tutor session can be marked complete." };
-
-  const { data, error } = await supabase.from("bookings").update({ status: "completed" }).eq("id", booking.id).select("id").maybeSingle();
-  if (error || !data) return { error: "We couldn’t complete the session. Please try again." };
-  revalidatePath("/dashboard/tutor");
-  revalidatePath("/dashboard/student");
-  return { success: true };
+  const id = z.uuid().safeParse(formData.get("booking_id"));
+  if (!id.success) return { error: "We couldn’t identify that session." };
+  return runTutorChange(id.data, "complete");
 }
 
 export async function markSessionUpcomingAction(formData: FormData) {
-  const bookingId = z.string().uuid().safeParse(formData.get("booking_id"));
-  if (!bookingId.success) return;
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return;
-  const { data: booking } = await supabase
-    .from("bookings")
-    .select("id, tutor_id, status")
-    .eq("id", bookingId.data)
-    .maybeSingle();
-  if (!booking || booking.tutor_id !== user.id || booking.status !== "completed") return;
-  const { data, error } = await supabase
-    .from("bookings")
-    .update({ status: "scheduled" })
-    .eq("id", booking.id)
-    .select("id")
-    .maybeSingle();
-  if (error || !data) return;
-  // Keep the original transcript and recording reference intact. If this is
-  // eventually completed again, discard only derived output so it is rebuilt
-  // from the stitched transcript rather than the first partial call.
-  const admin = createAdminClient();
-  await Promise.all([
-    admin.from("session_analytics").update({ summary_notes: null, talk_ratio: null, notes_markdown: null }).eq("booking_id", booking.id),
-    admin.from("session_embeddings").delete().eq("booking_id", booking.id),
-  ]);
-  revalidatePath("/dashboard/tutor");
-  revalidatePath("/dashboard/student");
+  const id = z.uuid().safeParse(formData.get("booking_id"));
+  if (!id.success) return;
+  const result = await runTutorChange(id.data, "reopen");
+  if (!result.success) return;
   redirect("/dashboard/tutor");
 }
 
@@ -178,46 +101,10 @@ export async function cancelSessionAction(
   _previous: CancelSessionActionState,
   formData: FormData,
 ): Promise<CancelSessionActionState> {
-  const bookingId = z.string().uuid().safeParse(formData.get("booking_id"));
-  const cancelSeries = formData.get("cancel_series") === "on";
-  if (!bookingId.success) return { error: "We couldn’t identify that session." };
-
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in again before cancelling." };
-  const { data: booking } = await supabase
-    .from("bookings")
-    .select("id, tutor_id, student_id, status, started_at, start_time, recurrence_rule, recurrence_series_id")
-    .eq("id", bookingId.data)
-    .maybeSingle();
-  if (!booking || booking.tutor_id !== user.id) return { error: "Only the tutor can cancel this session." };
-  if (booking.status !== "scheduled" || booking.started_at) return { error: "Only sessions that have not been started can be cancelled." };
-
-  let query = supabase
-    .from("bookings")
-    .update({ status: "cancelled" })
-    .eq("tutor_id", user.id)
-    .eq("status", "scheduled")
-    .is("started_at", null)
-    .select("id");
-  if (cancelSeries && booking.recurrence_rule) {
-    query = query
-      .eq("student_id", booking.student_id)
-      .gte("start_time", booking.start_time);
-    query = booking.recurrence_series_id
-      ? query.eq("recurrence_series_id", booking.recurrence_series_id)
-      : query.eq("recurrence_rule", booking.recurrence_rule);
-  } else {
-    query = query.eq("id", booking.id);
-  }
-  const { data, error } = await query;
-  if (error || !data?.length) return { error: "We couldn’t cancel that session. Please try again." };
-  revalidatePath("/dashboard/tutor");
-  revalidatePath("/dashboard/student");
-  return { success: true };
+  const id = z.uuid().safeParse(formData.get("booking_id"));
+  if (!id.success) return { error: "We couldn’t identify that session." };
+  return runTutorChange(id.data, "cancel", { series: formData.get("cancel_series") === "on" });
 }
-
-const PLATFORM_FEE_RATE = 0.15;
 
 export type SendSessionInvoiceActionState = { error?: string; success?: boolean };
 
@@ -227,69 +114,10 @@ export async function sendSessionInvoiceAction(
 ): Promise<SendSessionInvoiceActionState> {
   const bookingId = z.string().uuid().safeParse(formData.get("booking_id"));
   if (!bookingId.success) return { error: "We couldn’t identify that session." };
-  if (!process.env.STRIPE_SECRET_KEY) return { error: "Invoicing is not configured for this environment." };
-
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in again before sending an invoice." };
-
-  const { data: booking } = await supabase.from("bookings").select("*").eq("id", bookingId.data).maybeSingle<Booking>();
-  // Each condition gets its own message. Collapsing them into one silent return
-  // made a button that could never work look like a button that was broken.
-  if (!booking || booking.tutor_id !== user.id) return { error: "That session is not yours to invoice." };
-  if (booking.status !== "completed") return { error: "Mark the session complete before invoicing it." };
-  if (booking.is_trial) return { error: "This session was a free trial, so there is nothing to invoice." };
-  if (booking.stripe_invoice_id) return { error: "An invoice has already been sent for this session." };
-  if (!booking.amount_gbp_pence) {
-    return { error: "This session has no price recorded, so it cannot be invoiced. Set the tutor's hourly rate and rebook, or invoice the student directly." };
-  }
-  const [{ data: student }, { data: tutor }] = await Promise.all([
-    supabase.from("profiles").select("id, full_name, email, stripe_customer_id, auto_charge_enabled").eq("id", booking.student_id).maybeSingle<Pick<Profile, "id" | "full_name" | "email" | "stripe_customer_id" | "auto_charge_enabled">>(),
-    supabase.from("tutor_profiles").select("id, stripe_account_id").eq("id", booking.tutor_id).maybeSingle<Pick<TutorProfile, "id" | "stripe_account_id">>(),
-  ]);
-  if (!student) return { error: "We couldn’t find the student for this session." };
-  const stripe = getStripe();
-  let customerId = student.stripe_customer_id ?? null;
-  if (!customerId) {
-    const customer = await stripe.customers.create({ email: student.email, name: student.full_name, metadata: { supabase_user_id: student.id } });
-    customerId = customer.id;
-    await supabase.from("profiles").update({ stripe_customer_id: customerId }).eq("id", student.id);
-  }
-  let payoutReady = false;
-  if (tutor?.stripe_account_id) {
-    const account = await stripe.v2.core.accounts.retrieve(tutor.stripe_account_id, { include: ["configuration.recipient"] });
-    payoutReady = account.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers?.status === "active";
-  }
-  // Charge automatically only when the student opted in *and* Stripe still holds
-  // a default payment method for them. Trusting the flag alone would promise
-  // automatic payment and silently not collect.
-  let chargeAutomatically = false;
-  if (student.auto_charge_enabled) {
-    const customer = await stripe.customers.retrieve(customerId);
-    chargeAutomatically = Boolean(!customer.deleted && customer.invoice_settings?.default_payment_method);
-  }
-
-  const invoice = await stripe.invoices.create({
-    customer: customerId,
-    // send_invoice emails a link and waits. charge_automatically attempts the
-    // saved method as soon as the invoice finalizes, which needs auto_advance so
-    // Stripe progresses it rather than leaving it draft.
-    ...(chargeAutomatically
-      ? { collection_method: "charge_automatically" as const, auto_advance: true }
-      : { collection_method: "send_invoice" as const, days_until_due: 7, auto_advance: false }),
-    description: `${subjectLabel(booking.subject)} lesson`,
-    metadata: { booking_id: booking.id },
-    ...(payoutReady ? { transfer_data: { destination: tutor!.stripe_account_id! }, application_fee_amount: Math.round(booking.amount_gbp_pence * PLATFORM_FEE_RATE) } : {}),
-  });
-  await stripe.invoiceItems.create({ customer: customerId, invoice: invoice.id, currency: "gbp", amount: booking.amount_gbp_pence, description: `${subjectLabel(booking.subject)} lesson · ${new Date(booking.start_time).toLocaleDateString("en-GB")}`, metadata: { booking_id: booking.id } });
-  const finalized = await stripe.invoices.finalizeInvoice(invoice.id);
-  const sent = await stripe.invoices.sendInvoice(finalized.id);
-  const { error: saveError } = await supabase.from("bookings").update({ stripe_invoice_id: sent.id, stripe_invoice_url: sent.hosted_invoice_url, invoice_sent_at: new Date().toISOString(), payment_status: "pending" }).eq("id", booking.id);
-  if (saveError) {
-    // The invoice is already with the student, so do not imply it failed.
-    console.error(`Invoice ${sent.id} sent but not recorded on booking ${booking.id}:`, saveError.message);
-    return { error: "The invoice was sent, but we could not record it against this session. Refresh before sending another." };
-  }
+  const context = await legacyBillingContext();
+  if (!context) return { error: "Please sign in again before sending an invoice." };
+  const result = await legacyOutcome(() => sendLessonInvoice(context.client, context.identity, legacyBilling, bookingId.data));
+  if (!result.ok) return { error: result.code === "payments_unavailable" ? "Invoicing is not configured for this environment." : result.error };
   revalidatePath("/dashboard/tutor");
   revalidatePath("/dashboard/student");
   return { success: true };
@@ -341,5 +169,15 @@ export async function updateSessionNotesAction(
   if (error) return { error: "We couldn’t save your changes. Please try again." };
 
   revalidatePath(`/dashboard/student/bookings/${booking.id}`);
+  return { success: true };
+}
+
+async function runTutorChange(id: string, kind: string, input: Record<string, unknown> = {}): Promise<{ error?: string; success?: boolean }> {
+  const supabase = await createClient();
+  const result = await supabase.rpc("tutor_change_lesson_v1", { p_id: id, p_kind: kind, p_input: input });
+  try { schedulingError(result.error); }
+  catch (error) { if (error instanceof AppError) return { error: error.message }; throw error; }
+  revalidatePath("/dashboard/tutor");
+  revalidatePath("/dashboard/student");
   return { success: true };
 }

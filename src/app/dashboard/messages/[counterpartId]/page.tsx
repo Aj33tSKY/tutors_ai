@@ -6,9 +6,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import { DirectMessageThread, type DisplayMessage } from "@/components/dashboard/direct-message-thread";
 import { getCurrentProfile } from "@/lib/supabase/profile";
 import { createClient } from "@/lib/supabase/server";
-import type { Booking, DirectConversation, DirectMessage, Profile } from "@/lib/types";
+import type { Booking, DirectConversation, Profile } from "@/lib/types";
 
 const ATTACHMENTS_BUCKET = "message-attachments";
+const PAGE_SIZE = 50;
 
 export default async function DirectMessagesPage({
   params,
@@ -72,22 +73,21 @@ export default async function DirectMessagesPage({
   }
   if (conversationError || !conversation) return <MessagingUnavailable />;
 
-  const { data: messages } = await supabase
+  // Bounded history: the newest page only; older messages load on request.
+  const { data: newest } = await supabase
     .from("direct_messages")
-    .select("*")
+    .select("id,conversation_id,sender_id,body,attachment_path,attachment_name,attachment_type,created_at")
     .eq("conversation_id", conversation.id)
-    .order("created_at", { ascending: true })
-    .returns<DirectMessage[]>();
-
-  const initialMessages: DisplayMessage[] = await Promise.all(
-    (messages ?? []).map(async (message) => {
-      if (!message.attachment_path) return { ...message, attachmentUrl: null };
-      const { data } = await supabase.storage
-        .from(ATTACHMENTS_BUCKET)
-        .createSignedUrl(message.attachment_path, 60 * 60);
-      return { ...message, attachmentUrl: data?.signedUrl ?? null };
-    }),
-  );
+    .order("created_at", { ascending: false })
+    .limit(PAGE_SIZE + 1);
+  const rows = (newest ?? []).slice(0, PAGE_SIZE).reverse();
+  const paths = rows.flatMap((row) => (row.attachment_path ? [row.attachment_path] : []));
+  const urls = new Map<string, string>();
+  if (paths.length) {
+    const { data: signed } = await supabase.storage.from(ATTACHMENTS_BUCKET).createSignedUrls(paths, 60 * 60);
+    for (const item of signed ?? []) if (item.path && item.signedUrl) urls.set(item.path, item.signedUrl);
+  }
+  const initialMessages: DisplayMessage[] = rows.map(({ attachment_path, ...row }) => ({ ...row, attachmentUrl: attachment_path ? urls.get(attachment_path) ?? null : null }));
 
   const backHref = profile.role === "student" ? "/dashboard/student/tutors" : "/dashboard/tutor/students";
   return (
@@ -100,6 +100,7 @@ export default async function DirectMessagesPage({
         currentUserId={userId}
         counterpartName={counterpart.full_name}
         initialMessages={initialMessages}
+        initialHasMore={(newest?.length ?? 0) > PAGE_SIZE}
       />
     </div>
   );

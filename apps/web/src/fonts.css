@@ -1,0 +1,13 @@
+/* Self-hosted: the app never requests fonts from a third party. */
+@import "@fontsource-variable/geist/index.css";
+@import "@fontsource-variable/roboto-mono/index.css";
+@font-face {
+  font-family: "Newsreader";
+  src: url("../../../src/app/(marketing)/fonts/newsreader-latin.woff2") format("woff2");
+  font-weight: 400; font-style: normal; font-display: swap;
+}
+:root {
+  --font-body: "Geist Variable", system-ui, sans-serif;
+  --font-mono-stack: "Roboto Mono Variable", ui-monospace, monospace;
+  --font-transcript: "Newsreader", Georgia, serif;
+}

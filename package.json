@@ -7,12 +7,24 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test:db": "supabase test db --local"
+    "test:db": "supabase test db --local",
+    "dev:api": "tsx apps/api/src/index.ts",
+    "dev:web": "vite --config apps/web/vite.config.ts",
+    "dev:worker": "tsx apps/worker/src/index.ts",
+    "build:portable": "node scripts/migration/build.mjs",
+    "prerender:web": "tsx scripts/migration/prerender.mts",
+    "typecheck:portable": "tsc -p tsconfig.portable.json --noEmit",
+    "test:portable": "node --import tsx --test tests/portable/*.test.ts",
+    "jobs:migrate": "tsx scripts/migration/migrate-jobs.ts",
+    "test:portable:integration": "node scripts/migration/local-integration.mjs",
+    "check:web-deploy": "wrangler deploy --cwd apps/web --env \"\" --env-file /dev/null --dry-run --outdir ../../dist/web-worker"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.170",
     "@aws-sdk/client-s3": "^3.1165.0",
     "@aws-sdk/s3-request-presigner": "^3.1165.0",
+    "@fontsource-variable/geist": "^5.3.0",
+    "@fontsource-variable/roboto-mono": "^5.3.0",
     "@hookform/resolvers": "^7.0.5",
     "@livekit/components-react": "^2.9.25",
     "@livekit/components-styles": "^1.2.0",
@@ -46,15 +58,26 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "0.28.2",
     "eslint": "^10.14.0",
     "eslint-config-next": "16.4.6",
     "js-yaml": "5.5.0",
+    "pg": "8.23.1",
     "supabase": "3.0.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
-  }
+    "tsx": "4.23.15",
+    "typescript": "^5",
+    "vite": "8.3.8",
+    "wrangler": "4.162.0"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ]
 }

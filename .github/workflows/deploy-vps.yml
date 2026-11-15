@@ -1,0 +1,266 @@
+name: Deploy to VPS
+
+# The VPS release path that replaces the Vercel steps in staging.yml / production.yml at cutover.
+# Manual on purpose: it never runs on a push, so adding it changes nothing until a human dispatches it.
+# Same order as the existing pipeline: verify -> build artifacts -> migrate database -> deploy compatible
+# code -> prove health. A failed health check rolls the host back to the previous release automatically.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        required: true
+      confirm:
+        description: For production, type "deploy" to confirm
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  # ci.yml is called as a reusable workflow below; a called workflow cannot request more than its caller grants.
+  pull-requests: read
+
+concurrency:
+  group: vps-${{ inputs.environment }}-deployment
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check the release is allowed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+    env:
+      TARGET: ${{ inputs.environment }}
+      CONFIRM: ${{ inputs.confirm }}
+      # Both sets are exposed so selection happens in shell: a ternary expression would fall back to the
+      # staging value when a production secret is empty, which must never happen.
+      STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+      PRODUCTION_SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
+      STAGING_VPS_SSH_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
+      PRODUCTION_VPS_SSH_KEY: ${{ secrets.PRODUCTION_VPS_SSH_KEY }}
+      STAGING_VPS_HOST: ${{ vars.STAGING_VPS_HOST }}
+      PRODUCTION_VPS_HOST: ${{ vars.PRODUCTION_VPS_HOST }}
+      STAGING_VPS_KNOWN_HOSTS: ${{ vars.STAGING_VPS_KNOWN_HOSTS }}
+      PRODUCTION_VPS_KNOWN_HOSTS: ${{ vars.PRODUCTION_VPS_KNOWN_HOSTS }}
+      STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+      PRODUCTION_SITE_URL: ${{ vars.PRODUCTION_SITE_URL }}
+      STAGING_SUPABASE_PROJECT_ID: ${{ vars.STAGING_SUPABASE_PROJECT_ID }}
+      PRODUCTION_SUPABASE_PROJECT_ID: ${{ vars.PRODUCTION_SUPABASE_PROJECT_ID }}
+      STAGING_MIGRATIONS_BASELINED: ${{ vars.STAGING_MIGRATIONS_BASELINED }}
+      PRODUCTION_MIGRATIONS_BASELINED: ${{ vars.PRODUCTION_MIGRATIONS_BASELINED }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - id: target
+        run: |
+          case "$TARGET" in staging|production) ;; *) echo "::error::Unknown environment."; exit 1 ;; esac
+          echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
+      - name: Limit releases to main
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          if [ "$DEPLOY_REF" != "refs/heads/main" ]; then echo "::error::Releases can only be made from main."; exit 1; fi
+      - name: Require an explicit confirmation for production
+        run: |
+          if [ "$TARGET" = "production" ] && [ "$CONFIRM" != "deploy" ]; then
+            echo "::error::Type deploy in the confirmation field to release to production."; exit 1
+          fi
+      - name: Require a confirmed migration baseline
+        run: |
+          flag="${TARGET^^}_MIGRATIONS_BASELINED"
+          if [ "${!flag:-}" != "true" ]; then echo "::error::Set the repository variable $flag=true after reconciling migration history."; exit 1; fi
+      - name: Require the credentials the release needs
+        run: |
+          prefix="${TARGET^^}"
+          missing=""
+          for name in SUPABASE_ACCESS_TOKEN "${prefix}_SUPABASE_DB_PASSWORD" "${prefix}_SUPABASE_PROJECT_ID" "${prefix}_VPS_SSH_KEY" "${prefix}_VPS_HOST" "${prefix}_VPS_KNOWN_HOSTS" "${prefix}_SITE_URL"; do
+            if [ -z "${!name:-}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then echo "::error::Missing required $TARGET secrets/variables:$missing"; exit 1; fi
+
+  verify:
+    name: Verify the commit being released
+    needs: preflight
+    uses: ./.github/workflows/ci.yml
+    with:
+      # A production release never skips the database checks.
+      migration_validation: always
+
+  images:
+    name: Build and smoke-test the release images
+    needs: [preflight, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    env:
+      # The Oracle Always Free hosts are Ampere (arm64). Change this only if the hosts change.
+      IMAGE_PLATFORM: linux/arm64
+    outputs:
+      app: ${{ steps.push.outputs.app }}
+      web: ${{ steps.push.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Enable arm64 emulation for running the images in CI
+        # Only needed to smoke-test the arm64 images on an x86 runner; the build itself is native.
+        run: docker run --privileged --rm tonistiigi/binfmt:latest --install arm64
+      - name: Build the images from this exact commit
+        run: |
+          docker buildx build --platform "$IMAGE_PLATFORM" -f infra/app/Dockerfile -t tutors-app:release --load .
+          node scripts/migration/container-smoke.mjs tutors-app:release
+      - name: Prerender public pages against the target API
+        # Optional until the API for this environment exists; release builds require it once it does.
+        env:
+          TARGET: ${{ needs.preflight.outputs.environment }}
+          STAGING_API_ORIGIN: ${{ vars.STAGING_PRERENDER_API_ORIGIN }}
+          PRODUCTION_API_ORIGIN: ${{ vars.PRODUCTION_PRERENDER_API_ORIGIN }}
+          STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+          PRODUCTION_SITE_URL: ${{ vars.PRODUCTION_SITE_URL }}
+        run: |
+          api_var="${TARGET^^}_API_ORIGIN"; site_var="${TARGET^^}_SITE_URL"
+          if [ -z "${!api_var:-}" ]; then echo "No prerender API origin configured for $TARGET; building without prerendered pages."; exit 0; fi
+          npm run build:portable
+          PRERENDER_API_ORIGIN="${!api_var}" PUBLIC_SITE_ORIGIN="${!site_var}" PRERENDER_REQUIRED=1 npm run prerender:web
+          rm -rf infra/app/prerendered-build && mkdir -p infra/app/prerendered-build
+          cp -R apps/web/dist/. infra/app/prerendered-build/
+          echo "PRERENDERED_DIR=infra/app/prerendered-build" >> "$GITHUB_ENV"
+      - name: Build the web image and test routing through Caddy
+        run: |
+          docker buildx build --platform "$IMAGE_PLATFORM" -f infra/app/Dockerfile --target web --build-arg "PRERENDERED_DIR=${PRERENDERED_DIR:-infra/app/prerendered}" -t tutors-web:release --load .
+          node scripts/migration/web-smoke.mjs tutors-web:release tutors-app:release
+      - name: Push and record digests
+        id: push
+        env:
+          GH_ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          repo="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
+          for kind in app web; do
+            docker tag "tutors-$kind:release" "$repo/$kind:$GITHUB_SHA"
+            docker push "$repo/$kind:$GITHUB_SHA"
+            digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$repo/$kind:$GITHUB_SHA")"
+            echo "$kind=$digest" >> "$GITHUB_OUTPUT"
+            echo "Pushed $digest" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+  deploy:
+    name: Migrate the database and deploy the VPS
+    needs: [preflight, verify, images]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # contents: write tags the release; packages: read lets the run's own short-lived token pull the
+      # images on the host, so no long-lived registry credential is stored anywhere.
+      # Job-level permissions replace the workflow-level grant.
+      contents: write
+      packages: read
+    env:
+      TARGET: ${{ needs.preflight.outputs.environment }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+      PRODUCTION_SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
+      STAGING_SUPABASE_PROJECT_ID: ${{ vars.STAGING_SUPABASE_PROJECT_ID }}
+      PRODUCTION_SUPABASE_PROJECT_ID: ${{ vars.PRODUCTION_SUPABASE_PROJECT_ID }}
+      STAGING_SUPABASE_BASELINE_VERSION: ${{ vars.STAGING_SUPABASE_BASELINE_VERSION }}
+      PRODUCTION_SUPABASE_BASELINE_VERSION: ${{ vars.PRODUCTION_SUPABASE_BASELINE_VERSION }}
+      STAGING_VPS_SSH_KEY: ${{ secrets.STAGING_VPS_SSH_KEY }}
+      PRODUCTION_VPS_SSH_KEY: ${{ secrets.PRODUCTION_VPS_SSH_KEY }}
+      STAGING_VPS_HOST: ${{ vars.STAGING_VPS_HOST }}
+      PRODUCTION_VPS_HOST: ${{ vars.PRODUCTION_VPS_HOST }}
+      STAGING_VPS_USER: ${{ vars.STAGING_VPS_USER }}
+      PRODUCTION_VPS_USER: ${{ vars.PRODUCTION_VPS_USER }}
+      STAGING_VPS_KNOWN_HOSTS: ${{ vars.STAGING_VPS_KNOWN_HOSTS }}
+      PRODUCTION_VPS_KNOWN_HOSTS: ${{ vars.PRODUCTION_VPS_KNOWN_HOSTS }}
+      STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+      PRODUCTION_SITE_URL: ${{ vars.PRODUCTION_SITE_URL }}
+      GHCR_PULL_TOKEN: ${{ github.token }}
+      GHCR_PULL_USER: ${{ github.actor }}
+      APP_IMAGE: ${{ needs.images.outputs.app }}
+      WEB_IMAGE: ${{ needs.images.outputs.web }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Select this environment's credentials
+        run: |
+          prefix="${TARGET^^}"
+          pick() { local v="${prefix}_$1"; if [ -z "${!v:-}" ]; then echo "::error::$v is not set."; exit 1; fi; printf '%s' "${!v}"; }
+          pw="$(pick SUPABASE_DB_PASSWORD)"; echo "::add-mask::$pw"
+          user_var="${prefix}_VPS_USER"
+          {
+            echo "SUPABASE_DB_PASSWORD=$pw"
+            echo "SUPABASE_PROJECT_ID=$(pick SUPABASE_PROJECT_ID)"
+            echo "SUPABASE_BASELINE_VERSION=$(pick SUPABASE_BASELINE_VERSION)"
+            echo "VPS_HOST=$(pick VPS_HOST)"
+            echo "VPS_USER=${!user_var:-deploy}"
+            echo "SITE_URL=$(pick SITE_URL)"
+          } >> "$GITHUB_ENV"
+
+      - name: Link Supabase CLI to this environment
+        run: npx --no-install supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify remote migration history
+        run: |
+          npx --no-install supabase migration list --linked --output-format json > "$RUNNER_TEMP/migrations.json"
+          node scripts/ci/verify-supabase-migration-history.mjs "$RUNNER_TEMP/migrations.json"
+      - name: Preview migrations
+        run: npx --no-install supabase db push --linked --dry-run
+      - name: Apply migrations before the code that needs them
+        id: migrate
+        run: npx --no-install supabase db push --linked --yes
+
+      - name: Prepare SSH
+        run: |
+          prefix="${TARGET^^}"
+          key_var="${prefix}_VPS_SSH_KEY"; hosts_var="${prefix}_VPS_KNOWN_HOSTS"
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "${!key_var}" > ~/.ssh/deploy_key; chmod 600 ~/.ssh/deploy_key
+          # The host key is pinned in a repository variable; a changed key fails the release instead of trusting it.
+          printf '%s\n' "${!hosts_var}" > ~/.ssh/known_hosts
+      - name: Copy the release files and deploy
+        id: deploy
+        env:
+          SHA: ${{ github.sha }}
+        run: |
+          # These values are interpolated into a remote command, so they are validated before use.
+          [[ "$APP_IMAGE" =~ ^[a-z0-9./_-]+@sha256:[0-9a-f]{64}$ && "$WEB_IMAGE" =~ ^[a-z0-9./_-]+@sha256:[0-9a-f]{64}$ ]] || { echo "::error::Images must be digest-pinned."; exit 1; }
+          [[ "$GHCR_PULL_USER" =~ ^[A-Za-z0-9-]+$ && "$VPS_USER" =~ ^[a-z_][a-z0-9_-]*$ && "$VPS_HOST" =~ ^[A-Za-z0-9.:-]+$ ]] || { echo "::error::Unexpected characters in host, user or registry user."; exit 1; }
+          ssh_opts=(-i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes)
+          remote="$VPS_USER@$VPS_HOST"
+          # shellcheck disable=SC2029 # client-side expansion is intended; every value was validated above
+          scp "${ssh_opts[@]}" infra/app/compose.vps.yaml infra/app/deploy.sh "$remote:/opt/tutors/"
+          # The registry token travels on stdin, never on a command line.
+          # shellcheck disable=SC2029 # validated above
+          printf '%s' "$GHCR_PULL_TOKEN" | ssh "${ssh_opts[@]}" "$remote" "docker login ghcr.io -u '$GHCR_PULL_USER' --password-stdin"
+          # shellcheck disable=SC2029 # validated above
+          ssh "${ssh_opts[@]}" "$remote" "cd /opt/tutors && docker compose -f compose.vps.yaml --profile release run --rm migrate-jobs && chmod +x deploy.sh && ./deploy.sh '$APP_IMAGE' '$WEB_IMAGE' '$SHA'"
+      - name: Check the public site
+        run: bash scripts/ci/smoke-check-deployment.sh "$SITE_URL" /health/ready
+      - name: Record what was released
+        if: inputs.environment == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="production-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          if gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null 2>&1; then
+            echo "Released \`$tag\` — $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Could not create the tag $tag. The release succeeded regardless."
+          fi
+      - name: Explain how to recover
+        if: failure() && steps.migrate.outcome == 'success'
+        run: |
+          echo "::error::Migrations were applied before this failure, so the database is ahead of the running app. deploy.sh rolls the host back to the previous release when the new one is unhealthy. Prefer a forward fix; schema changes are additive, so the previous images keep working."

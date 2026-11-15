@@ -3,7 +3,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(6);
+select plan(7);
 
 insert into auth.users (id, email, raw_user_meta_data) values
   ('aaaaaaaa-0000-0000-0000-000000000011', 'student@test.local', '{"role":"student","full_name":"Student"}'),
@@ -68,7 +68,10 @@ select is(
 );
 
 set local role anon;
-update public.session_analytics set notes_markdown = 'Edited anonymously.' where booking_id = '0000000b-0000-0000-0000-00000000000b';
+-- Anonymous callers hold no UPDATE privilege at all, so this is refused outright.
+select throws_ok(
+  $$update public.session_analytics set notes_markdown = 'Edited anonymously.' where booking_id = '0000000b-0000-0000-0000-00000000000b'$$,
+  '42501', null, 'an anonymous caller is refused any session analytics update');
 select is((select count(*) from public.session_analytics)::int, 0, 'an anonymous caller reads no session analytics');
 
 select pg_temp.act_as_owner();

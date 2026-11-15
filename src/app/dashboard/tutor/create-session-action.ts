@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { schedulingError } from "../../../../packages/domain/src/calendar";
+import { AppError } from "../../../../packages/domain/src/errors";
 const CreateSessionSchema = z.object({
   studentId: z.string().uuid(),
   lessonName: z.string().trim().min(1, "Enter a session name.").max(120),
@@ -40,67 +41,14 @@ export async function createTutorSessionAction(
     return { error: "Sessions must start on a 15-minute interval." };
   }
   if (start <= new Date()) return { error: "Choose a future date and time." };
-  const durationMilliseconds = parsed.data.durationHours * 60 * 60 * 1000;
-  const recurrenceCount = parsed.data.scheduleType === "weekly" ? parsed.data.recurrenceCount : 1;
-  const sessionStarts = Array.from({ length: recurrenceCount }, (_, index) => new Date(start.getTime() + index * 7 * 24 * 60 * 60 * 1000));
-  const lastEnd = new Date(sessionStarts.at(-1)!.getTime() + durationMilliseconds);
-
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { error: "Please sign in again before creating a session." };
-
-  // Verify both role and student relationship using the caller's RLS-scoped view
-  // before intentionally using the service client for the insert.
-  const [{ data: tutor }, { data: existingBookings }, { data: relatedRequest }] = await Promise.all([
-    supabase.from("tutor_profiles").select("id, hourly_rate").eq("id", user.id).maybeSingle(),
-    supabase.from("bookings").select("id").eq("tutor_id", user.id).eq("student_id", parsed.data.studentId).limit(1),
-    supabase.from("lesson_requests").select("id, subject, exam_board").eq("tutor_id", user.id).eq("student_id", parsed.data.studentId).eq("status", "pending").limit(1).maybeSingle(),
-  ]);
-  if (!tutor) return { error: "Only tutors can create sessions." };
-  if (!existingBookings?.length && !relatedRequest) return { error: "Choose one of your students." };
-
-  const admin = createAdminClient();
-  const { data: possibleConflicts } = await admin
-    .from("bookings")
-    .select("id, start_time, end_time")
-    .eq("tutor_id", user.id)
-    .eq("status", "scheduled")
-    .lt("start_time", lastEnd.toISOString())
-    .gt("end_time", start.toISOString())
-  const hasConflict = possibleConflicts?.some((booking) => sessionStarts.some((sessionStart) => {
-    const sessionEnd = new Date(sessionStart.getTime() + durationMilliseconds);
-    return sessionStart < new Date(booking.end_time) && sessionEnd > new Date(booking.start_time);
-  }));
-  if (hasConflict) return { error: "One or more sessions overlap with your existing calendar." };
-
-  // A tutor-created first lesson follows the same free-trial rule as an
-  // accepted student request. Subsequent lessons retain the rate snapshot.
-  const isTrial = !existingBookings?.length;
-  const linkedRequestId = isTrial ? relatedRequest?.id ?? null : null;
-  const recurrenceSeriesId = recurrenceCount > 1 ? crypto.randomUUID() : null;
-  const { data: createdSessions, error } = await admin.from("bookings").insert(sessionStarts.map((sessionStart, index) => ({
-    student_id: parsed.data.studentId,
-    tutor_id: user.id,
-    // The initial request keeps subject/board context. Follow-up sessions are
-    // intentionally tracked by their descriptive lesson name alone.
-    subject: isTrial ? relatedRequest?.subject ?? null : null,
-    exam_board: isTrial ? relatedRequest?.exam_board ?? null : null,
-    lesson_name: parsed.data.lessonName,
-    lesson_request_id: linkedRequestId,
-    start_time: sessionStart.toISOString(),
-    end_time: new Date(sessionStart.getTime() + durationMilliseconds).toISOString(),
-    status: "scheduled",
-    is_trial: isTrial && index === 0,
-    payment_status: isTrial && index === 0 ? "paid" : "pending",
-    amount_gbp_pence: isTrial && index === 0 ? 0 : tutor.hourly_rate,
-    recurrence_rule: recurrenceCount > 1 ? `weekly:${recurrenceCount}` : null,
-    recurrence_series_id: recurrenceSeriesId,
-  }))).select("id");
-  if (error) return { error: "We couldn’t create this session. Please try again." };
-  if (linkedRequestId && createdSessions?.length) {
-    await admin.from("lesson_requests").update({ status: "scheduled", responded_at: new Date().toISOString() }).eq("id", linkedRequestId).eq("tutor_id", user.id);
-  }
-
+  const result = await supabase.rpc("schedule_lessons_v1", {
+    p_student_id: parsed.data.studentId, p_start: start.toISOString(), p_hours: parsed.data.durationHours,
+    p_count: parsed.data.scheduleType === "weekly" ? parsed.data.recurrenceCount : 1,
+    p_name: parsed.data.lessonName, p_request_id: null, p_command_id: crypto.randomUUID(),
+  });
+  try { schedulingError(result.error); }
+  catch (error) { if (error instanceof AppError) return { error: error.message }; throw error; }
   revalidatePath("/dashboard/tutor");
   revalidatePath("/dashboard/student");
   return { success: true };

@@ -5,6 +5,8 @@
 set -euo pipefail
 
 base_url="${1:-}"
+# The Vercel app answers at /api/health; the portable stack answers at /health/ready.
+health_path="${2:-/api/health}"
 if [ -z "$base_url" ]; then
   echo "::error::Usage: smoke-check-deployment.sh <base-url>"
   exit 2
@@ -15,7 +17,7 @@ case "$base_url" in
   *) base_url="https://$base_url" ;;
 esac
 
-health_url="${base_url%/}/api/health"
+health_url="${base_url%/}${health_path}"
 body_file="$(mktemp)"
 trap 'rm -f "$body_file"' EXIT
 attempts=6

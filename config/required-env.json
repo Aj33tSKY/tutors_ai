@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "The declared shape of this app's runtime configuration. Names and purposes only —",
+    "The declared shape of this app's runtime configuration. Names and purposes only \u2014",
     "never values, so this file is safe in Git and safe to read in a pull request.",
     "",
     "Two checks keep it honest, because a manifest nobody verifies goes stale and then",
@@ -12,20 +12,26 @@
     "The point is that staging and production should differ only in credentials and",
     "which resources they address, never in which variables exist. A variable present",
     "in one project and missing from the other is drift, and it fails at runtime in",
-    "whichever environment is missing it — usually the one nobody is watching."
+    "whichever environment is missing it \u2014 usually the one nobody is watching."
   ],
   "variables": [
     {
       "name": "NEXT_PUBLIC_SUPABASE_URL",
       "required": true,
       "secret": false,
-      "purpose": "Supabase project REST endpoint. Differs per environment."
+      "purpose": "Supabase project REST endpoint. Differs per environment.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
       "required": true,
       "secret": false,
-      "purpose": "Browser-safe Supabase key; RLS is what protects the data behind it."
+      "purpose": "Browser-safe Supabase key; RLS is what protects the data behind it.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "SUPABASE_SERVICE_ROLE_KEY",
@@ -37,49 +43,80 @@
       "name": "R2_ENDPOINT",
       "required": true,
       "secret": false,
-      "purpose": "Cloudflare R2 S3 endpoint (https://<account-id>.r2.cloudflarestorage.com) for session recordings."
+      "purpose": "Cloudflare R2 S3 endpoint (https://<account-id>.r2.cloudflarestorage.com) for session recordings.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "R2_BUCKET",
       "required": true,
       "secret": false,
-      "purpose": "Private R2 bucket holding session recordings. Separate bucket per environment."
+      "purpose": "Private R2 bucket holding session recordings. Separate bucket per environment.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "R2_ACCESS_KEY_ID",
       "required": true,
       "secret": true,
-      "purpose": "R2 API token key id, scoped to the recordings bucket. LiveKit Egress writes with it; the app signs and deletes with it."
+      "purpose": "R2 API token key id, scoped to the recordings bucket. LiveKit Egress writes with it; the app signs and deletes with it.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "R2_SECRET_ACCESS_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Pairs with the R2 access key id."
+      "purpose": "Pairs with the R2 access key id.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_LIVEKIT_URL",
       "required": true,
       "secret": false,
-      "purpose": "LiveKit project websocket URL, also the host the server SDK derives."
+      "purpose": "LiveKit project websocket URL, also the host the server SDK derives.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "LIVEKIT_API_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Mints room tokens, starts egress, verifies webhook signatures."
+      "purpose": "Mints room tokens, starts egress, verifies webhook signatures.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "LIVEKIT_API_SECRET",
       "required": true,
       "secret": true,
-      "purpose": "Pairs with the LiveKit API key. Can mint a token for any room in its project."
+      "purpose": "Pairs with the LiveKit API key. Can mint a token for any room in its project.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "DEEPGRAM_API_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Prerecorded transcription of each participant's audio."
+      "purpose": "Prerecorded transcription of each participant's audio.",
+      "requiredIn": [
+        "worker"
+      ]
     },
     {
       "name": "DEEPGRAM_MODEL",
@@ -91,19 +128,151 @@
       "name": "STRIPE_SECRET_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Invoicing. Test mode on staging, live mode on production."
+      "purpose": "Invoicing. Test mode on staging, live mode on production.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "STRIPE_WEBHOOK_SECRET",
       "required": true,
       "secret": true,
-      "purpose": "Verifies Stripe webhook signatures. Belongs to one endpoint, so it differs per environment."
+      "purpose": "Verifies Stripe webhook signatures. Belongs to one endpoint, so it differs per environment.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "CRON_SECRET",
       "required": true,
       "secret": true,
       "purpose": "Bearer token Vercel Cron presents to the cron routes. Must differ per environment."
+    },
+    {
+      "name": "APP_WEB_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Exact trusted frontend origin for API CORS, CSRF and authentication redirects.",
+      "requiredIn": [
+        "api"
+      ]
+    },
+    {
+      "name": "APP_COMMIT_SHA",
+      "required": false,
+      "secret": false,
+      "purpose": "Immutable commit identifier reported by the container health endpoint.",
+      "requiredIn": []
+    },
+    {
+      "name": "APP_JOBS_DATABASE_URL",
+      "required": false,
+      "secret": true,
+      "purpose": "Restricted private job-runtime role; direct or session PostgreSQL connection.",
+      "requiredIn": [
+        "worker"
+      ]
+    },
+    {
+      "name": "APP_EVENTS_DATABASE_URL",
+      "required": false,
+      "secret": true,
+      "purpose": "Webhook-intake login that can only persist signed provider events (private.accept_provider_event). Never the job or owner credentials.",
+      "requiredIn": [
+        "api"
+      ]
+    },
+    {
+      "name": "APP_JOBS_MIGRATION_DATABASE_URL",
+      "required": false,
+      "secret": true,
+      "purpose": "Job schema owner connection used only by the explicit release migration command.",
+      "requiredIn": [
+        "jobs-migration"
+      ]
+    },
+    {
+      "name": "VITE_API_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Browser-safe API origin; omit only for a tested same-origin proxy.",
+      "requiredIn": []
+    },
+    {
+      "name": "AI_GATEWAY_API_KEY",
+      "required": false,
+      "secret": true,
+      "purpose": "Fallback AI Gateway credential, used only when OPENAI_API_KEY is not set; never browser exposed.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
+    },
+    {
+      "name": "APP_API_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Trusted HTTPS API origin used by the Cloudflare same-origin relay. Set per environment as a Worker binding.",
+      "requiredIn": [
+        "web-proxy"
+      ]
+    },
+    {
+      "name": "PRERENDER_API_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "API origin the build reads approved tutors from when prerendering public pages. Unset skips prerendering.",
+      "requiredIn": []
+    },
+    {
+      "name": "PUBLIC_SITE_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Public site origin used for canonical URLs and the sitemap in prerendered pages.",
+      "requiredIn": []
+    },
+    {
+      "name": "PRERENDER_REQUIRED",
+      "required": false,
+      "secret": false,
+      "purpose": "Set to 1 in release builds so a missing prerender configuration fails instead of skipping.",
+      "requiredIn": []
+    },
+    {
+      "name": "PRERENDER_DIST",
+      "required": false,
+      "secret": false,
+      "purpose": "Test-only override of the directory prerendered pages are written to.",
+      "requiredIn": []
+    },
+    {
+      "name": "APP_JOBS_RUNTIME_ROLE",
+      "required": false,
+      "secret": false,
+      "purpose": "Name of the restricted worker login that the release re-grants private functions to after each migration.",
+      "requiredIn": [
+        "jobs-migration"
+      ]
+    },
+    {
+      "name": "APP_EVENTS_ROLE",
+      "required": false,
+      "secret": false,
+      "purpose": "Name of the webhook-intake login (execute on one function only) that the release re-grants after each migration.",
+      "requiredIn": [
+        "jobs-migration"
+      ]
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "required": false,
+      "secret": true,
+      "purpose": "Direct OpenAI credential for chat, summaries and embeddings. Preferred over the AI Gateway; never browser exposed.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     }
   ]
 }

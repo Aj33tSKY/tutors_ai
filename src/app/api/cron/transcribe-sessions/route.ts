@@ -78,6 +78,9 @@ export async function GET(req: Request) {
   if (!verifyCronRequest(req)) return new Response("Unauthorized", { status: 401 });
 
   const admin = createAdminClient();
+  const ownership = await admin.rpc("lesson_job_owner");
+  if (ownership.error) return new Response("Could not verify scheduler ownership", { status: 503 });
+  if (ownership.data !== "legacy") return Response.json({ skipped: "scheduler_handover" }, { status: 202 });
   const { data: pending, error } = await admin
     .from("session_recordings")
     .select("id, booking_id, storage_path, transcribe_attempts, started_at")

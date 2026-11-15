@@ -8,6 +8,9 @@ export async function GET(request: Request) {
   }
 
   const admin = createAdminClient();
+  const ownership = await admin.rpc("lesson_job_owner");
+  if (ownership.error) return new Response("Could not verify scheduler ownership", { status: 503 });
+  if (ownership.data !== "legacy") return Response.json({ skipped: "scheduler_handover" }, { status: 202 });
   const { data: expired, error } = await admin
     .from("session_recordings")
     .select("id, storage_path")

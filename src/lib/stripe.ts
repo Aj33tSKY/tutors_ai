@@ -12,7 +12,4 @@ export function getStripe(): Stripe {
   return _stripe;
 }
 
-/** GBP pence, matching how rates are already stored in tutor_profiles.hourly_rate. */
-export function gbp(pence: number) {
-  return (pence / 100).toLocaleString("en-GB", { style: "currency", currency: "GBP" });
-}
+export { gbp } from "./money";

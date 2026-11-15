@@ -130,6 +130,9 @@ export async function GET(req: Request) {
   }
 
   const supabase = createAdminClient();
+  const ownership = await supabase.rpc("lesson_job_owner");
+  if (ownership.error) return new Response("Could not verify scheduler ownership", { status: 503 });
+  if (ownership.data !== "legacy") return Response.json({ skipped: "scheduler_handover" }, { status: 202 });
 
   // Filtering a joined table's column isn't reliable through the query
   // builder here, so fetch recent completed bookings and filter for

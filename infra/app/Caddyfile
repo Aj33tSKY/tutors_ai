@@ -1,0 +1,63 @@
+# Serves the static frontend and reverse-proxies the API on one origin, so session cookies stay
+# host-only and no relay Worker is needed. TLS certificates are obtained and renewed automatically.
+{
+	admin off
+}
+
+{$SITE_ADDRESS:localhost} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		# The lesson room needs the camera, microphone and screen capture on this origin only.
+		Permissions-Policy "camera=(self), microphone=(self), display-capture=(self), geolocation=()"
+		-Server
+	}
+
+	# API and health. Streaming chat must not be buffered; Caddy sets X-Forwarded-* itself and
+	# overwrites anything a client supplies.
+	@api path /v1/* /health/*
+	handle @api {
+		reverse_proxy {$API_UPSTREAM:api:3001} {
+			flush_interval -1
+			transport http {
+				dial_timeout 5s
+				response_header_timeout 60s
+			}
+		}
+	}
+
+	# Hashed build output is immutable. A missing file is a real 404, never the app shell.
+	handle /assets/* {
+		root * /srv
+		header Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+	handle /images/* {
+		root * /srv
+		header Cache-Control "public, max-age=86400"
+		file_server
+	}
+	@file path_regexp file \.[A-Za-z0-9]+$
+	handle @file {
+		root * /srv
+		header Cache-Control "no-cache"
+		file_server
+	}
+
+	# Everything else is a page: a prerendered one when it exists, otherwise the app shell, which
+	# routes (and shows its own not-found page) on the client.
+	handle {
+		root * /srv
+		header Cache-Control "no-cache"
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
+
+	handle_errors {
+		respond "{err.status_code} {err.status_text}" {err.status_code}
+	}
+}

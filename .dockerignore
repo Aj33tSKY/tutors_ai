@@ -1,0 +1,13 @@
+.git
+node_modules
+**/node_modules
+.next
+dist
+**/dist
+.env*
+**/.env*
+**/.wrangler
+.vercel
+supabase/.temp
+docs/design
+*.log

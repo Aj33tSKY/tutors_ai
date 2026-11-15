@@ -7,7 +7,6 @@ import { LayoutDashboard, Users, MessageCircle, Clock, Landmark, LogOut, PanelLe
 import { cn } from "@/lib/utils";
 import { Wordmark } from "@/components/marketing/wordmark";
 import type { UserRole } from "@/lib/types";
-import { signOutAction } from "@/app/(auth)/actions";
 
 /** Remembered across visits, same key the sidebar reads and writes. */
 const COLLAPSE_STORAGE_KEY = "dashboard-sidebar-collapsed";
@@ -79,10 +78,13 @@ export function DashboardSidebar({
   role,
   fullName,
   email,
+  signOut,
 }: {
   role: UserRole;
   fullName: string;
   email: string;
+  /** A server action (legacy) or a client function (portable app); the host supplies it. */
+  signOut: () => void | Promise<void>;
 }) {
   const initial = fullName.trim().charAt(0).toUpperCase() || "?";
   // useSyncExternalStore (not state + an effect) reads the saved preference:
@@ -139,7 +141,7 @@ export function DashboardSidebar({
             >
               {initial}
             </div>
-            <form action={signOutAction}>
+            <form action={signOut}>
               <button
                 type="submit"
                 aria-label="Sign out"
@@ -158,7 +160,7 @@ export function DashboardSidebar({
               <p className="truncate text-sm font-medium">{fullName}</p>
               <p className="truncate text-xs text-muted-foreground">{email}</p>
             </div>
-            <form action={signOutAction}>
+            <form action={signOut}>
               <button
                 type="submit"
                 aria-label="Sign out"

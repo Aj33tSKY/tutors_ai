@@ -9,6 +9,12 @@ documented in [docs/CI-CD.md](docs/CI-CD.md), transcription in
 [docs/transcription.md](docs/transcription.md), and the self-hosted video server in
 [infra/livekit/README.md](infra/livekit/README.md).
 
+The portable frontend/API/worker migration is in progress: see the
+[implementation plan](docs/frontend-backend-migration-plan.md),
+[current progress](docs/migration-progress.md) and
+[local runtime instructions](infra/app/README.md). The existing Next runtime remains
+the release target until the documented parity and cutover checks pass.
+
 Implementation of `docs/mvp_plan.md`: tutor discovery & booking, live WebRTC sessions with
 transcription, post-session analytics, and a RAG revision chatbot — for UK A-Level Maths,
 Further Maths, Physics, Chemistry, Biology and Computing.
