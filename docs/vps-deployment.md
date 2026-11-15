@@ -101,8 +101,9 @@ remain Phase 6 items in the migration plan.
 
 ## The release workflow
 
-`.github/workflows/deploy-vps.yml` is **manual only** (`workflow_dispatch`), so adding it changes
-nothing until dispatched; `staging.yml` and `production.yml` still deploy to Vercel until cutover.
+`.github/workflows/deploy-vps.yml` deploys **staging on every merge to `main`**, and production only when a
+human dispatches it with the typed confirmation. `staging.yml` (Vercel) is retired to manual-only and
+`production.yml` stays as the Vercel rollback until the production cutover, after which both are deleted.
 It runs: preflight (main only, production confirmation, baseline flag, every credential present) →
 the shared CI suite → build both images from the exact commit, smoke-test them, push to GHCR and
 record **digests** → apply Supabase migrations (history verified, dry-run first) → copy
