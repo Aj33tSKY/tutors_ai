@@ -37,7 +37,8 @@ import { conversationMessages, openThread, sendMessage } from "../../../packages
 import { scheduleInput, requestScheduleInput, rescheduleInput, cancelInput, requestsQuery } from "../../../packages/contracts/src/scheduling.js";
 
 type Variables = { requestId: string; client: SupabaseClient; identity: Identity };
-type StripeEventVerifier = (rawBody: string, signature: string) => { id: string; type: string; data: { object: Record<string, unknown> } };
+type VerifiedStripeEvent = { id: string; type: string; data: { object: Record<string, unknown> } };
+type StripeEventVerifier = (rawBody: string, signature: string) => VerifiedStripeEvent | Promise<VerifiedStripeEvent>;
 type Dependencies = { client?: typeof requestClient; identify?: typeof identify; live?: LiveProvider | null; billing?: Billing | null; events?: EventIntake | null; verifyStripe?: StripeEventVerifier | null; chatModel?: LanguageModel; verifyLiveKit?: ((rawBody: string, authorization: string | undefined) => Promise<WebhookEvent>) | null };
 
 export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
@@ -213,10 +214,11 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
   app.post("/v1/webhooks/stripe", async (c) => {
     const signature = c.req.header("stripe-signature");
     const verify = dependencies.verifyStripe !== undefined ? dependencies.verifyStripe : (process.env.STRIPE_WEBHOOK_SECRET
-      ? (raw: string, header: string) => Stripe.webhooks.constructEvent(raw, header, process.env.STRIPE_WEBHOOK_SECRET!) as unknown as ReturnType<StripeEventVerifier> : null);
+      // The async form runs on Node and on runtimes that only provide asynchronous Web Crypto (Cloudflare Workers).
+      ? (raw: string, header: string) => Stripe.webhooks.constructEventAsync(raw, header, process.env.STRIPE_WEBHOOK_SECRET!) as unknown as Promise<VerifiedStripeEvent> : null);
     if (!signature || !verify) throw new AppError(400, "webhook_not_configured", "Webhook not configured");
-    let event: ReturnType<StripeEventVerifier>;
-    try { event = verify(await c.req.text(), signature); } catch { throw new AppError(400, "invalid_signature", "Invalid signature"); }
+    let event: VerifiedStripeEvent;
+    try { event = await verify(await c.req.text(), signature); } catch { throw new AppError(400, "invalid_signature", "Invalid signature"); }
     const normalized = normalizeStripeEvent(event);
     if (!normalized) return c.json({ received: true });
     const intake = dependencies.events !== undefined ? dependencies.events : (eventsCache ??= eventIntake());

@@ -50,3 +50,6 @@ supabase/.temp/
 apps/*/dist/
 apps/*/.wrangler/
 node_modules/
+
+# Local Worker secrets for the Cloudflare spike
+apps/edge/.dev.vars
