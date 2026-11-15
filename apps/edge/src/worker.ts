@@ -8,9 +8,41 @@ type Assets = { fetch(request: Request): Promise<Response> };
 type Env = { ASSETS: Assets; SPIKE?: string };
 let app: ReturnType<typeof createApp> | undefined;
 
+// The same response headers the Caddy server (infra/app/Caddyfile) sets, so the two hosts behave identically.
+function hardened(response: Response, pathname: string): Response {
+  const result = new Response(response.body, response);
+  result.headers.set("Strict-Transport-Security", "max-age=31536000");
+  result.headers.set("X-Content-Type-Options", "nosniff");
+  result.headers.set("X-Frame-Options", "DENY");
+  result.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  result.headers.set("Permissions-Policy", "camera=(self), microphone=(self), display-capture=(self), geolocation=()");
+  if (pathname.startsWith("/assets/") && response.status === 200) result.headers.set("Cache-Control", "public, max-age=31536000, immutable");
+  else if (!pathname.startsWith("/v1/") && !pathname.startsWith("/health/") && !pathname.startsWith("/images/")) result.headers.set("Cache-Control", "no-cache");
+  return result;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
+    return hardened(await route(request, env, pathname), pathname);
+  },
+};
+
+async function route(request: Request, env: Env, pathname: string): Promise<Response> {
+    // SPIKE ONLY: a slow stream, to prove incremental delivery and to see what the Worker observes on client disconnect.
+    if (pathname === "/spike/stream" && env.SPIKE === "1") {
+      const encoder = new TextEncoder();
+      let sent = 0;
+      const body = new ReadableStream({
+        async pull(controller) {
+          if (sent >= 20) { controller.close(); console.info(JSON.stringify({ event: "stream_complete", sent })); return; }
+          await new Promise((resolve) => setTimeout(resolve, 250));
+          controller.enqueue(encoder.encode(`data: chunk ${++sent}\n\n`));
+        },
+        cancel() { console.info(JSON.stringify({ event: "stream_cancelled_by_client", sent })); },
+      });
+      return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
+    }
     // SPIKE ONLY (removed before any real use): proves Postgres over TCP works in this runtime. Read-only.
     if (pathname === "/spike/pg" && env.SPIKE === "1") {
       const started = Date.now();
@@ -35,5 +67,4 @@ export default {
       return Response.json({ error: { code: "api_unavailable", message: "API is not configured" } }, { status: 503 });
     }
     return app.fetch(request);
-  },
-};
+}
