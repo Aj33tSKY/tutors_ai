@@ -1,11 +1,10 @@
 name: Deploy staging
 
-# Staging deploys automatically on every merge to main — it holds only test data,
-# so it needs no gate. Production releases the same commits, but only when a
-# human dispatches it; see production.yml.
+
+# RETIRED: staging now deploys to the VPS from deploy-vps.yml on every merge to main. This legacy
+# Vercel workflow is kept only as a manual rollback path while Vercel is wound down, and will be
+# deleted with the Next runtime. It no longer runs on push.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 permissions:

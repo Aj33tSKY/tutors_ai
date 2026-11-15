@@ -1,10 +1,12 @@
 name: Deploy to VPS
 
-# The VPS release path that replaces the Vercel steps in staging.yml / production.yml at cutover.
-# Manual on purpose: it never runs on a push, so adding it changes nothing until a human dispatches it.
-# Same order as the existing pipeline: verify -> build artifacts -> migrate database -> deploy compatible
+# The release path for the VPS hosts (Vercel is being retired). Every merge to main deploys staging;
+# production is only ever deployed by a human dispatching this workflow and typing the confirmation.
+# Same order as the earlier pipeline: verify -> build artifacts -> migrate database -> deploy compatible
 # code -> prove health. A failed health check rolls the host back to the previous release automatically.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -23,7 +25,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: vps-${{ inputs.environment }}-deployment
+  group: vps-${{ inputs.environment || 'staging' }}-deployment
   cancel-in-progress: false
 
 jobs:
@@ -34,7 +36,8 @@ jobs:
     outputs:
       environment: ${{ steps.target.outputs.environment }}
     env:
-      TARGET: ${{ inputs.environment }}
+      # A push to main has no inputs and always means staging.
+      TARGET: ${{ inputs.environment || 'staging' }}
       CONFIRM: ${{ inputs.confirm }}
       # Both sets are exposed so selection happens in shell: a ternary expression would fall back to the
       # staging value when a production secret is empty, which must never happen.
@@ -250,7 +253,7 @@ jobs:
       - name: Check the public site
         run: bash scripts/ci/smoke-check-deployment.sh "$SITE_URL" /health/ready
       - name: Record what was released
-        if: inputs.environment == 'production'
+        if: needs.preflight.outputs.environment == 'production'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |

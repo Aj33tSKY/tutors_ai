@@ -64,10 +64,11 @@ export async function registerLessonJobs(boss: PgBoss, pool: Pool, store: Record
   });
 }
 
-export async function discoverLessonJobs(boss: PgBoss, pool: Pool) {
+export async function discoverLessonJobs(boss: PgBoss, pool: Pool, options: { summaries?: boolean } = {}) {
   const { rows } = await pool.query<{ id: string }>("select * from private.lesson_transcription_candidates()");
   for (const row of rows) await boss.send(queues.transcribe, { version: 1, recordingId: row.id }, { singletonKey: row.id, singletonSeconds: 60 });
-  const summaries = await pool.query<{ id: string }>("select * from private.lesson_summary_candidates()");
+  // Without an AI credential a summary would fail and burn a retry attempt, so none are queued.
+  const summaries = options.summaries === false ? { rows: [] as { id: string }[] } : await pool.query<{ id: string }>("select * from private.lesson_summary_candidates()");
   for (const row of summaries.rows) await boss.send(queues.summarize, { version: 1, bookingId: row.id }, { singletonKey: row.id, singletonSeconds: 60 });
   await boss.send(queues.retention, { version: 1 }, { singletonKey: "retention", singletonSeconds: 300 });
 }

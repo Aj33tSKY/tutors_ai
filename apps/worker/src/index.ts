@@ -4,6 +4,7 @@ import { assertJobRuntimePrivileges, queue, queues } from "../../../packages/job
 import { Pool } from "pg";
 import { discoverLessonJobs, registerLessonJobs } from "../../../packages/jobs/src/lesson-jobs.js";
 import Stripe from "stripe";
+import { aiConfigured } from "../../../packages/jobs/src/ai-models.js";
 import { livekitEgress } from "../../../packages/jobs/src/livekit-egress.js";
 import { handleRecordingEvent, reconcileRecordings } from "../../../packages/jobs/src/recording-control.js";
 import { processProviderEvents, type EventEffects } from "../../../packages/jobs/src/provider-events.js";
@@ -11,9 +12,11 @@ import { recordingStore } from "../../../packages/jobs/src/recording-store.js";
 
 const connection = process.env.APP_JOBS_DATABASE_URL;
 if (!connection) throw new Error("APP_JOBS_DATABASE_URL is required (direct or session connection)");
-if (!process.env.DEEPGRAM_API_KEY || !(process.env.OPENAI_API_KEY || process.env.AI_GATEWAY_API_KEY)) {
-  throw new Error("DEEPGRAM_API_KEY and OPENAI_API_KEY (or AI_GATEWAY_API_KEY) are required before starting lesson processing");
-}
+if (!process.env.DEEPGRAM_API_KEY) throw new Error("DEEPGRAM_API_KEY is required before starting lesson processing");
+// Transcription does not need an AI model, so the worker still runs without one; summaries simply wait
+// (and consume no retry attempts) until OPENAI_API_KEY or AI_GATEWAY_API_KEY is configured.
+const summariesEnabled = aiConfigured();
+if (!summariesEnabled) console.warn(JSON.stringify({ event: "ai_not_configured", effect: "lesson summaries are paused" }));
 await assertJobRuntimePrivileges(connection);
 const boss = queue(connection);
 await boss.start();
@@ -29,7 +32,7 @@ await boss.work<{ version: number }>(queues.heartbeat, async (jobs) => {
   }
 });
 const tick = async () => {
-  await discoverLessonJobs(boss, pool);
+  await discoverLessonJobs(boss, pool, { summaries: summariesEnabled });
   await boss.send(queues.heartbeat, { version: 1 }, { singletonKey: "worker", singletonSeconds: 20 });
 };
 await tick();
