@@ -10,7 +10,7 @@ const root = resolve(import.meta.dirname, "../..");
 const directory = await mkdtemp(join(tmpdir(), "tutors-portable-test-"));
 const project = `portable-test-${process.pid}`;
 const env = { ...process.env };
-for (const key of Object.keys(env)) if (/^(SUPABASE_|NEXT_PUBLIC_|VITE_|APP_|STRIPE_|R2_|LIVEKIT_|DEEPGRAM_|AI_GATEWAY_)/.test(key)) delete env[key];
+for (const key of Object.keys(env)) if (/^(SUPABASE_|NEXT_PUBLIC_|VITE_|APP_|STRIPE_|R2_|LIVEKIT_|DEEPGRAM_|AI_GATEWAY_|OPENAI_)/.test(key)) delete env[key];
 const cli = join(root, "node_modules/.bin/supabase");
 let localSecrets = [];
 async function run(args, capture = false) {

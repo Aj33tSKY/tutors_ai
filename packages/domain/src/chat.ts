@@ -2,7 +2,7 @@ import { convertToModelMessages, createIdGenerator, createUIMessageStreamRespons
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Identity } from "../../contracts/src/index";
 import type { ChatConversationSummary, ChatRequest, ChatTranscript } from "../../contracts/src/chat";
-import { languageModel } from "../../jobs/src/ai-models";
+import { aiConfigured, languageModel } from "../../jobs/src/ai-models";
 import { AppError } from "./errors";
 import { databaseResult, requireRole } from "./portal";
 
@@ -57,6 +57,8 @@ export async function chatInstructions(client: SupabaseClient, studentId: string
  */
 export async function chatTurn(client: SupabaseClient, identity: Identity, request: ChatRequest, options: { model?: LanguageModel } = {}): Promise<Response> {
   requireRole(identity, ["student"]);
+  // Checked before the allowance is spent: an unconfigured assistant must cost the student nothing.
+  if (!options.model && !aiConfigured()) throw new AppError(503, "assistant_unavailable", "The revision assistant is not available yet. Please try again later.");
   const { chatId } = request;
   const message = request.message as unknown as UIMessage;
   const conversation = await client.from("chat_conversations").select("id,title").eq("id", chatId).eq("student_id", identity.id).maybeSingle();

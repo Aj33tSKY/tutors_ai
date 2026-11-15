@@ -190,6 +190,12 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
   assert.equal((await chatApp.request("/v1/student/chat/conversations", { method: "POST", headers: { cookie: tutorCookie, origin } })).status, 403, "only students chat");
   assert.equal((await chatPost(otherCookie, turnBody(chatId, "intruder"))).status, 404, "other students cannot use this conversation");
   assert.equal((await chatPost(cookie, { chatId, message: { id: "m", role: "user", parts: [{ type: "file", url: "x" }] } })).status, 400, "only text parts are accepted");
+  // With no AI credential the assistant is unavailable, and that must not spend the student's allowance.
+  const unconfigured = createApp({ webOrigin: origin, supabaseUrl: url, supabaseAnonKey: process.env.LOCAL_ANON_KEY!, secureCookies: false, commit: "integration" });
+  const spentBefore = (await pool.query("select coalesce(sum(used),0)::int as n from private.chat_usage where student_id=$1", [student.id])).rows[0].n;
+  const refused = await unconfigured.request("/v1/student/chat", { method: "POST", headers: { cookie, origin, "content-type": "application/json" }, body: JSON.stringify(turnBody(chatId, "Is anyone there?")) });
+  assert.equal(refused.status, 503, await refused.clone().text());
+  assert.equal((await pool.query("select coalesce(sum(used),0)::int as n from private.chat_usage where student_id=$1", [student.id])).rows[0].n, spentBefore, "an unavailable assistant costs nothing");
   const reply = await chatPost(cookie, turnBody(chatId, "Explain centripetal force"));
   assert.equal(reply.status, 200, await reply.clone().text());
   assert.match(await reply.text(), /Hello, /);
