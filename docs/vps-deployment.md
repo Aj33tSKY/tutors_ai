@@ -1,6 +1,7 @@
 # Deploying to a VPS
 
-The portable stack runs on one Linux VPS per environment: **Caddy** (TLS, static frontend, API
+The portable stack runs on one Linux VPS per environment, and the environments may be on different providers.
+Today only **staging** exists (below); production hosting is decided at cutover. **Caddy** (TLS, static frontend, API
 proxy), the **API** and the **worker**. Supabase (Postgres and Auth), Cloudflare R2 (recordings) and
 the Hetzner LiveKit server stay external and are not part of this host. This document describes what
 the repository provides; it does not provision anything.
@@ -14,10 +15,24 @@ Internet ──443──► Caddy ─┬─ /v1/*, /health/* ──► api:3001 
 One origin serves the app and the API, so session cookies stay host-only and HttpOnly and no
 edge relay is needed. `APP_WEB_ORIGIN` must equal the public origin exactly.
 
+## Where each environment runs
+
+| Environment | Host | Notes |
+| --- | --- | --- |
+| Staging | One Oracle Cloud Always Free **Ampere A1** VM (2 OCPU / 12 GB, arm64, London) | Deploys automatically on every merge to `main`. |
+| Production | **Not provisioned.** Planned: a Hetzner server (about $24 a month), chosen at cutover | A free tier is not used for production: Oracle halved the free A1 allowance (docs now say 2 OCPU / 12 GB total, so a second 2/12 host does not fit) and reclaims idle free instances. `PRODUCTION_VPS_*` settings do not exist until a host does. |
+
+Oracle's Always Free limit is 2 OCPU / 12 GB of A1 across the whole tenancy, and instances idle for 7 days (CPU, network and
+memory all under 20% at the 95th percentile) may be reclaimed (stopped). The staging host holds no data that cannot be
+rebuilt: Postgres is Supabase, recordings are R2, and `deploy-vps.yml` rebuilds the stack. Only its `/opt/tutors/env/*.env`
+files exist nowhere else, so keep a private copy.
+
 ## Architecture
 
-The Oracle Always Free hosts are **Ampere (arm64)**, so release images are built with
-`--platform linux/arm64` (`IMAGE_PLATFORM` in `deploy-vps.yml`). The JavaScript build runs natively; only the
+The staging host is **Ampere (arm64)**, so release images are built with
+`--platform linux/arm64` (`IMAGE_PLATFORM` in `deploy-vps.yml`). **A production host on x86 (for example Hetzner CPX)
+cannot run these images**: before it exists, either choose an arm64 server (Hetzner CAX) or build a multi-architecture
+image (`linux/amd64,linux/arm64`, digest-pinned) so both environments run the same artifact. The JavaScript build runs natively; only the
 runtime-dependency stage targets arm64. CI runs the arm64 images under QEMU emulation for the container and Caddy
 smoke tests (the ordinary PR job still smoke-tests amd64). Both architectures pass locally.
 
@@ -35,7 +50,8 @@ smoke tests (the ordinary PR job still smoke-tests amd64). Both architectures pa
 
 1. A VPS with Docker Engine and the Compose plugin; 2 vCPU / 2 GB is a starting point, size from
    measurements (the API streams chat and the worker holds Deepgram/AI requests).
-2. Firewall: allow 22 (restricted to your addresses), 80 and 443 (TCP and UDP). Nothing else.
+2. Firewall: allow 22, 80 and 443 (TCP; UDP 443 optional for HTTP/3). Nothing else. SSH is open to the internet because GitHub's runners
+   deploy over it, so keep password login off, use key-only auth and run `fail2ban` (both are in place on staging).
    The API and worker publish no ports.
 3. DNS: an A/AAAA record for the site hostname. Caddy obtains and renews certificates itself, so
    port 80 must be reachable.
@@ -114,7 +130,7 @@ Per-environment settings (repository level, prefixed like the existing ones; non
 
 | Kind | Names |
 | --- | --- |
-| Secrets | `STAGING_VPS_SSH_KEY`, `PRODUCTION_VPS_SSH_KEY`. The registry login uses the run's own short-lived token (`packages: read`), so no registry credential is stored. |
+| Secrets | `STAGING_VPS_SSH_KEY` (and `PRODUCTION_VPS_SSH_KEY` once a production host exists). The registry login uses the run's own short-lived token (`packages: read`), so no registry credential is stored. |
 | Variables | `{STAGING,PRODUCTION}_VPS_HOST`, `_VPS_USER` (default `deploy`), `_VPS_KNOWN_HOSTS`, `_SITE_URL`, `_PRERENDER_API_ORIGIN` (optional) |
 | Existing | the Supabase secrets/variables used by `staging.yml` and `production.yml` |
 
