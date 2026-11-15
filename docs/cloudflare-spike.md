@@ -15,6 +15,15 @@ candidate in the hosting bake-off against Google Cloud Run. Code: `apps/edge/`. 
 | LiveKit webhook signature (valid accepted, bad rejected) | Pass |
 | Stripe webhook signature | **Failed, then fixed.** Synchronous `constructEvent` cannot run on Workers. Switched to `constructEventAsync`, which works on Node and Workers |
 
+## Deployed results (2026-11-15, `cf-staging.hybridtutors.co.uk`, staging Supabase, London client)
+
+- Start-up reported by Cloudflare: 130 ms.
+- Worker CPU time per request (Cloudflare's own tail report, 25 requests each): `/health/ready` median 3 ms (max 34 ms, probably the first
+  request), `/v1/public/tutors` median 4 ms (max 15 ms). No request failed. The Free plan allows 10 ms, so the maximums
+  exceed it; heavier routes (authenticated reads, chat) are not yet measured.
+- Time to first byte, 25 requests, from a London client (Worker vs the Oracle staging VPS): `/health/ready` p50 108 vs 105 ms,
+  `/v1/public/tutors` p50 102 vs 89 ms, `/` (static) p50 65 vs 35 ms. Roughly equal for API calls; static is slower on the Worker in this sample.
+
 ## Not yet tested (must be before any decision)
 - Streaming chat (SSE) end to end, including a client disconnecting mid-stream.
 - CPU time per request on real Cloudflare (Free plan: 10 ms). Local runs do not enforce it.
