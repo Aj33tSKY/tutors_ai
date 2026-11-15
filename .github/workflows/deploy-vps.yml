@@ -151,7 +151,9 @@ jobs:
           for kind in app web; do
             docker tag "tutors-$kind:release" "$repo/$kind:$GITHUB_SHA"
             docker push "$repo/$kind:$GITHUB_SHA"
-            digest="$(docker inspect --format '{{index .RepoDigests 0}}' "$repo/$kind:$GITHUB_SHA")"
+            # Select the digest recorded for this repository; RepoDigests can also list other names.
+            digest="$(docker inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$repo/$kind:$GITHUB_SHA" | grep -F "$repo/$kind@sha256:" | head -n1)"
+            [[ "$digest" =~ ^ghcr\.io/[a-z0-9._/-]+@sha256:[0-9a-f]{64}$ ]] || { echo "::error::No registry digest for $kind."; exit 1; }
             echo "$kind=$digest" >> "$GITHUB_OUTPUT"
             echo "Pushed $digest" >> "$GITHUB_STEP_SUMMARY"
           done
@@ -249,7 +251,7 @@ jobs:
           # shellcheck disable=SC2029 # validated above
           printf '%s' "$GHCR_PULL_TOKEN" | ssh "${ssh_opts[@]}" "$remote" "docker login ghcr.io -u '$GHCR_PULL_USER' --password-stdin"
           # shellcheck disable=SC2029 # validated above
-          ssh "${ssh_opts[@]}" "$remote" "cd /opt/tutors && docker compose -f compose.vps.yaml --profile release run --rm migrate-jobs && chmod +x deploy.sh && ./deploy.sh '$APP_IMAGE' '$WEB_IMAGE' '$SHA'"
+          ssh "${ssh_opts[@]}" "$remote" "cd /opt/tutors && APP_IMAGE='$APP_IMAGE' WEB_IMAGE='$WEB_IMAGE' docker compose -f compose.vps.yaml --profile release run --rm migrate-jobs && chmod +x deploy.sh && ./deploy.sh '$APP_IMAGE' '$WEB_IMAGE' '$SHA'"
       - name: Check the public site
         run: bash scripts/ci/smoke-check-deployment.sh "$SITE_URL" /health/ready
       - name: Record what was released
