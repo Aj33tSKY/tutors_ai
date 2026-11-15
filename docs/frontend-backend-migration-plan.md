@@ -1,7 +1,7 @@
 # Frontend/backend migration plan
 
-Status: in progress on `feature/portable-frontend-backend`; first authenticated slice implemented.
-Updated: 14 November 2026.
+Status: in progress on `feature/portable-frontend-backend`; API/UI and durable lesson processing extraction underway.
+Updated: 15 November 2026.
 
 Read [migration-progress.md](migration-progress.md) for implemented work, verification and
 remaining scope. Unchecked phase exits remain outstanding even where individual foundations exist.

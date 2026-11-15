@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -42,9 +41,9 @@ export function ContactsList({ title, singular, contacts }: { title: string; sin
                     </p>
                   </div>
                   <Button asChild size="sm" variant="outline">
-                    <Link href={`/dashboard/messages/${contact.id}`}>
+                    <a href={`/dashboard/messages/${contact.id}`}>
                       <MessageCircle className="size-3.5" /> Message
-                    </Link>
+                    </a>
                   </Button>
                 </li>
               ))}

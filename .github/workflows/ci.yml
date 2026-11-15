@@ -48,6 +48,10 @@ jobs:
         run: npm run test:portable
       - name: Build portable API, worker and static frontend
         run: npm run build:portable
+      - name: Validate the Cloudflare static-assets adapter without deploying
+        run: npm run check:web-deploy
+        env:
+          CLOUDFLARE_SEND_METRICS: "false"
       - name: Verify the standalone container runtime
         run: |
           docker build -f infra/app/Dockerfile -t tutors-portable:ci .

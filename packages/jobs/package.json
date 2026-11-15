@@ -5,6 +5,11 @@
   "type": "module",
   "dependencies": {
     "pg-boss": "12.38.2",
-    "pg": "8.23.1"
+    "pg": "8.23.1",
+    "@aws-sdk/client-s3": "3.1165.0",
+    "@aws-sdk/s3-request-presigner": "3.1165.0",
+    "zod": "4.6.7",
+    "ai": "7.0.166",
+    "@opentelemetry/api": "1.10.0"
   }
 }

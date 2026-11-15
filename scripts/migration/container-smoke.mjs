@@ -9,6 +9,7 @@ assert.notEqual(process.getuid(), 0);
 let nextInstalled = true;
 try { import.meta.resolve('next'); } catch { nextInstalled = false; }
 assert.equal(nextInstalled, false);
+await Promise.all([import('pg-boss'), import('ai'), import('@aws-sdk/client-s3'), import('livekit-server-sdk')]);
 await import('./dist/api.mjs');
 let ready = false;
 for (let i=0;i<40;i++) {
@@ -23,7 +24,7 @@ const denied = await fetch('http://127.0.0.1:3001/v1/bookings/aaaaaaaa-0000-4000
 assert.equal(denied.status,401);
 const wrongOrigin = await fetch('http://127.0.0.1:3001/v1/auth/sign-in',{method:'POST',headers:{origin:'https://attacker.example'}});
 assert.equal(wrongOrigin.status,403);
-console.info('Container smoke passed: non-root, no Next, HTTP health, access denial and graceful SIGTERM');
+console.info('Container smoke passed: non-root, no Next, worker/provider dependencies, HTTP health, access denial and graceful SIGTERM');
 process.kill(process.pid,'SIGTERM');
 `;
 const { stdout } = await promisify(execFile)("docker", ["run", "--rm",

@@ -1,7 +1,8 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
   "name": "tutors-web-staging",
+  "main": "src/edge.ts",
   "compatibility_date": "2026-11-14",
-  "assets": { "directory": "./dist", "not_found_handling": "single-page-application" },
-  "env": { "production": { "name": "tutors-web", "assets": { "directory": "./dist", "not_found_handling": "single-page-application" } } }
+  "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/v1/*", "/health/*"] },
+  "env": { "production": { "name": "tutors-web", "assets": { "directory": "./dist", "binding": "ASSETS", "not_found_handling": "single-page-application", "run_worker_first": ["/v1/*", "/health/*"] } } }
 }

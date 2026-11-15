@@ -22,6 +22,7 @@ const PROVIDED_BY_PLATFORM = new Set([
   "VERCEL_PROJECT_PRODUCTION_URL",
   "CI",
   "PORT",
+  "ASSETS",
 ]);
 
 const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));
@@ -39,9 +40,9 @@ function sourceFiles(dir) {
 }
 
 const used = new Map();
-for (const file of SOURCE_DIRS.flatMap(sourceFiles).concat(["scripts/migration/migrate-jobs.ts"])) {
+for (const file of SOURCE_DIRS.flatMap(sourceFiles).concat(sourceFiles("scripts/migration"))) {
   const contents = readFileSync(file, "utf8");
-  for (const match of contents.matchAll(/(?:process\.env|import\.meta\.env)\.([A-Z_][A-Z0-9_]*)/g)) {
+  for (const match of contents.matchAll(/(?:process\.env|import\.meta\.env|\benv)\.([A-Z_][A-Z0-9_]*)/g)) {
     const name = match[1];
     if (PROVIDED_BY_PLATFORM.has(name)) continue;
     if (!used.has(name)) used.set(name, new Set());
@@ -80,7 +81,7 @@ for (const variable of manifest.variables) {
     problems.push(`${variable.name} needs a real purpose, not "${variable.purpose}".`);
   }
   if (variable.requiredIn !== undefined && (!Array.isArray(variable.requiredIn) ||
-      variable.requiredIn.some((runtime) => !["api", "worker", "jobs-migration"].includes(runtime)))) {
+      variable.requiredIn.some((runtime) => !["api", "worker", "jobs-migration", "web-proxy"].includes(runtime)))) {
     problems.push(`${variable.name} has invalid requiredIn runtime names.`);
   }
 }

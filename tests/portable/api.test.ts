@@ -36,3 +36,10 @@ test("CORS grants credentials to the exact configured origin", async () => {
   assert.equal(response.headers.get("access-control-allow-origin"), config.webOrigin);
   assert.equal(response.headers.get("access-control-allow-credentials"), "true");
 });
+test("availability endpoints require authentication before database access", async () => {
+  for (const method of ["GET", "POST", "DELETE"]) {
+    const path = method === "DELETE" ? "/v1/tutor/availability/aaaaaaaa-0000-4000-8000-000000000001" : "/v1/tutor/availability";
+    const response = await app.request(path, { method, headers: { origin: config.webOrigin } });
+    assert.equal(response.status, 401);
+  }
+});

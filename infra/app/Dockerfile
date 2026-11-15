@@ -13,6 +13,9 @@ COPY apps ./apps
 COPY packages ./packages
 COPY scripts/migration ./scripts/migration
 COPY src/app/globals.css ./src/app/globals.css
+COPY src/components ./src/components
+COPY src/lib ./src/lib
+COPY tsconfig.json tsconfig.portable.json ./
 COPY postcss.config.mjs ./
 RUN npm run build:portable
 

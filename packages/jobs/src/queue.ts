@@ -23,7 +23,7 @@ export function queue(connectionString: string, migrate = false) {
   return boss;
 }
 
-export const queues = { heartbeat: "runtime-heartbeat-v1" } as const;
+export const queues = { heartbeat: "runtime-heartbeat-v1", transcribe: "lesson-transcription-v1", retention: "lesson-retention-v1", summarize: "lesson-summary-v1" } as const;
 
 /** Explicit release command; normal API/worker startup must not install schemas. */
 export async function migrateQueue(connectionString: string) {
@@ -31,5 +31,8 @@ export async function migrateQueue(connectionString: string) {
   try {
     await boss.start();
     await boss.createQueue(queues.heartbeat, { retryLimit: 3, retryDelay: 5, expireInSeconds: 60 });
+    await boss.createQueue(queues.transcribe, { retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 });
+    await boss.createQueue(queues.retention, { retryLimit: 5, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 });
+    await boss.createQueue(queues.summarize, { retryLimit: 3, retryDelay: 60, retryBackoff: true, expireInSeconds: 600 });
   } finally { await boss.stop(); }
 }

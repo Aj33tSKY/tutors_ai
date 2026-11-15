@@ -1,6 +1,6 @@
 {
   "$comment": [
-    "The declared shape of this app's runtime configuration. Names and purposes only —",
+    "The declared shape of this app's runtime configuration. Names and purposes only \u2014",
     "never values, so this file is safe in Git and safe to read in a pull request.",
     "",
     "Two checks keep it honest, because a manifest nobody verifies goes stale and then",
@@ -12,7 +12,7 @@
     "The point is that staging and production should differ only in credentials and",
     "which resources they address, never in which variables exist. A variable present",
     "in one project and missing from the other is drift, and it fails at runtime in",
-    "whichever environment is missing it — usually the one nobody is watching."
+    "whichever environment is missing it \u2014 usually the one nobody is watching."
   ],
   "variables": [
     {
@@ -37,49 +37,77 @@
       "name": "R2_ENDPOINT",
       "required": true,
       "secret": false,
-      "purpose": "Cloudflare R2 S3 endpoint (https://<account-id>.r2.cloudflarestorage.com) for session recordings."
+      "purpose": "Cloudflare R2 S3 endpoint (https://<account-id>.r2.cloudflarestorage.com) for session recordings.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "R2_BUCKET",
       "required": true,
       "secret": false,
-      "purpose": "Private R2 bucket holding session recordings. Separate bucket per environment."
+      "purpose": "Private R2 bucket holding session recordings. Separate bucket per environment.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "R2_ACCESS_KEY_ID",
       "required": true,
       "secret": true,
-      "purpose": "R2 API token key id, scoped to the recordings bucket. LiveKit Egress writes with it; the app signs and deletes with it."
+      "purpose": "R2 API token key id, scoped to the recordings bucket. LiveKit Egress writes with it; the app signs and deletes with it.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "R2_SECRET_ACCESS_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Pairs with the R2 access key id."
+      "purpose": "Pairs with the R2 access key id.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_LIVEKIT_URL",
       "required": true,
       "secret": false,
-      "purpose": "LiveKit project websocket URL, also the host the server SDK derives."
+      "purpose": "LiveKit project websocket URL, also the host the server SDK derives.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "LIVEKIT_API_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Mints room tokens, starts egress, verifies webhook signatures."
+      "purpose": "Mints room tokens, starts egress, verifies webhook signatures.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "LIVEKIT_API_SECRET",
       "required": true,
       "secret": true,
-      "purpose": "Pairs with the LiveKit API key. Can mint a token for any room in its project."
+      "purpose": "Pairs with the LiveKit API key. Can mint a token for any room in its project.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "DEEPGRAM_API_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Prerecorded transcription of each participant's audio."
+      "purpose": "Prerecorded transcription of each participant's audio.",
+      "requiredIn": [
+        "worker"
+      ]
     },
     {
       "name": "DEEPGRAM_MODEL",
@@ -145,6 +173,24 @@
       "secret": false,
       "purpose": "Browser-safe API origin; omit only for a tested same-origin proxy.",
       "requiredIn": []
+    },
+    {
+      "name": "AI_GATEWAY_API_KEY",
+      "required": false,
+      "secret": true,
+      "purpose": "Explicit AI Gateway credential for summary and embedding jobs outside Vercel; never browser exposed.",
+      "requiredIn": [
+        "worker"
+      ]
+    },
+    {
+      "name": "APP_API_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Trusted HTTPS API origin used by the Cloudflare same-origin relay. Set per environment as a Worker binding.",
+      "requiredIn": [
+        "web-proxy"
+      ]
     }
   ]
 }

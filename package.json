@@ -15,7 +15,8 @@
     "typecheck:portable": "tsc -p tsconfig.portable.json --noEmit",
     "test:portable": "node --import tsx --test tests/portable/*.test.ts",
     "jobs:migrate": "tsx scripts/migration/migrate-jobs.ts",
-    "test:portable:integration": "node scripts/migration/local-integration.mjs"
+    "test:portable:integration": "node scripts/migration/local-integration.mjs",
+    "check:web-deploy": "wrangler deploy --cwd apps/web --env \"\" --env-file /dev/null --dry-run --outdir ../../dist/web-worker"
   },
   "dependencies": {
     "@ai-sdk/react": "^4.0.170",
@@ -69,7 +70,8 @@
     "tailwindcss": "^4",
     "tsx": "4.23.15",
     "typescript": "^5",
-    "vite": "8.3.8"
+    "vite": "8.3.8",
+    "wrangler": "4.162.0"
   },
   "workspaces": [
     "apps/*",

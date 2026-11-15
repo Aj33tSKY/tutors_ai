@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "pg-boss": "12.38.2"
+    "pg-boss": "12.38.2",
+    "@tutors/jobs": "0.1.0"
   }
 }

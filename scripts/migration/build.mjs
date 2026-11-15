@@ -5,6 +5,7 @@ for (const [entry, outfile] of [
   ["apps/api/src/index.ts", "dist/api.mjs"],
   ["apps/worker/src/index.ts", "dist/worker.mjs"],
   ["scripts/migration/migrate-jobs.ts", "dist/migrate-jobs.mjs"],
+  ["scripts/migration/job-ownership.ts", "dist/job-ownership.mjs"],
 ]) {
   await build({ entryPoints: [entry], outfile, bundle: true, platform: "node", format: "esm", target: "node24", packages: "external", sourcemap: true });
 }
