@@ -87,6 +87,10 @@ jobs:
   verify:
     name: Verify the commit being released
     needs: preflight
+    # A merge to main already passed these exact required checks on its pull request (branch protection
+    # enforces it), so the automatic staging push does not repeat them. Dispatches, including every
+    # production release, always run the full suite.
+    if: github.event_name != 'push'
     uses: ./.github/workflows/ci.yml
     with:
       # A production release never skips the database checks.
@@ -95,6 +99,7 @@ jobs:
   images:
     name: Build and smoke-test the release images
     needs: [preflight, verify]
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -115,11 +120,15 @@ jobs:
       - run: npm ci
       - name: Enable arm64 emulation for running the images in CI
         # Only needed to smoke-test the arm64 images on an x86 runner; the build itself is native.
+        if: github.event_name != 'push'
         run: docker run --privileged --rm tonistiigi/binfmt:latest --install arm64
       - name: Build the images from this exact commit
         run: |
           docker buildx build --platform "$IMAGE_PLATFORM" -f infra/app/Dockerfile -t tutors-app:release --load .
-          node scripts/migration/container-smoke.mjs tutors-app:release
+      - name: Smoke-test the app image
+        # Skipped on the automatic staging push: the host's health check and rollback cover it there.
+        if: github.event_name != 'push'
+        run: node scripts/migration/container-smoke.mjs tutors-app:release
       - name: Prerender public pages against the target API
         # Optional until the API for this environment exists; release builds require it once it does.
         env:
@@ -136,10 +145,12 @@ jobs:
           rm -rf infra/app/prerendered-build && mkdir -p infra/app/prerendered-build
           cp -R apps/web/dist/. infra/app/prerendered-build/
           echo "PRERENDERED_DIR=infra/app/prerendered-build" >> "$GITHUB_ENV"
-      - name: Build the web image and test routing through Caddy
+      - name: Build the web image
         run: |
           docker buildx build --platform "$IMAGE_PLATFORM" -f infra/app/Dockerfile --target web --build-arg "PRERENDERED_DIR=${PRERENDERED_DIR:-infra/app/prerendered}" -t tutors-web:release --load .
-          node scripts/migration/web-smoke.mjs tutors-web:release tutors-app:release
+      - name: Test routing through Caddy
+        if: github.event_name != 'push'
+        run: node scripts/migration/web-smoke.mjs tutors-web:release tutors-app:release
       - name: Push and record digests
         id: push
         env:
@@ -161,6 +172,7 @@ jobs:
   deploy:
     name: Migrate the database and deploy the VPS
     needs: [preflight, verify, images]
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && needs.images.result == 'success' && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
@@ -251,7 +263,7 @@ jobs:
           # shellcheck disable=SC2029 # validated above
           printf '%s' "$GHCR_PULL_TOKEN" | ssh "${ssh_opts[@]}" "$remote" "docker login ghcr.io -u '$GHCR_PULL_USER' --password-stdin"
           # shellcheck disable=SC2029 # validated above
-          ssh "${ssh_opts[@]}" "$remote" "cd /opt/tutors && APP_IMAGE='$APP_IMAGE' WEB_IMAGE='$WEB_IMAGE' docker compose -f compose.vps.yaml --profile release run --rm migrate-jobs && chmod +x deploy.sh && ./deploy.sh '$APP_IMAGE' '$WEB_IMAGE' '$SHA'"
+          ssh "${ssh_opts[@]}" "$remote" "cd /opt/tutors && APP_IMAGE='$APP_IMAGE' WEB_IMAGE='$WEB_IMAGE' APP_COMMIT_SHA='$SHA' docker compose -f compose.vps.yaml --profile release run --rm migrate-jobs && chmod +x deploy.sh && ./deploy.sh '$APP_IMAGE' '$WEB_IMAGE' '$SHA'"
       - name: Check the public site
         run: bash scripts/ci/smoke-check-deployment.sh "$SITE_URL" /health/ready
       - name: Record what was released
