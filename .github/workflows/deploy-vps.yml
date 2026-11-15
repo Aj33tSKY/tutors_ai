@@ -118,9 +118,9 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - name: Enable arm64 emulation for running the images in CI
-        # Only needed to smoke-test the arm64 images on an x86 runner; the build itself is native.
-        if: github.event_name != 'push'
+      - name: Enable arm64 emulation
+        # Needed on every run: the image's runtime-dependency stage executes arm64 binaries (npm ci) on this
+        # x86 runner, as do the smoke tests. Do not skip it for the staging push.
         run: docker run --privileged --rm tonistiigi/binfmt:latest --install arm64
       - name: Build the images from this exact commit
         run: |
