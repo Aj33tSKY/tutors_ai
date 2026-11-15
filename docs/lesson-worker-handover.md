@@ -1,9 +1,9 @@
 # Portable lesson worker handover
 
-The Node worker now handles stereo transcription, summary/embedding generation
-and recording retention. LiveKit recording creation, screen-egress retries and
-signed webhooks still run in Next. Moving those routes is a separate outstanding
-part of the application migration.
+The Node worker now handles stereo transcription, summary/embedding generation,
+recording retention and LiveKit recording control. The API persists signed LiveKit
+webhooks (`POST /v1/webhooks/livekit`) and the worker starts and stops Egress. See
+[LiveKit recording control](#livekit-recording-control) for the cutover.
 
 ## Credentials and installation
 
@@ -94,3 +94,39 @@ They exercise RLS, restricted credentials, concurrent claims, replay, lease
 expiry, stale publication, provider failure, preservation of tutor edits and
 retention. They do not demonstrate live Deepgram/AI/LiveKit connectivity or an
 observed staging handover.
+
+## LiveKit recording control
+
+The API verifies the LiveKit signature, stores only the normalised event (room's booking,
+participant identity, track id, or the Egress outcome) in `private.provider_events` keyed by
+LiveKit's event id, and answers 200 (503 if it could not store, so LiveKit retries). The worker
+applies events through enumerated private SQL functions; its login still cannot read
+application tables.
+
+Guarantees, each covered by the integration suite with a fake media server:
+
+- A recording row is reserved **before** LiveKit is asked to record. Unique indexes make a
+  duplicate join or repeated `track_published` a no-op, so a crash after the external call
+  leaves a row to reconcile, never a second job.
+- The booking, not the payload, decides who the tutor is; consent and an open lesson are required.
+- Screen starts retry in-process for about a minute (a busy Egress node refuses silently), then
+  fail the row. A share that ends first abandons the retry. Audio start failures free the slot and
+  retry after 5, 15 and 30 seconds.
+- The file's own media start and end are stored for playback alignment.
+- **Reconciler (every 30 s):** reservations older than 3 minutes that never reached LiveKit are
+  failed (after stopping stray jobs in the room); jobs unreported for 10 minutes are settled from
+  LiveKit's own record, so a lost `egress_ended` no longer leaves a recording `active` forever.
+
+Cutover (staging first). LiveKit supports several webhook URLs, but run **one** receiver at a time:
+the legacy and new handlers share the same tables and the legacy one stops "stray" jobs.
+
+1. Deploy API and worker. Give the worker `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`,
+   `NEXT_PUBLIC_LIVEKIT_URL` and the R2 variables; give the API `APP_EVENTS_DATABASE_URL`.
+   Without LiveKit credentials the worker leaves recording events queued, visible in
+   `private.provider_event_backlog`.
+2. Change `WEBHOOK_URL` in the LiveKit deployment to `https://<api-domain>/v1/webhooks/livekit`
+   through the **Deploy LiveKit** workflow. Installing restarts LiveKit and drops calls in
+   progress, so do it when nobody is connected; the workflow refuses otherwise unless forced.
+3. Make a staging call: audio row `active`, tutor screen share row `active`, both `ready` after
+   the call, transcript produced. Roll back by restoring the old URL; events already stored are
+   applied by the worker when it returns, and the legacy route is untouched until retired.

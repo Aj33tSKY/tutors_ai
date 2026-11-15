@@ -1,3 +1,4 @@
+import { AppLink } from "../navigation";
 import { Users } from "lucide-react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,7 +70,7 @@ export function FamilyOverviewView({ family: { children, bookings } }: { family:
           {upcoming.length ? <ul className="divide-y divide-border">{upcoming.map((booking) => <li key={booking.id} className="py-3 first:pt-0"><p className="font-medium">{booking.lesson_name || subjectLabel(booking.subject as import("@/lib/types").StemSubject)}</p><p className="text-sm text-muted-foreground">{childNames.get(booking.student_id)} · {new Date(booking.start_time).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p></li>)}</ul> : <p className="text-sm text-muted-foreground">No upcoming lessons are scheduled.</p>}
         </CardContent></Card>
         <Card><CardHeader><CardTitle>Recent lesson reviews</CardTitle></CardHeader><CardContent>
-          {recent.length ? <ul className="divide-y divide-border">{recent.map((booking) => <li key={booking.id} className="flex items-center justify-between gap-3 py-3 first:pt-0"><div><p className="font-medium">{booking.lesson_name || subjectLabel(booking.subject as import("@/lib/types").StemSubject)}</p><p className="text-sm text-muted-foreground">{childNames.get(booking.student_id)} · {new Date(booking.start_time).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p></div><a href={`/dashboard/student/bookings/${booking.id}`} className="shrink-0 text-sm font-semibold text-brand-strong">Review →</a></li>)}</ul> : <p className="text-sm text-muted-foreground">Completed lessons will appear here with notes and recordings when available.</p>}
+          {recent.length ? <ul className="divide-y divide-border">{recent.map((booking) => <li key={booking.id} className="flex items-center justify-between gap-3 py-3 first:pt-0"><div><p className="font-medium">{booking.lesson_name || subjectLabel(booking.subject as import("@/lib/types").StemSubject)}</p><p className="text-sm text-muted-foreground">{childNames.get(booking.student_id)} · {new Date(booking.start_time).toLocaleDateString("en-GB", { day: "numeric", month: "short" })}</p></div><AppLink href={`/dashboard/student/bookings/${booking.id}`} className="shrink-0 text-sm font-semibold text-brand-strong">Review →</AppLink></li>)}</ul> : <p className="text-sm text-muted-foreground">Completed lessons will appear here with notes and recordings when available.</p>}
         </CardContent></Card>
       </div>}
     </div>

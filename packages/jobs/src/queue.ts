@@ -6,13 +6,15 @@ export async function assertJobRuntimePrivileges(connectionString: string) {
   const pool = new Pool({ connectionString, max: 1, connectionTimeoutMillis: 10000 });
   try {
     const { rows } = await pool.query(`select r.rolsuper, r.rolbypassrls,
+      exists(select 1 from pg_roles elevated where pg_has_role(current_user,elevated.oid,'MEMBER')
+        and (elevated.rolsuper or elevated.rolbypassrls or elevated.rolname in ('authenticated','service_role'))) as can_assume_privileged_role,
       has_schema_privilege(current_user, 'app_jobs', 'CREATE') as can_migrate,
       coalesce((select bool_or(has_table_privilege(current_user, c.oid, 'SELECT'))
         from pg_class c join pg_namespace n on n.oid=c.relnamespace
         where n.nspname='auth' and c.relname='users'), false) as reads_auth
       from pg_roles r where r.rolname=current_user`);
     const role = rows[0];
-    if (!role || role.rolsuper || role.rolbypassrls || role.can_migrate || role.reads_auth) {
+    if (!role || role.rolsuper || role.rolbypassrls || role.can_assume_privileged_role || role.can_migrate || role.reads_auth) {
       throw new Error("Job runtime credentials must not own migrations, bypass RLS or read Auth records");
     }
   } finally { await pool.end(); }

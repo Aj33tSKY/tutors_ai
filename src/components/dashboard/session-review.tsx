@@ -1,3 +1,4 @@
+import { ReturnToDashboardLink } from "./return-to-dashboard-link";
 import { Play, Video } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -23,7 +24,7 @@ export function SessionReviewView({ review, notesAction }: { review: SessionRevi
           calendar's own header; the recording/notes row below is left
           unconstrained so it uses the full page, same as the calendar. */}
       <div className="max-w-6xl space-y-6">
-        <a href="/dashboard" className="text-sm text-muted-foreground">← All sessions</a>
+        <ReturnToDashboardLink />
 
         <header>
           <div className="flex flex-wrap items-center gap-2">

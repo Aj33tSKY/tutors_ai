@@ -42,3 +42,21 @@ test("edge returns streaming data before completion and propagates cancellation"
   await reader.cancel();
   assert.equal(cancelled, true);
 });
+test("edge lets only credential-free public catalogue reads be cached", async () => {
+  const seen: Array<{ cookie: string | null; cache: string | null }> = [];
+  const handler = edgeHandler(async (request) => {
+    seen.push({ cookie: request.headers.get("cookie"), cache: request.headers.get("cache-control") });
+    const headers: Record<string, string> = { "cache-control": "public, max-age=60" };
+    if (request.url.includes("/leak")) headers["set-cookie"] = "a=b";
+    if (request.url.includes("/slots")) headers["cache-control"] = "no-store";
+    return new Response("{}", { headers });
+  });
+  const env = { APP_API_ORIGIN: "https://api.example.test", ASSETS: assets };
+  const catalogue = await handler(new Request("https://app.example.test/v1/public/tutors", { headers: { cookie: "session=secret" } }), env);
+  assert.equal(seen[0].cookie, null, "a session cookie is never forwarded to a public read");
+  assert.match(catalogue.headers.get("cache-control")!, /^public/);
+  assert.match((await handler(new Request("https://app.example.test/v1/public/tutors/x/slots"), env)).headers.get("cache-control")!, /no-store/);
+  assert.match((await handler(new Request("https://app.example.test/v1/public/leak"), env)).headers.get("cache-control")!, /private, no-store/, "a response that sets a cookie is never shared");
+  assert.match((await handler(new Request("https://app.example.test/v1/student/billing"), env)).headers.get("cache-control")!, /private, no-store/, "authenticated routes are never public");
+  assert.match((await handler(new Request("https://app.example.test/v1/public/tutors", { method: "POST", body: "{}" }), env)).headers.get("cache-control")!, /private, no-store/);
+});

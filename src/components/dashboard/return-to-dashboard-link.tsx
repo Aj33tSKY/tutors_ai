@@ -1,11 +1,11 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useAppNavigation } from "@/components/navigation";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export function ReturnToDashboardLink() {
-  const router = useRouter();
+  const router = useAppNavigation();
 
   return (
     <Button
@@ -14,7 +14,7 @@ export function ReturnToDashboardLink() {
       size="sm"
       className="-ml-2"
       onClick={() => {
-        router.push("/dashboard");
+        router.navigate("/dashboard");
         window.setTimeout(() => router.refresh(), 0);
       }}
     >

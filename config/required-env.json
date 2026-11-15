@@ -19,13 +19,19 @@
       "name": "NEXT_PUBLIC_SUPABASE_URL",
       "required": true,
       "secret": false,
-      "purpose": "Supabase project REST endpoint. Differs per environment."
+      "purpose": "Supabase project REST endpoint. Differs per environment.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "NEXT_PUBLIC_SUPABASE_ANON_KEY",
       "required": true,
       "secret": false,
-      "purpose": "Browser-safe Supabase key; RLS is what protects the data behind it."
+      "purpose": "Browser-safe Supabase key; RLS is what protects the data behind it.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "SUPABASE_SERVICE_ROLE_KEY",
@@ -79,7 +85,8 @@
       "secret": false,
       "purpose": "LiveKit project websocket URL, also the host the server SDK derives.",
       "requiredIn": [
-        "api"
+        "api",
+        "worker"
       ]
     },
     {
@@ -88,7 +95,8 @@
       "secret": true,
       "purpose": "Mints room tokens, starts egress, verifies webhook signatures.",
       "requiredIn": [
-        "api"
+        "api",
+        "worker"
       ]
     },
     {
@@ -97,7 +105,8 @@
       "secret": true,
       "purpose": "Pairs with the LiveKit API key. Can mint a token for any room in its project.",
       "requiredIn": [
-        "api"
+        "api",
+        "worker"
       ]
     },
     {
@@ -119,13 +128,20 @@
       "name": "STRIPE_SECRET_KEY",
       "required": true,
       "secret": true,
-      "purpose": "Invoicing. Test mode on staging, live mode on production."
+      "purpose": "Invoicing. Test mode on staging, live mode on production.",
+      "requiredIn": [
+        "api",
+        "worker"
+      ]
     },
     {
       "name": "STRIPE_WEBHOOK_SECRET",
       "required": true,
       "secret": true,
-      "purpose": "Verifies Stripe webhook signatures. Belongs to one endpoint, so it differs per environment."
+      "purpose": "Verifies Stripe webhook signatures. Belongs to one endpoint, so it differs per environment.",
+      "requiredIn": [
+        "api"
+      ]
     },
     {
       "name": "CRON_SECRET",
@@ -159,6 +175,15 @@
       ]
     },
     {
+      "name": "APP_EVENTS_DATABASE_URL",
+      "required": false,
+      "secret": true,
+      "purpose": "Webhook-intake login that can only persist signed provider events (private.accept_provider_event). Never the job or owner credentials.",
+      "requiredIn": [
+        "api"
+      ]
+    },
+    {
       "name": "APP_JOBS_MIGRATION_DATABASE_URL",
       "required": false,
       "secret": true,
@@ -178,8 +203,9 @@
       "name": "AI_GATEWAY_API_KEY",
       "required": false,
       "secret": true,
-      "purpose": "Explicit AI Gateway credential for summary and embedding jobs outside Vercel; never browser exposed.",
+      "purpose": "Fallback AI Gateway credential, used only when OPENAI_API_KEY is not set; never browser exposed.",
       "requiredIn": [
+        "api",
         "worker"
       ]
     },
@@ -190,6 +216,62 @@
       "purpose": "Trusted HTTPS API origin used by the Cloudflare same-origin relay. Set per environment as a Worker binding.",
       "requiredIn": [
         "web-proxy"
+      ]
+    },
+    {
+      "name": "PRERENDER_API_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "API origin the build reads approved tutors from when prerendering public pages. Unset skips prerendering.",
+      "requiredIn": []
+    },
+    {
+      "name": "PUBLIC_SITE_ORIGIN",
+      "required": false,
+      "secret": false,
+      "purpose": "Public site origin used for canonical URLs and the sitemap in prerendered pages.",
+      "requiredIn": []
+    },
+    {
+      "name": "PRERENDER_REQUIRED",
+      "required": false,
+      "secret": false,
+      "purpose": "Set to 1 in release builds so a missing prerender configuration fails instead of skipping.",
+      "requiredIn": []
+    },
+    {
+      "name": "PRERENDER_DIST",
+      "required": false,
+      "secret": false,
+      "purpose": "Test-only override of the directory prerendered pages are written to.",
+      "requiredIn": []
+    },
+    {
+      "name": "APP_JOBS_RUNTIME_ROLE",
+      "required": false,
+      "secret": false,
+      "purpose": "Name of the restricted worker login that the release re-grants private functions to after each migration.",
+      "requiredIn": [
+        "jobs-migration"
+      ]
+    },
+    {
+      "name": "APP_EVENTS_ROLE",
+      "required": false,
+      "secret": false,
+      "purpose": "Name of the webhook-intake login (execute on one function only) that the release re-grants after each migration.",
+      "requiredIn": [
+        "jobs-migration"
+      ]
+    },
+    {
+      "name": "OPENAI_API_KEY",
+      "required": false,
+      "secret": true,
+      "purpose": "Direct OpenAI credential for chat, summaries and embeddings. Preferred over the AI Gateway; never browser exposed.",
+      "requiredIn": [
+        "api",
+        "worker"
       ]
     }
   ]

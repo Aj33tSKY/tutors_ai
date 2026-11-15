@@ -71,11 +71,13 @@ select throws_ok(
   'a stranger cannot book a lesson in another student''s name'
 );
 
-select lives_ok(
+select throws_ok(
   $$ insert into public.bookings (student_id, tutor_id, subject, exam_board, start_time, end_time, amount_gbp_pence)
      values ('dddddddd-0000-0000-0000-000000000004', 'bbbbbbbb-0000-0000-0000-000000000002',
-             'Physics', 'AQA', now(), now() + interval '1 hour', 4200) $$,
-  'a student can book a lesson for themselves'
+             'Physics', 'AQA', now(), now() + interval '1 hour', 0) $$,
+  '42501',
+  null,
+  'a student cannot insert a booking directly; lessons are created by the tutor transaction'
 );
 
 update public.bookings set status = 'cancelled' where id = '0000000a-0000-0000-0000-00000000000a';

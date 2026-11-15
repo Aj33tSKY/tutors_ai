@@ -48,6 +48,8 @@ jobs:
         run: npm run test:portable
       - name: Build portable API, worker and static frontend
         run: npm run build:portable
+      - name: Verify every bundle import is a declared runtime dependency
+        run: node scripts/ci/verify-bundle-deps.mjs
       - name: Validate the Cloudflare static-assets adapter without deploying
         run: npm run check:web-deploy
         env:
@@ -56,6 +58,10 @@ jobs:
         run: |
           docker build -f infra/app/Dockerfile -t tutors-portable:ci .
           node scripts/migration/container-smoke.mjs tutors-portable:ci
+      - name: Verify the web image (Caddy routing, caching, headers and API proxy)
+        run: |
+          docker build -f infra/app/Dockerfile --target web -t tutors-web:ci .
+          node scripts/migration/web-smoke.mjs tutors-web:ci tutors-portable:ci
       # The manifest is what the production parity check trusts, so it has to
       # keep matching the code or it quietly stops covering a variable.
       - name: Check the environment manifest matches the code

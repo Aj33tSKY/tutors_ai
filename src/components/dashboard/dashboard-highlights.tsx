@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { AppLink as Link } from "@/components/navigation";
 import { ArrowRight, CalendarDays, FileText, MessageCircle } from "lucide-react";
 import { subjectLabel } from "@/lib/subjects";
 import type { CalendarSession } from "@/lib/types";

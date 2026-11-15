@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AvailabilityView } from "../../../src/components/dashboard/availability-view.js";
 import { ContactsList } from "../../../src/components/dashboard/contacts-list.js";
@@ -13,13 +13,8 @@ function Failure({ error }: { error: unknown }) {
   return <p role="alert">{error instanceof Error ? error.message : "Could not load this page"}</p>;
 }
 function PortalFrame({ children }: { children: ReactNode }) {
-  const client = useQueryClient();
-  const navigate = useNavigate();
-  const [error, setError] = useState<unknown>();
-  return <main className="mx-auto max-w-6xl space-y-6 p-8"><header className="flex justify-between"><Link to="/dashboard">Dashboard</Link><button onClick={async () => {
-    try { await api.signOut(); client.clear(); navigate("/sign-in"); }
-    catch (cause) { setError(cause); }
-  }}>Sign out</button></header>{error ? <Failure error={error}/> : null}{children}</main>;
+  // Sign-out lives in the dashboard frame; this only lays the page out.
+  return <div className="mx-auto max-w-6xl space-y-6"><Link to="/dashboard">Dashboard</Link>{children}</div>;
 }
 export function AvailabilityPage() {
   const client = useQueryClient();

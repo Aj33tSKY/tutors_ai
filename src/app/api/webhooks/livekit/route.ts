@@ -1,3 +1,5 @@
+// LEGACY: superseded by POST /v1/webhooks/livekit (persisted event + worker). Kept live until the
+// LiveKit webhook URL is switched (docs/lesson-worker-handover.md). Never run both receivers at once.
 // AudioConfig/AudioRoute/AudioChannel aren't re-exported by livekit-server-sdk
 // (only the older egress request types are) — import straight from the
 // protocol package it wraps.

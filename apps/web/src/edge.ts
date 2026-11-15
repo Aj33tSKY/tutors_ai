@@ -13,13 +13,17 @@ export function edgeHandler(upstream: (request: Request) => Promise<Response> = 
     target.search = url.search;
     const forwarded = new Request(target, request);
     for (const name of ["host", "forwarded", "x-forwarded-host", "x-forwarded-for", "x-forwarded-proto"]) forwarded.headers.delete(name);
-    forwarded.headers.set("Cache-Control", "no-store");
+    // Public catalogue reads carry no credentials: they may be cached briefly, as the API declares.
+    const isPublic = url.pathname.startsWith("/v1/public/") && request.method === "GET";
+    if (isPublic) forwarded.headers.delete("cookie");
+    forwarded.headers.set("Cache-Control", isPublic ? "no-cache" : "no-store");
     try {
       // Stream request/response bodies; preserve Origin, HttpOnly Set-Cookie and
       // client cancellation. Never follow a redirect carrying session cookies.
       const response = await upstream(new Request(forwarded, { redirect: "manual" }));
       const result = new Response(response.body, response);
-      result.headers.set("Cache-Control", "private, no-store");
+      // Never let a credentialed or non-public response become shareable.
+      if (!isPublic || !/^public\b/.test(response.headers.get("cache-control") ?? "") || response.headers.has("set-cookie")) result.headers.set("Cache-Control", "private, no-store");
       return result;
     } catch { return unavailable("API is temporarily unavailable"); }
   };

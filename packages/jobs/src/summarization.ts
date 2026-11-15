@@ -1,4 +1,5 @@
 import { embedMany, generateText, Output } from "ai";
+import { aiConfigured, embeddingModel, languageModel } from "./ai-models.js";
 import { z } from "zod";
 import type { Pool } from "pg";
 
@@ -116,12 +117,12 @@ export function formatSessionNotesMarkdown(summary: Record<string, string | unde
 
 const summaryClaim = z.object({ id: z.uuid(), token: z.uuid(), transcript: z.string().min(1), summary: z.unknown(), subject: z.string(), examBoard: z.string() });
 export async function generateLessonSummary(input: z.infer<typeof summaryClaim>) {
-  if (!process.env.AI_GATEWAY_API_KEY) throw new Error("AI_GATEWAY_API_KEY is required outside Vercel");
+  if (!aiConfigured()) throw new Error("OPENAI_API_KEY (or AI_GATEWAY_API_KEY) is required");
   const transcript = consolidateTranscriptTurns(input.transcript);
   const subjectLabel = input.subject.replaceAll("_", " ");
   const boardLabel = input.examBoard.replaceAll("_", " ");
   const summary = input.summary == null ? (await generateText({
-    model: "openai/gpt-5.4-nano", output: Output.object({ schema: SummarySchema }),
+    model: languageModel(), output: Output.object({ schema: SummarySchema }),
     abortSignal: AbortSignal.timeout(120_000),
     system: `You are a UK A-Level ${subjectLabel} tutor writing your own private reflection notes on a session you just taught, for the ${boardLabel} exam board, based on its transcript. Write each field as one to three short, factual sentences in your own voice, grounded only in what the transcript actually shows — never invent content to fill a field. When a field genuinely doesn't apply (no clear breakthrough, no particular pattern noticed), write exactly "N/A" for that field and nothing else — don't spend a sentence explaining why it doesn't apply. This applies even when the call is only an introduction, a product test, or has no substantive syllabus content.
 
@@ -129,7 +130,8 @@ Each transcript line is tagged "[Tutor MM:SS]" or "[Student MM:SS]" with when it
     prompt: transcript,
   })).output : ExistingSummarySchema.parse(input.summary);
   const contents = chunkTranscript(transcript);
-  const { embeddings } = await embedMany({ model: "google/text-embedding-005", values: contents, abortSignal: AbortSignal.timeout(120_000) });
+  const embedding = embeddingModel();
+  const { embeddings } = await embedMany({ ...embedding, values: contents, abortSignal: AbortSignal.timeout(120_000) });
   if (embeddings.length !== contents.length || embeddings.some((v) => v.length !== 768 || v.some((n) => !Number.isFinite(n)))) throw new Error("Invalid embedding response");
   return { summary, notes: formatSessionNotesMarkdown(summary), ratio: talkRatio(transcript),
     chunks: contents.map((content, i) => ({ content, embedding: embeddings[i] })) };

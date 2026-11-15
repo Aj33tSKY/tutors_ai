@@ -3,7 +3,7 @@ import { cors } from "hono/cors";
 import { secureHeaders } from "hono/secure-headers";
 import { bodyLimit } from "hono/body-limit";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { ZodError } from "zod";
+import { z, ZodError } from "zod";
 import { credentials, signup, resetRequest, passwordUpdate, authCode, uuid, renameBooking, calendarRange, type Identity } from "../../../packages/contracts/src/index.js";
 import { getBooking, renameLesson } from "../../../packages/domain/src/bookings.js";
 import { AppError } from "../../../packages/domain/src/errors.js";
@@ -18,9 +18,27 @@ import { liveProvider, type LiveProvider } from "./livekit-provider.js";
 import { sessionReview } from "../../../packages/domain/src/reviews.js";
 import { notesInput } from "../../../packages/contracts/src/reviews.js";
 import { recordingStore } from "../../../packages/jobs/src/recording-store.js";
+import { calendarSessions, schedulingError } from "../../../packages/domain/src/calendar.js";
+import { autoChargeInput } from "../../../packages/contracts/src/billing.js";
+import { studentBilling, startPaymentMethodSetup, openBillingPortal, setAutoCharge, payoutState, startPayoutOnboarding, openPayoutDashboard, sendLessonInvoice, type Billing } from "../../../packages/domain/src/billing.js";
+import { stripeBilling } from "../../../packages/data/src/stripe.js";
+import { eventIntake, normalizeStripeEvent, type EventIntake } from "../../../packages/jobs/src/provider-events.js";
+import Stripe from "stripe";
+import { WebhookReceiver, type WebhookEvent } from "livekit-server-sdk";
+import { normalizeLiveKitEvent } from "../../../packages/jobs/src/livekit-events.js";
+import { tutorQuery, lessonRequestInput } from "../../../packages/contracts/src/tutors.js";
+import { publicTutors, publicTutor, openSlots, requestLesson } from "../../../packages/domain/src/tutors.js";
+import { createClient } from "@supabase/supabase-js";
+import { chatRequest } from "../../../packages/contracts/src/chat.js";
+import { chatTurn, chatConversations, createChatConversation, chatTranscript, deleteChatConversation } from "../../../packages/domain/src/chat.js";
+import type { LanguageModel } from "ai";
+import { messagesQuery, MAX_ATTACHMENT_BYTES } from "../../../packages/contracts/src/messaging.js";
+import { conversationMessages, openThread, sendMessage } from "../../../packages/domain/src/messages.js";
+import { scheduleInput, requestScheduleInput, rescheduleInput, cancelInput, requestsQuery } from "../../../packages/contracts/src/scheduling.js";
 
 type Variables = { requestId: string; client: SupabaseClient; identity: Identity };
-type Dependencies = { client?: typeof requestClient; identify?: typeof identify; live?: LiveProvider | null };
+type StripeEventVerifier = (rawBody: string, signature: string) => { id: string; type: string; data: { object: Record<string, unknown> } };
+type Dependencies = { client?: typeof requestClient; identify?: typeof identify; live?: LiveProvider | null; billing?: Billing | null; events?: EventIntake | null; verifyStripe?: StripeEventVerifier | null; chatModel?: LanguageModel; verifyLiveKit?: ((rawBody: string, authorization: string | undefined) => Promise<WebhookEvent>) | null };
 
 export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
   const config = configSchema.parse(input);
@@ -35,9 +53,17 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     console.info(JSON.stringify({ event: "http_request", requestId: c.get("requestId"), method: c.req.method, status: c.res.status, durationMs: Math.round(performance.now() - started) }));
   });
   app.use("*", cors({ origin: config.webOrigin, credentials: true, allowMethods: ["GET", "POST", "PATCH", "DELETE", "OPTIONS"], allowHeaders: ["Content-Type"], exposeHeaders: ["X-Request-Id"] }));
-  app.use("*", bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ error: { code: "body_too_large", message: "Request is too large", requestId: c.get("requestId") } }, 413) }));
+  const tooLarge = (c: { get(key: "requestId"): string; json(body: unknown, status: 413): Response }) => c.json({ error: { code: "body_too_large", message: "Request is too large", requestId: c.get("requestId") } }, 413);
+  const jsonLimit = bodyLimit({ maxSize: 64 * 1024, onError: tooLarge });
+  // Only multipart message uploads may carry a file; everything else stays small.
+  const uploadLimit = bodyLimit({ maxSize: MAX_ATTACHMENT_BYTES + 256 * 1024, onError: tooLarge });
+  const webhookLimit = bodyLimit({ maxSize: 1024 * 1024, onError: tooLarge });
+  app.use("*", (c, next) => c.req.path.startsWith("/v1/webhooks/") ? webhookLimit(c, next) : next());
+  app.use("*", (c, next) => c.req.path.startsWith("/v1/webhooks/") ? next() : c.req.method === "POST" && /^\/v1\/conversations\/[^/]+\/messages$/.test(c.req.path)
+    && c.req.header("content-type")?.startsWith("multipart/form-data") ? uploadLimit(c, next) : jsonLimit(c, next));
   app.use("*", async (c, next) => {
-    if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method) && c.req.header("origin") !== config.webOrigin) {
+    // Provider webhooks are authenticated by their signature, not by a browser origin.
+    if (!["GET", "HEAD", "OPTIONS"].includes(c.req.method) && !c.req.path.startsWith("/v1/webhooks/") && c.req.header("origin") !== config.webOrigin) {
       throw new AppError(403, "invalid_origin", "Request origin is not allowed");
     }
     c.set("client", (dependencies.client ?? requestClient)(c, config));
@@ -90,6 +116,12 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     return c.json({ success: true });
   });
   app.get("/v1/auth/me", async (c) => c.json({ identity: await (dependencies.identify ?? identify)(c.get("client")) }));
+  app.get("/v1/calendar", async (c) => {
+    const range = calendarRange.parse(c.req.query());
+    const identity = await (dependencies.identify ?? identify)(c.get("client"));
+    return c.json({ sessions: await calendarSessions(c.get("client"), identity, range.from, range.to) });
+  });
+  let eventsCache: EventIntake | null | undefined;
   const live = () => dependencies.live === undefined ? liveProvider() : dependencies.live;
   app.use("/v1/lessons/*", async (c, next) => {
     c.set("identity", await (dependencies.identify ?? identify)(c.get("client"))); await next();
@@ -131,6 +163,84 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     if (!provider) throw new AppError(503, "video_unavailable", "Video is temporarily unavailable");
     return c.json({ tutorPresent: await provider.tutorPresent(booking.id, booking.tutor_id) });
   });
+  app.use("/v1/conversations/*", async (c, next) => {
+    c.set("identity", await (dependencies.identify ?? identify)(c.get("client"))); await next();
+  });
+  app.get("/v1/conversations/with/:counterpartId", async (c) => c.json(await openThread(c.get("client"), c.get("identity"), uuid.parse(c.req.param("counterpartId")))));
+  app.get("/v1/conversations/:id/messages", async (c) => c.json(await conversationMessages(c.get("client"), uuid.parse(c.req.param("id")), messagesQuery.parse(c.req.query()))));
+  app.post("/v1/conversations/:id/messages", async (c) => {
+    const id = uuid.parse(c.req.param("id"));
+    let body = ""; let file: File | null = null;
+    if (c.req.header("content-type")?.startsWith("multipart/form-data")) {
+      const form = await c.req.parseBody();
+      body = typeof form.body === "string" ? form.body : "";
+      file = form.file instanceof File && form.file.size > 0 ? form.file : null;
+    } else {
+      const json = z.object({ body: z.string() }).strict().parse(await c.req.json()); body = json.body;
+    }
+    return c.json({ message: await sendMessage(c.get("client"), c.get("identity"), id, { body, file }) }, 201);
+  });
+  // Public catalogue: anonymous RLS role, no cookies, short browser cache. Only approved real tutors are visible.
+  const anonymous = () => createClient(config.supabaseUrl, config.supabaseAnonKey, { auth: { persistSession: false, autoRefreshToken: false } });
+  const publicCache = (c: { header(name: string, value: string): void }) => c.header("Cache-Control", "public, max-age=60, stale-while-revalidate=300");
+  app.get("/v1/public/tutors", async (c) => { publicCache(c); return c.json(await publicTutors(anonymous(), tutorQuery.parse(c.req.query()))); });
+  app.get("/v1/public/tutors/:id", async (c) => { publicCache(c); return c.json({ tutor: await publicTutor(anonymous(), uuid.parse(c.req.param("id"))) }); });
+  // Open times change as lessons are booked, so they are never cached.
+  app.get("/v1/public/tutors/:id/slots", async (c) => c.json({ slots: await openSlots(anonymous(), uuid.parse(c.req.param("id"))) }));
+  let stripeCache: Billing | null | undefined;
+  const billing = (): Billing | null => dependencies.billing !== undefined ? dependencies.billing : (stripeCache === undefined ? (stripeCache = stripeBilling()) : stripeCache);
+  app.use("/v1/student/*", async (c, next) => {
+    const identity = await (dependencies.identify ?? identify)(c.get("client"));
+    requireRole(identity, ["student"]); c.set("identity", identity); await next();
+  });
+  // Streams over the same cookie session. A 429 here means the daily allowance is spent.
+  app.post("/v1/student/chat", async (c) => chatTurn(c.get("client"), c.get("identity"), chatRequest.parse(await c.req.json()), { model: dependencies.chatModel }));
+  app.get("/v1/student/chat/conversations", async (c) => c.json({ conversations: await chatConversations(c.get("client"), c.get("identity")) }));
+  app.post("/v1/student/chat/conversations", async (c) => c.json(await createChatConversation(c.get("client"), c.get("identity")), 201));
+  app.get("/v1/student/chat/conversations/:id", async (c) => c.json(await chatTranscript(c.get("client"), c.get("identity"), uuid.parse(c.req.param("id")))));
+  app.delete("/v1/student/chat/conversations/:id", async (c) => { await deleteChatConversation(c.get("client"), c.get("identity"), uuid.parse(c.req.param("id"))); return c.json({ success: true }); });
+  app.post("/v1/student/tutors/:id/requests", async (c) => c.json(await requestLesson(c.get("client"), c.get("identity"), uuid.parse(c.req.param("id")), lessonRequestInput.parse(await c.req.json())), 201));
+  app.get("/v1/student/billing", async (c) => c.json(await studentBilling(c.get("client"), c.get("identity"), billing())));
+  app.post("/v1/student/billing/setup", async (c) => c.json(await startPaymentMethodSetup(c.get("client"), c.get("identity"), billing(), config.webOrigin)));
+  app.post("/v1/student/billing/portal", async (c) => c.json(await openBillingPortal(c.get("client"), c.get("identity"), billing(), config.webOrigin)));
+  app.put("/v1/student/billing/auto-charge", async (c) => {
+    const input = autoChargeInput.parse(await c.req.json());
+    await setAutoCharge(c.get("client"), c.get("identity"), billing(), input.enabled);
+    return c.json({ success: true });
+  });
+  // Signed provider events are persisted before they are acknowledged. A persistence failure answers 503 so the
+  // provider retries; everything after persistence is the worker's job. Unhandled event types are acknowledged unstored.
+  app.post("/v1/webhooks/stripe", async (c) => {
+    const signature = c.req.header("stripe-signature");
+    const verify = dependencies.verifyStripe !== undefined ? dependencies.verifyStripe : (process.env.STRIPE_WEBHOOK_SECRET
+      ? (raw: string, header: string) => Stripe.webhooks.constructEvent(raw, header, process.env.STRIPE_WEBHOOK_SECRET!) as unknown as ReturnType<StripeEventVerifier> : null);
+    if (!signature || !verify) throw new AppError(400, "webhook_not_configured", "Webhook not configured");
+    let event: ReturnType<StripeEventVerifier>;
+    try { event = verify(await c.req.text(), signature); } catch { throw new AppError(400, "invalid_signature", "Invalid signature"); }
+    const normalized = normalizeStripeEvent(event);
+    if (!normalized) return c.json({ received: true });
+    const intake = dependencies.events !== undefined ? dependencies.events : (eventsCache ??= eventIntake());
+    if (!intake) throw new AppError(503, "events_unavailable", "Event intake is not configured");
+    try { await intake.accept("stripe", event.id, event.type, normalized); }
+    catch { throw new AppError(503, "events_unavailable", "Could not record this event; please retry"); }
+    return c.json({ received: true });
+  });
+  // LiveKit events follow the same rule: persist the signed event, acknowledge, let the worker act on it.
+  // A wrong path elsewhere answers 404 rather than a page, so a misconfigured webhook is visible to LiveKit.
+  app.post("/v1/webhooks/livekit", async (c) => {
+    const key = process.env.LIVEKIT_API_KEY; const secret = process.env.LIVEKIT_API_SECRET;
+    const verify = dependencies.verifyLiveKit !== undefined ? dependencies.verifyLiveKit : (key && secret ? (raw: string, header: string | undefined) => new WebhookReceiver(key, secret).receive(raw, header) : null);
+    if (!verify) throw new AppError(503, "webhook_not_configured", "Webhook not configured");
+    let event: WebhookEvent;
+    try { event = await verify(await c.req.text(), c.req.header("authorization")); } catch { throw new AppError(401, "invalid_signature", "Invalid LiveKit webhook signature"); }
+    const normalized = normalizeLiveKitEvent(event);
+    if (!normalized || !event.id) return c.json({ received: true });
+    const intake = dependencies.events !== undefined ? dependencies.events : (eventsCache ??= eventIntake());
+    if (!intake) throw new AppError(503, "events_unavailable", "Event intake is not configured");
+    try { await intake.accept("livekit", event.id, event.event, normalized); }
+    catch { throw new AppError(503, "events_unavailable", "Could not record this event; please retry"); }
+    return c.json({ received: true });
+  });
   app.get("/v1/contacts", async (c) => {
     const identity = await (dependencies.identify ?? identify)(c.get("client"));
     return c.json({ contacts: await contacts(c.get("client"), identity) });
@@ -148,6 +258,25 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
   app.use("/v1/tutor/*", async (c, next) => {
     const identity = await (dependencies.identify ?? identify)(c.get("client"));
     requireRole(identity, ["tutor"]); c.set("identity", identity); await next();
+  });
+  app.post("/v1/tutor/lessons", async (c) => {
+    const input = scheduleInput.parse(await c.req.json());
+    const result = await c.get("client").rpc("schedule_lessons_v1", { p_student_id: input.studentId, p_start: input.startTime,
+      p_hours: input.durationHours, p_count: input.count, p_name: input.lessonName, p_request_id: input.requestId ?? null, p_command_id: input.commandId });
+    schedulingError(result.error); return c.json(result.data, 201);
+  });
+  app.get("/v1/tutor/payouts", async (c) => c.json(await payoutState(c.get("client"), c.get("identity"), billing())));
+  app.post("/v1/tutor/payouts/onboarding", async (c) => c.json(await startPayoutOnboarding(c.get("client"), c.get("identity"), billing(), config.webOrigin)));
+  app.post("/v1/tutor/payouts/dashboard", async (c) => c.json(await openPayoutDashboard(c.get("client"), c.get("identity"), billing())));
+  app.get("/v1/tutor/requests", async (c) => {
+    const { page } = requestsQuery.parse(c.req.query());
+    const result = await c.get("client").from("lesson_requests").select("*", { count: "exact" }).eq("tutor_id", c.get("identity").id)
+      .eq("status", "pending").order("created_at", { ascending: false }).order("id").range(page * 50, page * 50 + 49);
+    databaseResult(result.error);
+    const ids = [...new Set((result.data ?? []).map((r) => r.student_id))];
+    const students = ids.length ? await c.get("client").from("profiles").select("id,full_name").in("id", ids) : { data: [], error: null };
+    databaseResult(students.error);
+    return c.json({ requests: result.data ?? [], studentNames: Object.fromEntries((students.data ?? []).map((student) => [student.id, student.full_name])), total: result.count ?? 0, page, pageSize: 50 });
   });
   app.get("/v1/tutor/availability", async (c) => {
     const { data, error } = await c.get("client").from("availability").select("id,tutor_id,day_of_week,start_time,end_time")
@@ -189,8 +318,15 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     return c.json({ bookings: data ?? [] });
   });
   app.get("/v1/bookings/:id", async (c) => c.json(await getBooking(bookingRepository(c.get("client")), c.get("identity"), uuid.parse(c.req.param("id")))));
-  app.get("/v1/bookings/:id/review", async (c) => c.json(await sessionReview(c.get("client"), c.get("identity"), uuid.parse(c.req.param("id")),
-    async (path) => { try { return await recordingStore().sign(path, 3600); } catch { return null; } })));
+  app.get("/v1/bookings/:id/review", async (c) => {
+    let store: ReturnType<typeof recordingStore> | undefined;
+    return c.json(await sessionReview(c.get("client"), c.get("identity"), uuid.parse(c.req.param("id")),
+      async (path) => { try { store ??= recordingStore(); return await store.sign(path, 3600); } catch { return null; } }));
+  });
+  app.post("/v1/bookings/:id/invoice", async (c) => {
+    const identity = await (dependencies.identify ?? identify)(c.get("client"));
+    return c.json(await sendLessonInvoice(c.get("client"), identity, billing(), uuid.parse(c.req.param("id"))), 201);
+  });
   app.patch("/v1/bookings/:id/notes", async (c) => {
     const id = uuid.parse(c.req.param("id"));
     const input = notesInput.parse(await c.req.json());
@@ -199,6 +335,43 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     const { data, error } = await c.get("client").from("session_analytics").update({ notes_markdown: input.notesMarkdown }).eq("booking_id", id).select("booking_id");
     databaseResult(error);
     if (!data?.length) throw new AppError(409, "notes_not_ready", "Notes are not available yet");
+    return c.json({ success: true });
+  });
+  for (const kind of ["complete", "reopen", "cancel", "reschedule"] as const) app.post(`/v1/bookings/:id/${kind}`, async (c) => {
+    requireRole(c.get("identity"), ["tutor"]);
+    const id = uuid.parse(c.req.param("id"));
+    const input = kind === "reschedule" ? rescheduleInput.parse(await c.req.json()) : kind === "cancel" ? cancelInput.parse(await c.req.json()) : {};
+    const result = await c.get("client").rpc("tutor_change_lesson_v1", { p_id: id, p_kind: kind, p_input: input });
+    schedulingError(result.error); return c.json(result.data);
+  });
+  app.use("/v1/requests/*", async (c, next) => {
+    const identity = await (dependencies.identify ?? identify)(c.get("client"));
+    requireRole(identity, ["tutor"]); c.set("identity", identity); await next();
+  });
+  app.get("/v1/requests/:id", async (c) => {
+    const id = uuid.parse(c.req.param("id"));
+    const result = await c.get("client").from("lesson_requests").select("*").eq("id", id).eq("tutor_id", c.get("identity").id).maybeSingle();
+    databaseResult(result.error);
+    if (!result.data) throw new AppError(404, "not_found", "Request not found");
+    const student = await c.get("client").from("profiles").select("full_name").eq("id", result.data.student_id).maybeSingle();
+    databaseResult(student.error); return c.json({ request: result.data, studentName: student.data?.full_name ?? "Student" });
+  });
+  app.post("/v1/requests/:id/schedule", async (c) => {
+    const id = uuid.parse(c.req.param("id"));
+    const input = requestScheduleInput.parse(await c.req.json());
+    const request = await c.get("client").from("lesson_requests").select("student_id,subject").eq("id", id).eq("tutor_id", c.get("identity").id).maybeSingle();
+    databaseResult(request.error);
+    if (!request.data) throw new AppError(404, "not_found", "Request not found");
+    const result = await c.get("client").rpc("schedule_lessons_v1", { p_student_id: request.data.student_id, p_start: input.startTime,
+      p_hours: 1, p_count: input.count, p_name: input.lessonName || request.data.subject.replaceAll("_", " "), p_request_id: id, p_command_id: input.commandId });
+    schedulingError(result.error); return c.json(result.data);
+  });
+  app.post("/v1/requests/:id/decline", async (c) => {
+    const id = uuid.parse(c.req.param("id"));
+    const result = await c.get("client").from("lesson_requests").update({ status: "declined", responded_at: new Date().toISOString() })
+      .eq("id", id).eq("tutor_id", c.get("identity").id).eq("status", "pending").select("id");
+    databaseResult(result.error);
+    if (!result.data?.length) throw new AppError(409, "request_changed", "This request is no longer pending");
     return c.json({ success: true });
   });
   app.patch("/v1/bookings/:id/name", async (c) => {

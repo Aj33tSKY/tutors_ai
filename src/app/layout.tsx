@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Roboto_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { NextNavigationProvider } from "@/components/next-navigation-provider";
 import "./globals.css";
 
 // One variable sans for both body copy and headings — mono is kept only for
@@ -50,7 +51,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="flex min-h-full flex-col text-foreground">
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
-          {children}
+          <NextNavigationProvider>{children}</NextNavigationProvider>
         </ThemeProvider>
       </body>
     </html>

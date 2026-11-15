@@ -1,40 +1,18 @@
 import { CheckCircle2, ExternalLink, Landmark } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
-import { getCurrentProfile } from "@/lib/supabase/profile";
-import { getStripe } from "@/lib/stripe";
+import { legacyBilling, legacyBillingContext } from "@/lib/billing-adapter";
+import { payoutState } from "../../../../../packages/domain/src/billing";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { startPayoutOnboardingAction, openStripeDashboardAction } from "./actions";
 
 export default async function TutorPayoutsPage() {
-  const { userId } = await getCurrentProfile();
-  const supabase = await createClient();
-  const stripeConfigured = Boolean(process.env.STRIPE_SECRET_KEY);
-
-  const { data: tutor } = await supabase
-    .from("tutor_profiles")
-    .select("stripe_account_id")
-    .eq("id", userId)
-    .maybeSingle();
-
-  const connected = Boolean(tutor?.stripe_account_id);
-
-  // Always check live rather than trust a cached flag — this is a
-  // money-movement decision, not just a display. See the checkout action
-  // for the same live check before enabling a destination charge.
-  let payoutsEnabled = false;
-  if (stripeConfigured && connected && tutor?.stripe_account_id) {
-    const account = await getStripe().v2.core.accounts.retrieve(tutor.stripe_account_id, {
-      include: ["configuration.recipient"],
-    });
-    payoutsEnabled =
-      account.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers?.status ===
-      "active";
-    await supabase
-      .from("tutor_profiles")
-      .update({ stripe_payouts_enabled: payoutsEnabled })
-      .eq("id", userId);
-  }
+  const context = await legacyBillingContext();
+  const state = context
+    ? await payoutState(context.client, context.identity, legacyBilling).catch(() => null)
+    : null;
+  const stripeConfigured = Boolean(state?.configured);
+  const connected = Boolean(state?.connected);
+  const payoutsEnabled = Boolean(state?.payoutsEnabled);
 
   return (
     <div className="max-w-3xl space-y-6">

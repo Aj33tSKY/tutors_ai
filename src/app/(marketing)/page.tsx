@@ -1,4 +1,7 @@
 import { Suspense } from "react";
+import { unstable_cache } from "next/cache";
+import { createPublicClient } from "@/lib/supabase/public";
+import { publicTutors } from "../../../packages/domain/src/tutors";
 import { Hero } from "@/components/marketing/hero";
 import { LearningConnection } from "@/components/marketing/learning-connection";
 import "@/components/marketing/landing-page.css";
@@ -12,13 +15,17 @@ import { CtaSection } from "@/components/marketing/cta-section";
 // during the build.
 export const dynamic = "force-dynamic";
 
+// A catalogue outage must not take the landing page down, so a failure shows no tutors.
+const featuredTutors = unstable_cache(async () => (await publicTutors(createPublicClient())).tutors.slice(0, 6), ["featured-tutors-v2"], { revalidate: 300 });
+async function Featured() { return <TutorShowcase tutors={await featuredTutors().catch(() => [])} />; }
+
 export default function HomePage() {
   return (
     <>
       <Hero />
       <LearningConnection />
       <FeatureShowcase />
-      <Suspense fallback={<TutorShowcaseFallback />}><TutorShowcase /></Suspense>
+      <Suspense fallback={<TutorShowcaseFallback />}><Featured /></Suspense>
       <HowItWorks />
       <CtaSection />
     </>

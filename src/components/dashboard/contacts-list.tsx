@@ -1,3 +1,4 @@
+import { AppLink } from "../navigation";
 import { MessageCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -41,9 +42,9 @@ export function ContactsList({ title, singular, contacts }: { title: string; sin
                     </p>
                   </div>
                   <Button asChild size="sm" variant="outline">
-                    <a href={`/dashboard/messages/${contact.id}`}>
+                    <AppLink href={`/dashboard/messages/${contact.id}`}>
                       <MessageCircle className="size-3.5" /> Message
-                    </a>
+                    </AppLink>
                   </Button>
                 </li>
               ))}

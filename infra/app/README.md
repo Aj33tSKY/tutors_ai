@@ -1,3 +1,8 @@
+> **Status:** the portable stack now covers the application's features (see
+> [migration-progress.md](../../docs/migration-progress.md)). To run it on a VPS see
+> [vps-deployment.md](../../docs/vps-deployment.md); this file's local-development notes below are still accurate
+> but its early "first slice" wording is historical.
+
 # Portable application runtime
 
 This directory implements the first migration slice on `feature/portable-frontend-backend`.
