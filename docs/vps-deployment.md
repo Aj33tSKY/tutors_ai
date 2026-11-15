@@ -27,6 +27,13 @@ memory all under 20% at the 95th percentile) may be reclaimed (stopped). The sta
 rebuilt: Postgres is Supabase, recordings are R2, and `deploy-vps.yml` rebuilds the stack. Only its `/opt/tutors/env/*.env`
 files exist nowhere else, so keep a private copy.
 
+## Keeping the free Supabase project awake
+
+`supabase-keepalive.yml` runs daily and makes one real query through both paths (direct PostgREST RPC and the deployed app), and fails
+loudly if either does not answer. Supabase pauses a Free project after a week with too little user database activity; whether this
+is enough is **believed, not proven** until a week passes without a pause. Production should be on a paid plan, which never pauses.
+A paused project can be restored from the dashboard for up to 90 days.
+
 ## Architecture
 
 The staging host is **Ampere (arm64)**, so release images are built with

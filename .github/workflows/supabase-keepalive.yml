@@ -1,0 +1,40 @@
+name: Keep staging database active
+
+# Supabase pauses Free projects that see too little user database activity for a week. This makes one real
+# query each day through the two paths a user's request takes, and fails loudly (GitHub emails the owner)
+# if either does not answer, including when the project is already paused. Staging only: production should
+# be on a paid plan, which never pauses.
+#
+# Whether this is enough to prevent pausing is believed, not proven; see docs/vps-deployment.md.
+# GitHub disables scheduled workflows after 60 days without repository activity.
+on:
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  keepalive:
+    name: Query the staging database
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+      # The anon key is public by design (it ships in the browser bundle); row-level security protects data.
+      SUPABASE_ANON_KEY: ${{ vars.STAGING_SUPABASE_ANON_KEY }}
+      SITE_URL: ${{ vars.STAGING_SITE_URL }}
+    steps:
+      - name: Query the database directly
+        run: |
+          [ -n "$SUPABASE_URL" ] && [ -n "$SUPABASE_ANON_KEY" ] || { echo "::error::STAGING_SUPABASE_URL and STAGING_SUPABASE_ANON_KEY must be set."; exit 1; }
+          # A public RPC that reads the database; an unknown id returns an empty list, which is a successful query.
+          curl --fail-with-body --silent --show-error --max-time 30 --retry 3 --retry-delay 10 \
+            -X POST "$SUPABASE_URL/rest/v1/rpc/tutor_open_slots_v1" \
+            -H "apikey: $SUPABASE_ANON_KEY" -H "Authorization: Bearer $SUPABASE_ANON_KEY" \
+            -H "Content-Type: application/json" -d '{"p_tutor":"00000000-0000-0000-0000-000000000000"}'
+          echo
+      - name: Query through the deployed app
+        run: |
+          [ -n "$SITE_URL" ] || { echo "::error::STAGING_SITE_URL must be set."; exit 1; }
+          curl --fail-with-body --silent --show-error --max-time 30 --retry 3 --retry-delay 10 -o /dev/null -w "app responded %{http_code}\n" "$SITE_URL/v1/public/tutors"
