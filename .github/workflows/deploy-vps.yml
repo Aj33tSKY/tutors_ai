@@ -53,8 +53,6 @@ jobs:
       STAGING_MIGRATIONS_BASELINED: ${{ vars.STAGING_MIGRATIONS_BASELINED }}
       PRODUCTION_MIGRATIONS_BASELINED: ${{ vars.PRODUCTION_MIGRATIONS_BASELINED }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
-      GHCR_PULL_USER: ${{ vars.GHCR_PULL_USER }}
     steps:
       - id: target
         run: |
@@ -78,7 +76,7 @@ jobs:
         run: |
           prefix="${TARGET^^}"
           missing=""
-          for name in SUPABASE_ACCESS_TOKEN GHCR_PULL_TOKEN GHCR_PULL_USER "${prefix}_SUPABASE_DB_PASSWORD" "${prefix}_SUPABASE_PROJECT_ID" "${prefix}_VPS_SSH_KEY" "${prefix}_VPS_HOST" "${prefix}_VPS_KNOWN_HOSTS" "${prefix}_SITE_URL"; do
+          for name in SUPABASE_ACCESS_TOKEN "${prefix}_SUPABASE_DB_PASSWORD" "${prefix}_SUPABASE_PROJECT_ID" "${prefix}_VPS_SSH_KEY" "${prefix}_VPS_HOST" "${prefix}_VPS_KNOWN_HOSTS" "${prefix}_SITE_URL"; do
             if [ -z "${!name:-}" ]; then missing="$missing $name"; fi
           done
           if [ -n "$missing" ]; then echo "::error::Missing required $TARGET secrets/variables:$missing"; exit 1; fi
@@ -161,8 +159,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
-      # Writes the release tag at the end. Job-level permissions replace the workflow-level grant.
+      # contents: write tags the release; packages: read lets the run's own short-lived token pull the
+      # images on the host, so no long-lived registry credential is stored anywhere.
+      # Job-level permissions replace the workflow-level grant.
       contents: write
+      packages: read
     env:
       TARGET: ${{ needs.preflight.outputs.environment }}
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
@@ -182,8 +183,8 @@ jobs:
       PRODUCTION_VPS_KNOWN_HOSTS: ${{ vars.PRODUCTION_VPS_KNOWN_HOSTS }}
       STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
       PRODUCTION_SITE_URL: ${{ vars.PRODUCTION_SITE_URL }}
-      GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
-      GHCR_PULL_USER: ${{ vars.GHCR_PULL_USER }}
+      GHCR_PULL_TOKEN: ${{ github.token }}
+      GHCR_PULL_USER: ${{ github.actor }}
       APP_IMAGE: ${{ needs.images.outputs.app }}
       WEB_IMAGE: ${{ needs.images.outputs.web }}
     steps:

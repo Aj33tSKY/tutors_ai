@@ -113,8 +113,8 @@ Per-environment settings (repository level, prefixed like the existing ones; non
 
 | Kind | Names |
 | --- | --- |
-| Secrets | `STAGING_VPS_SSH_KEY`, `PRODUCTION_VPS_SSH_KEY`, `GHCR_PULL_TOKEN` (read-only package token for the hosts) |
-| Variables | `{STAGING,PRODUCTION}_VPS_HOST`, `_VPS_USER` (default `deploy`), `_VPS_KNOWN_HOSTS`, `_SITE_URL`, `_PRERENDER_API_ORIGIN` (optional), `GHCR_PULL_USER` |
+| Secrets | `STAGING_VPS_SSH_KEY`, `PRODUCTION_VPS_SSH_KEY`. The registry login uses the run's own short-lived token (`packages: read`), so no registry credential is stored. |
+| Variables | `{STAGING,PRODUCTION}_VPS_HOST`, `_VPS_USER` (default `deploy`), `_VPS_KNOWN_HOSTS`, `_SITE_URL`, `_PRERENDER_API_ORIGIN` (optional) |
 | Existing | the Supabase secrets/variables used by `staging.yml` and `production.yml` |
 
 Credentials are selected in shell, not with a ternary expression, because a ternary would silently fall
