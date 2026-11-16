@@ -8,6 +8,8 @@ type ExecutionContextLike = Parameters<ReturnType<typeof createApp>["fetch"]>[2]
 type Assets = { fetch(request: Request): Promise<Response> };
 type Env = { ASSETS: Assets; SPIKE?: string };
 let app: ReturnType<typeof createApp> | undefined;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let sharedPool: any;
 
 // The same response headers the Caddy server (infra/app/Caddyfile) sets, so the two hosts behave identically.
 function hardened(response: Response, pathname: string): Response {
@@ -49,16 +51,21 @@ async function route(request: Request, env: Env, ctx: ExecutionContextLike, path
       });
       return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
     }
-    // SPIKE ONLY (removed before any real use): proves Postgres over TCP works in this runtime. Read-only.
-    if (pathname === "/spike/pg" && env.SPIKE === "1") {
+    // SPIKE ONLY (removed before any real use): Postgres over TCP experiments. Read-only.
+    if ((pathname === "/spike/pg" || pathname === "/spike/pg-shared") && env.SPIKE === "1") {
       const started = Date.now();
+      const query = new URL(request.url).searchParams;
       try {
         const { Pool } = await import("pg");
-        const pool = new Pool({ connectionString: process.env.APP_EVENTS_DATABASE_URL, max: 1, connectionTimeoutMillis: 8000 });
-        const { rows } = await pool.query("select current_user as who, 1 as ok");
-        await pool.end();
-        return Response.json({ ok: true, ...rows[0], ms: Date.now() - started });
-      } catch (error) { return Response.json({ ok: false, error: error instanceof Error ? error.message.slice(0, 200) : "unknown", ms: Date.now() - started }, { status: 500 }); }
+        const connection = new URL(process.env.APP_EVENTS_DATABASE_URL!);
+        if (query.get("port")) connection.port = query.get("port")!;
+        const sleep = Number(query.get("sleep") ?? 0);
+        // pg-shared reuses one module-level pool across requests, which is what eventIntake() does today.
+        const pool = pathname === "/spike/pg-shared" ? (sharedPool ??= new Pool({ connectionString: connection.toString(), max: 2, connectionTimeoutMillis: 8000 })) : new Pool({ connectionString: connection.toString(), max: 1, connectionTimeoutMillis: 8000 });
+        const { rows } = await pool.query("select current_user as who, pg_sleep($1::float8)", [sleep]);
+        if (pathname === "/spike/pg") await pool.end();
+        return Response.json({ ok: true, who: rows[0].who, ms: Date.now() - started });
+      } catch (error) { return Response.json({ ok: false, error: error instanceof Error ? error.message.slice(0, 160) : "unknown", ms: Date.now() - started }, { status: 500 }); }
     }
     if (!pathname.startsWith("/v1/") && !pathname.startsWith("/health/")) {
       // Static files only answer GET and HEAD. Scanners POST to made-up paths (GraphQL probes were seen within hours

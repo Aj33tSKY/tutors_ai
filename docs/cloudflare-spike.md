@@ -112,6 +112,28 @@ client leaves and the reply is saved (`result.consumeStream()`). Cloudflare canc
 the allowance was spent. `chatTurn` now takes an optional `keepAlive` hook; the API registers the work with `executionCtx.waitUntil`, which is a
 no-op on Node. Re-tested twice on the Worker: the transcript now holds `user` and `assistant`.
 
+## Round 5: database connections from Workers (2026-11-16)
+
+Where the Worker touches Postgres: **almost everything goes over HTTPS** (supabase-js to PostgREST and Auth, so Supabase pools server-side and
+isolates never become Postgres connections). The **one direct TCP path is webhook intake** (`eventIntake`, role `tutors_events`).
+
+Measured from the deployed Worker, 100 simultaneous requests each holding a connection for 0.4 s (Supabase Free / Nano, eu-west-1):
+
+| Pooler | Succeeded | Failed | Peak Postgres backends for the role |
+| --- | --- | --- | --- |
+| Session mode, port 5432 (what intake used) | 15 | 85, `EMAXCONNSESSION max clients reached in session mode` | 15 |
+| Transaction mode, port 6543 | 100 | 0 | 31 (the two pools share the database) |
+
+Total backends peaked at 56 of the Free plan's 60. The pooler caps real connections, so Postgres is protected, but session mode fails closed
+beyond the pool size (15) and transaction mode queues up to the client limit (200 on Nano).
+
+**Defect found and fixed:** a module-level pool (what `eventIntake` did) is reused across requests, which Workers forbid. Measured: 5 sequential
+requests gave success, success, **error 1101**, success, success. `eventIntake` now opens and closes one connection per event on Workers
+(detected by `navigator.userAgent`), keeps one pool on Node, and the Worker's secret points at port 6543. Unit tests cover both modes.
+
+Other findings: Supabase is in eu-west-1 (Ireland); the project signs tokens with ES256, so `auth.getClaims()` can verify sessions locally with no
+Auth round trip.
+
 ## Not yet tested (must be before any decision)
 - Heavier routes (booking, lesson tokens, uploads) for CPU time, and a larger CPU sample than the 24 requests the tail log kept.
 - A second ramp round at a different time of day, and any load that does not run through the Free Supabase project.
