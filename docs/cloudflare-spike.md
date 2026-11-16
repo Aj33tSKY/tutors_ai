@@ -48,10 +48,47 @@ Test account: a pre-confirmed staging student created with the Supabase admin AP
 
   Worker medians and p95 are equal or better; its p99 is worse (about 270-300 ms vs 94-190 ms). One client machine may limit these rps figures.
 
+## Round 3: three-way comparison (Worker vs Vercel vs Oracle VPS), 2026-11-16
+
+Same API code on all three, same staging Supabase project, same test account, London client. Vercel: Node function in `lhr1`
+(Hobby plan, throwaway project outside this repo). Vercel's first deploy ran its build in Washington but the function ran in London.
+
+| Test | Worker (Cloudflare Free) | Vercel (Hobby, lhr1) | Oracle VPS (2 OCPU) |
+| --- | --- | --- | --- |
+| Ramp 5 to 50 clients, mixed routes, errors | 0 | 0 | 0 |
+| Throughput at 50 clients | 318 rps | 312 rps | 259 rps |
+| p50 at 25 clients | 98 ms | 119 ms | 110 ms |
+| Burst: 3 x 300 simultaneous, success | 900/900 | 900/900 | 900/900 |
+| Burst wall time per 300 | 1.8-2.3 s | 1.6-1.7 s | 2.4 s |
+| Soak 20 min, 10 rps, healthy minutes: p50 / p95 / p99 | 90 / 158 / 229 ms | 114 / 216 / 338 ms | 94 / 176 / 243 ms |
+| Soak: drift first 5 vs last 5 min (p50) | 87 -> 92 | 111 -> 121 | 91 -> 96 |
+| Soak: errors in healthy minutes | 0 of 10,128 | 0 of 10,130 | 0 of 10,127 |
+
+**The soak had three bad minutes (11, 19, 20) that hit all three hosts at the same instant**, with p99 of 12-26 s and about 300 request
+timeouts each in minute 20. The cause is the shared dependency: during and after the stall, direct calls to the staging Supabase
+project took 1-20 s and its Database report showed "Memory commitment: SEVERE" (1.35 GB committed against about 936 MB RAM) with swap in
+use. It recovered within minutes. So the ceiling in these tests is the Free Supabase project, not any host, and no hosting choice fixes it.
+
+Cloudflare's own aggregate figures for the Worker over about 23,000 invocations: CPU P50 2.4 ms, P90 5.0 ms, P99 8.9 ms, P99.9 14.7 ms;
+"Exceeded CPU Time Limits": 0. Free plan limits: 100,000 requests a day, 10 ms CPU.
+
+An internet scanner (`l9scan`) found the new hostname within hours and POSTed to GraphQL paths. That exposed a real bug: static paths
+passed POSTs to the asset handler, which threw uncaught exceptions (30 of them). Fixed: non-GET/HEAD on static paths returns 405, and
+a catch-all turns any unexpected failure into a logged 500.
+
+The first soak attempt was invalid because the laptop slept mid-test (72-minute gap). The rerun used `caffeinate`.
+
+### Rough monthly cost (list prices, estimates, not measured bills)
+- Cloudflare Workers Paid: $5 flat covers 10M requests and 30M CPU-ms (about 6M requests at 5 ms). About $41 at 100M requests.
+- Vercel Pro: $20 per seat per month with $20 of usage credit; Hobby is non-commercial only. Roughly $140-180 at 100M requests.
+- Oracle free VPS: $0 now; capped at 2 OCPU / 12 GB and reclaimable when idle. Hetzner CPX22 about $24.
+
 ## Not yet tested (must be before any decision)
 - Real chat against a model (needs an OpenAI key); the streaming mechanics above are proven with a synthetic stream.
 - Heavier routes (booking, lesson tokens, uploads) for CPU time, and a larger CPU sample than the 24 requests the tail log kept.
-- The black-box test suite against a deployed Worker (the current integration suite injects fakes in-process).
+- Idle-then-first-request (cold start) on all three. Skipped on purpose until Supabase had recovered; it needs a route that does not touch Supabase.
+- A second ramp round at a different time of day, and any load that does not run through the Free Supabase project.
+- Google Cloud Run (needs a billing card).
 - Hyperdrive versus direct pooler connections, request and query limits under load.
 - Cost and latency from the UK, cold starts, deploy, rollback and secrets handling.
 
