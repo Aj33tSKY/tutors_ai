@@ -134,8 +134,30 @@ requests gave success, success, **error 1101**, success, success. `eventIntake` 
 Other findings: Supabase is in eu-west-1 (Ireland); the project signs tokens with ES256, so `auth.getClaims()` can verify sessions locally with no
 Auth round trip.
 
+## Review (2026-11-16): corrections and new findings
+
+1. **Correction: CPU.** The "P99 8.9 ms, fits Free" figure covered cheap routes only. Measured on the Worker: chat turn 87-251 ms CPU,
+   conversation create 63 ms, sign-in 21 ms. Cloudflare served them, but Free promises 10 ms; **Workers Paid is required**. At 250 ms per turn,
+   40,000 turns a day is about 300M CPU-ms a month, roughly $5-6 on top of the $5 base.
+2. **New: Supabase Auth limits by IP, and our API calls Auth from the server.** Staging allows 30 sign-ins or sign-ups and 150 token refreshes per
+   5 minutes **per IP**. Behind a VPS that is the whole site's budget; behind Workers the egress IPs vary, which is not a guarantee. Fix: enable
+   Auth "IP address forwarding" and send `Sb-Forwarded-For: <CF-Connecting-IP>` from a dedicated **auth-only** client that uses a secret key. The
+   secret key must never be used for data queries: without a user token it acts as service_role and bypasses RLS.
+3. **New: Supabase's pooler ignores the connection-level `statement_timeout`** in both modes. Server reported `2min`; a 6 s query was not
+   cut off with the option set to 5 s. This also means the VPS worker's 30 s timeout has never applied. Fix: set it on the database roles
+   (`alter role ... set statement_timeout`) in the release grant step, then re-verify through the pooler.
+4. **Security, fixed:** the spike Worker was serving `/spike/pg?sleep=&port=` publicly, which let anyone hold database connections. Disabled
+   (`SPIKE=0`); the routes must be deleted before any real deploy.
+5. **Gap: background work.** pg-boss needs a long-running process and session-mode connections; it cannot run on Workers. The move covers web and
+   API only. Either keep a small worker host or rebuild jobs on Cron Triggers and Queues (the "process due work" design).
+6. **Weak evidence to treat with care:** one client machine in London; ramp only to 50 clients; cold start has one sample per cell; the soak stall
+   was blamed on Supabase memory by correlation, not proof; chat CPU has three samples.
+
 ## Not yet tested (must be before any decision)
-- Heavier routes (booking, lesson tokens, uploads) for CPU time, and a larger CPU sample than the 24 requests the tail log kept.
+- Heavier routes (booking, lesson tokens, uploads) for CPU time.
+- Stripe API calls, R2 presign and upload, LiveKit token minting and egress control on the Worker runtime.
+- A live webhook insert into the event inbox through the Worker (pattern proven, write not exercised).
+- Sign-in bursts through each host, to observe the per-IP Auth limit directly.
 - A second ramp round at a different time of day, and any load that does not run through the Free Supabase project.
 - Google Cloud Run (needs a billing card).
 - Hyperdrive versus direct pooler connections, request and query limits under load.
