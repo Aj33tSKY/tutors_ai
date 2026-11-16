@@ -2,6 +2,9 @@ import { AudioChannel, AudioConfig, AudioRoute } from "@livekit/protocol";
 import { EgressClient, EncodedFileType, EncodingOptionsPreset, FileOutput, MediaSource, Output, S3Upload, StartEgressRequest, StorageConfig } from "livekit-server-sdk";
 import { describeInfo, type EgressControl } from "./recording-control";
 
+/** LiveKit's Twirp API answers "not_found" for an egress it has no record of (for example after a server restart). */
+export const isEgressNotFound = (error: unknown) => Boolean(error && typeof error === "object" && "code" in error && String((error as { code: unknown }).code) === "not_found");
+
 /** Egress adapter for the self-hosted LiveKit stack. Output goes to the private recordings bucket. */
 export function livekitEgress(env = process.env): EgressControl | null {
   const { LIVEKIT_API_KEY: key, LIVEKIT_API_SECRET: secret, NEXT_PUBLIC_LIVEKIT_URL: url, R2_ENDPOINT: endpoint, R2_ACCESS_KEY_ID: accessKey, R2_SECRET_ACCESS_KEY: accessSecret, R2_BUCKET: bucket } = env;
@@ -38,7 +41,7 @@ export function livekitEgress(env = process.env): EgressControl | null {
     },
     async stop(egressId) {
       try { await client.stopEgress(egressId); }
-      catch (error) { if (!(error && typeof error === "object" && "code" in error && ["not_found", "failed_precondition"].includes(String(error.code)))) throw error; }
+      catch (error) { if (!(isEgressNotFound(error) || (error && typeof error === "object" && "code" in error && String(error.code) === "failed_precondition"))) throw error; }
     },
     async stopStray(roomName, keep) {
       const tracked = new Set(keep);
@@ -46,8 +49,15 @@ export function livekitEgress(env = process.env): EgressControl | null {
       await Promise.all(active.filter((info) => !tracked.has(info.egressId)).map((info) => client.stopEgress(info.egressId).catch(() => undefined)));
     },
     async describe(egressId) {
-      const [info] = await client.listEgress({ egressId });
-      return info ? describeInfo(info) : null;
+      // "No record" must be null, not an error: the reconciler settles null as ended, but treats an error as "server
+      // unreachable, retry later", which would leave a forgotten recording (and its lesson's summary) stuck for ever.
+      try {
+        const [info] = await client.listEgress({ egressId });
+        return info ? describeInfo(info) : null;
+      } catch (error) {
+        if (isEgressNotFound(error)) return null;
+        throw error;
+      }
     },
   };
 }
