@@ -73,14 +73,26 @@ export async function processProviderEvents(pool: Pool, effects: EventEffects, l
   return applied;
 }
 
-export function eventIntake(connectionString = process.env.APP_EVENTS_DATABASE_URL) {
+type IntakePool = { query(text: string, values: unknown[]): Promise<{ rows: Array<{ accepted?: unknown }> }>; end(): Promise<void> };
+/** Cloudflare Workers forbid reusing an I/O object (a socket) across requests: a shared pool fails on the next request. */
+const runsOnWorkers = () => (globalThis as { navigator?: { userAgent?: string } }).navigator?.userAgent === "Cloudflare-Workers";
+
+/**
+ * Persists a signed provider event. On Node one small pool lives for the process. On Workers each acceptance opens its own
+ * connection and closes it, which stays cheap through Supabase's transaction-mode pooler (port 6543): that mode multiplexes many
+ * short clients onto a few real connections, where session mode (port 5432) rejects every client beyond the pool size.
+ */
+export function eventIntake(connectionString = process.env.APP_EVENTS_DATABASE_URL, options: { connectionPerRequest?: boolean; createPool?: (connectionString: string, max: number) => Promise<IntakePool> } = {}) {
   if (!connectionString) return null;
-  let pool: Pool | undefined;
+  const perRequest = options.connectionPerRequest ?? runsOnWorkers();
+  const createPool = options.createPool ?? (async (url: string, max: number) => { const { Pool: PgPool } = await import("pg"); return new PgPool({ connectionString: url, max, connectionTimeoutMillis: 5000, statement_timeout: 5000 }) as unknown as IntakePool; });
+  let shared: IntakePool | undefined;
   return { async accept(provider: string, eventId: string, type: string, payload: NormalizedEvent) {
-    const { Pool: PgPool } = await import("pg");
-    pool ??= new PgPool({ connectionString, max: 2, connectionTimeoutMillis: 5000, statement_timeout: 5000 });
-    const { rows } = await pool.query("select private.accept_provider_event($1,$2,$3,$4) as accepted", [provider, eventId, type, JSON.stringify(payload)]);
-    return Boolean(rows[0]?.accepted);
+    const db = perRequest ? await createPool(connectionString, 1) : (shared ??= await createPool(connectionString, 2));
+    try {
+      const { rows } = await db.query("select private.accept_provider_event($1,$2,$3,$4) as accepted", [provider, eventId, type, JSON.stringify(payload)]);
+      return Boolean(rows[0]?.accepted);
+    } finally { if (perRequest) await db.end().catch(() => undefined); }
   } };
 }
 export type EventIntake = NonNullable<ReturnType<typeof eventIntake>>;
