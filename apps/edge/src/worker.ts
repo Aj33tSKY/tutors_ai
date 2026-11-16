@@ -4,6 +4,7 @@
 import { createApp } from "../../api/src/app.js";
 import { readConfig } from "../../api/src/config.js";
 
+type ExecutionContextLike = Parameters<ReturnType<typeof createApp>["fetch"]>[2];
 type Assets = { fetch(request: Request): Promise<Response> };
 type Env = { ASSETS: Assets; SPIKE?: string };
 let app: ReturnType<typeof createApp> | undefined;
@@ -22,10 +23,10 @@ function hardened(response: Response, pathname: string): Response {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  async fetch(request: Request, env: Env, ctx: ExecutionContextLike): Promise<Response> {
     const { pathname } = new URL(request.url);
     // Never let an unexpected failure escape as an uncaught exception: log it and answer with a clean 500.
-    try { return hardened(await route(request, env, pathname), pathname); }
+    try { return hardened(await route(request, env, ctx, pathname), pathname); }
     catch (error) {
       console.error(JSON.stringify({ event: "unhandled_error", method: request.method, pathname, message: error instanceof Error ? error.message.slice(0, 300) : "unknown" }));
       return hardened(Response.json({ error: { code: "internal_error", message: "Something went wrong" } }, { status: 500 }), pathname);
@@ -33,7 +34,7 @@ export default {
   },
 };
 
-async function route(request: Request, env: Env, pathname: string): Promise<Response> {
+async function route(request: Request, env: Env, ctx: ExecutionContextLike, pathname: string): Promise<Response> {
     // SPIKE ONLY: a slow stream, to prove incremental delivery and to see what the Worker observes on client disconnect.
     if (pathname === "/spike/stream" && env.SPIKE === "1") {
       const encoder = new TextEncoder();
@@ -74,5 +75,5 @@ async function route(request: Request, env: Env, pathname: string): Promise<Resp
       console.error(JSON.stringify({ event: "config_invalid", message: error instanceof Error ? error.message.slice(0, 300) : "unknown" }));
       return Response.json({ error: { code: "api_unavailable", message: "API is not configured" } }, { status: 503 });
     }
-    return app.fetch(request);
+    return app.fetch(request, env, ctx);
 }

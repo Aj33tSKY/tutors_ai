@@ -83,10 +83,37 @@ The first soak attempt was invalid because the laptop slept mid-test (72-minute 
 - Vercel Pro: $20 per seat per month with $20 of usage credit; Hobby is non-commercial only. Roughly $140-180 at 100M requests.
 - Oracle free VPS: $0 now; capped at 2 OCPU / 12 GB and reclaimable when idle. Hetzner CPX22 about $24.
 
+## Round 4: cold start and real chat (2026-11-16)
+
+**Cold start** (6 signed-in requests per host after 10 and after 30 minutes with no traffic; one sample per cell, so noisy):
+
+| Host | After 10 min: first / next five | After 30 min: first / next five |
+| --- | --- | --- |
+| Cloudflare Worker | 687 ms / 136-213 ms | 1,673 ms / 91-185 ms |
+| Vercel (lhr1) | 1,229 ms / 251-425 ms | 1,110 ms / 133-204 ms |
+| Oracle VPS | 461 ms / 128-311 ms | 253 ms / 141-232 ms |
+
+The VPS keeps warm connections to Supabase, so its first request is only slightly slower. The Worker and Vercel pay roughly 0.5-1.5 s on the
+first request after a quiet spell (likely fresh TLS connections to Supabase from a new isolate or instance, not start-up, which is 59-130 ms).
+
+**Real chat** (`gpt-5.4-nano`, replies capped at 600 tokens, one test student, 36 model calls in total, allowance accounting verified
+exact in the database: 36 sent, 36 used):
+
+| Host | 18 sequential turns: errors | first text p50 (range) | total p50 |
+| --- | --- | --- | --- |
+| Cloudflare Worker | 0 | 819 ms (690-3,098) | 1,763 ms |
+| Vercel | 0 | 918 ms (716-1,594) | 1,887 ms |
+| Oracle VPS | 0 | 1,142 ms (791-1,487) | 1,881 ms |
+
+Five simultaneous chats: all 5 completed on both the Worker and the VPS (wall 4.4 s vs 2.6 s; the Worker's slowest first text was 3.4 s).
+
+**Defect found and fixed: a client disconnect lost the assistant's reply on Workers.** On Node (VPS, Vercel) the model keeps generating after the
+client leaves and the reply is saved (`result.consumeStream()`). Cloudflare cancels the request, so only the student's message was saved while
+the allowance was spent. `chatTurn` now takes an optional `keepAlive` hook; the API registers the work with `executionCtx.waitUntil`, which is a
+no-op on Node. Re-tested twice on the Worker: the transcript now holds `user` and `assistant`.
+
 ## Not yet tested (must be before any decision)
-- Real chat against a model (needs an OpenAI key); the streaming mechanics above are proven with a synthetic stream.
 - Heavier routes (booking, lesson tokens, uploads) for CPU time, and a larger CPU sample than the 24 requests the tail log kept.
-- Idle-then-first-request (cold start) on all three. Skipped on purpose until Supabase had recovered; it needs a route that does not touch Supabase.
 - A second ramp round at a different time of day, and any load that does not run through the Free Supabase project.
 - Google Cloud Run (needs a billing card).
 - Hyperdrive versus direct pooler connections, request and query limits under load.
