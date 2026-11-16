@@ -24,7 +24,12 @@ function hardened(response: Response, pathname: string): Response {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
-    return hardened(await route(request, env, pathname), pathname);
+    // Never let an unexpected failure escape as an uncaught exception: log it and answer with a clean 500.
+    try { return hardened(await route(request, env, pathname), pathname); }
+    catch (error) {
+      console.error(JSON.stringify({ event: "unhandled_error", method: request.method, pathname, message: error instanceof Error ? error.message.slice(0, 300) : "unknown" }));
+      return hardened(Response.json({ error: { code: "internal_error", message: "Something went wrong" } }, { status: 500 }), pathname);
+    }
   },
 };
 
@@ -55,6 +60,9 @@ async function route(request: Request, env: Env, pathname: string): Promise<Resp
       } catch (error) { return Response.json({ ok: false, error: error instanceof Error ? error.message.slice(0, 200) : "unknown", ms: Date.now() - started }, { status: 500 }); }
     }
     if (!pathname.startsWith("/v1/") && !pathname.startsWith("/health/")) {
+      // Static files only answer GET and HEAD. Scanners POST to made-up paths (GraphQL probes were seen within hours
+      // of the hostname going live); without this guard the asset handler throws an uncaught exception.
+      if (request.method !== "GET" && request.method !== "HEAD") return new Response("Method Not Allowed", { status: 405, headers: { Allow: "GET, HEAD" } });
       const asset = await env.ASSETS.fetch(request);
       // Same rule as the Caddy server: a missing file is a real 404, any other unknown path gets the app shell.
       if (asset.status === 404 && !/\.[A-Za-z0-9]+$/.test(pathname)) return env.ASSETS.fetch(new Request(new URL("/", request.url), request));
