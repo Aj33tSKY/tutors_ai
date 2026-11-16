@@ -7,5 +7,10 @@
   "assets": { "directory": "./.assets", "binding": "ASSETS", "not_found_handling": "none", "run_worker_first": ["/v1/*", "/health/*"] },
   "workers_dev": false,
   "routes": [{ "pattern": "cf-staging.hybridtutors.co.uk", "custom_domain": true }],
+  "triggers": { "crons": [] },
+  "queues": {
+    "producers": [{ "binding": "JOBS", "queue": "tutors-jobs-spike" }],
+    "consumers": [{ "queue": "tutors-jobs-spike", "max_batch_size": 1, "max_retries": 3 }]
+  },
   "observability": { "enabled": true }
 }
