@@ -1,5 +1,8 @@
 # Deploying to a VPS
 
+> **Interim.** Staging runs here today, but the target is Cloudflare Workers ([cloudflare-migration-plan.md](cloudflare-migration-plan.md)). This
+> runbook, the Docker images and `deploy-vps.yml` are retired in that plan's phase E. Do not provision a production VPS.
+
 The portable stack runs on one Linux VPS per environment: **Caddy** (TLS, static frontend, API
 proxy), the **API** and the **worker**. Supabase (Postgres and Auth), Cloudflare R2 (recordings) and
 the Hetzner LiveKit server stay external and are not part of this host. This document describes what

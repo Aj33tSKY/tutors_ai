@@ -59,3 +59,16 @@ The staging server works and has been load-tested with four simultaneous session
 ## Application test coverage
 
 Database authorisation is covered by `supabase/tests/`. Nothing tests routing, cookies, or the Server Actions above. Designed in [testing-plan.md](testing-plan.md), not implemented.
+
+## Cloudflare migration follow-ups (from the 16 November review)
+
+Required work is tracked as phases in [cloudflare-migration-plan.md](cloudflare-migration-plan.md). These are the
+optimisations and checks deliberately left for later:
+
+- Verify sessions with `auth.getClaims()` (the project signs with ES256) to remove the Auth round trip from signed-in
+  requests. Trade-off: a revoked session stays valid until its token expires, so sensitive actions should still check.
+- Rate-limit rules on `/v1/auth/*` and the webhook paths. A scanner found a new hostname within hours.
+- Sample or drop the per-request log line (each request currently logs twice).
+- A keep-warm schedule if the 0.7-1.7 s first request after idle proves to matter.
+- Smart Placement if users outside the UK appear (Supabase is in eu-west-1).
+- Confirm data-processing terms with Cloudflare, Supabase and OpenAI cover students' data, many of them under 18.

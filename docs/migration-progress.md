@@ -1,5 +1,9 @@
 # Frontend/backend migration progress
 
+> **Direction changed on 16 November 2026.** The hosting target is now Cloudflare Workers for the web app, the API and the
+> background jobs; see [cloudflare-migration-plan.md](cloudflare-migration-plan.md). The VPS runtime described below is an interim staging host, and the cutover
+> mechanics under "Remaining work" (VPS provisioning, the worker ownership handover) are superseded by that plan's phases.
+
 Branch: `feature/portable-frontend-backend`, created from fetched `origin/main` at
 `67a3da5` on 14 November 2026. This is an incremental migration, not a completed cutover.
 

@@ -1,5 +1,8 @@
 # Portable frontend/backend architecture assessment
 
+> **Decision record, superseded.** The hosting choice was settled on 16 November 2026 after measured tests: Cloudflare
+> Workers for web, API and jobs. See [cloudflare-migration-plan.md](cloudflare-migration-plan.md).
+
 Research date: 14 November 2026. This assessment addresses the revised preference for a separate frontend and a portable, containerised core backend. It supersedes the Cloudflare-native backend recommendation in the earlier hosting assessment for this objective. Research covers the local application and official framework/provider documentation, not live invoices, provider accounts or load tests. Estimates are planning allowances, excluding tax and engineering time.
 
 **Recommended target**

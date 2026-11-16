@@ -1,5 +1,8 @@
 # Cloudflare frontend adapter
 
+> **Superseded.** This relay design (a Worker forwarding `/v1/*` to a separate API container) is replaced by one Worker that
+> serves the frontend and runs the API itself (`apps/edge`); see [cloudflare-migration-plan.md](cloudflare-migration-plan.md).
+
 The portable frontend builds to `apps/web/dist`. Its small Worker forwards
 `/v1/*` and `/health/*` to the Hono container; all other requests use Static
 Assets. Business logic remains in the container. The same files and URL layout
