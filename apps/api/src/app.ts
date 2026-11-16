@@ -195,7 +195,7 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     requireRole(identity, ["student"]); c.set("identity", identity); await next();
   });
   // Streams over the same cookie session. A 429 here means the daily allowance is spent.
-  app.post("/v1/student/chat", async (c) => chatTurn(c.get("client"), c.get("identity"), chatRequest.parse(await c.req.json()), { model: dependencies.chatModel }));
+  app.post("/v1/student/chat", async (c) => chatTurn(c.get("client"), c.get("identity"), chatRequest.parse(await c.req.json()), { model: dependencies.chatModel, keepAlive: (work) => { try { c.executionCtx.waitUntil(Promise.resolve(work)); } catch { /* no execution context on Node: the process keeps running */ } } }));
   app.get("/v1/student/chat/conversations", async (c) => c.json({ conversations: await chatConversations(c.get("client"), c.get("identity")) }));
   app.post("/v1/student/chat/conversations", async (c) => c.json(await createChatConversation(c.get("client"), c.get("identity")), 201));
   app.get("/v1/student/chat/conversations/:id", async (c) => c.json(await chatTranscript(c.get("client"), c.get("identity"), uuid.parse(c.req.param("id")))));
