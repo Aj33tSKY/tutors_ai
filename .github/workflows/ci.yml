@@ -54,6 +54,13 @@ jobs:
         run: npm run check:web-deploy
         env:
           CLOUDFLARE_SEND_METRICS: "false"
+      - name: Run the Worker in Cloudflare's runtime and check runtime-specific behaviour
+        # Node tests cannot catch runtime differences (Stripe's synchronous signature check failed only on Workers).
+        run: |
+          npm run build:edge-assets
+          node scripts/ci/worker-smoke.mjs
+        env:
+          CLOUDFLARE_SEND_METRICS: "false"
       - name: Verify the standalone container runtime
         run: |
           docker build -f infra/app/Dockerfile -t tutors-portable:ci .

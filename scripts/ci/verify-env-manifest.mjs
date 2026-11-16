@@ -22,7 +22,9 @@ const PROVIDED_BY_PLATFORM = new Set([
   "VERCEL_PROJECT_PRODUCTION_URL",
   "CI",
   "PORT",
+  // Cloudflare Worker bindings, declared in apps/edge/wrangler.jsonc rather than configured as variables.
   "ASSETS",
+  "JOBS",
 ]);
 
 const manifest = JSON.parse(readFileSync(MANIFEST, "utf8"));

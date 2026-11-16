@@ -1,5 +1,15 @@
 import type { Pool } from "pg";
 
+/**
+ * Supabase's pooler drops the connection-level `statement_timeout` a client asks for (measured in both modes), so the limit
+ * is set on the role, where every pooled backend for that login picks it up. Non-fatal: a release must not fail on it, but
+ * the warning must be acted on.
+ */
+async function setRoleStatementTimeout(pool: Pool, quotedRole: string, timeout: string) {
+  try { await pool.query(`alter role ${quotedRole} set statement_timeout = '${timeout}'`); }
+  catch (error) { console.warn(JSON.stringify({ event: "role_statement_timeout_not_set", role: quotedRole, code: (error as { code?: string }).code ?? "unknown" })); }
+}
+
 /** Owner-only release operation. Never grant general application-table access. */
 export async function grantJobRuntime(pool: Pool, role: string) {
   if (!/^[a-z_][a-z0-9_]{0,62}$/.test(role)) throw new Error("Invalid runtime role name");
@@ -28,6 +38,8 @@ export async function grantJobRuntime(pool: Pool, role: string) {
       private.recording_activate(uuid,text), private.recording_fail(uuid), private.recording_begin_stop(uuid,text), private.screen_end(text),
       private.recording_tracked_screens(uuid), private.recording_egress_ended(text,boolean,timestamptz,timestamptz,text),
       private.recording_stale_starting(interval), private.recording_unsettled(interval) to ${quoted}`);
+  // Long enough for any single job query; the slow parts of a job (Deepgram, the AI model) happen outside the database.
+  await setRoleStatementTimeout(pool, quoted, "60s");
 }
 
 /**
@@ -46,4 +58,6 @@ export async function grantEventIntake(pool: Pool, role: string) {
   const quoted = `"${role}"`;
   await pool.query(`grant usage on schema private to ${quoted};
     grant execute on function private.accept_provider_event(text,text,text,jsonb) to ${quoted}`);
+  // A webhook must answer quickly; a stuck insert should fail so the provider retries.
+  await setRoleStatementTimeout(pool, quoted, "5s");
 }

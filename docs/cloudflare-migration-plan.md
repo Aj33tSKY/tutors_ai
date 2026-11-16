@@ -1,7 +1,7 @@
 # Cloudflare migration plan
 
-Status: **approved 16 November 2026.** Step 1 (spike) is complete; step 2 (refactor) is next. Nothing on the live
-staging or production sites has changed yet.
+Status: **approved 16 November 2026.** Step 1 (spike) and phase B (refactor) are complete in code; phase C (staged cutover on
+staging) is next and needs approval. Nothing on the live staging or production sites has changed yet. Operations: [cloudflare-deployment.md](cloudflare-deployment.md).
 
 Evidence for every claim below is in `docs/cloudflare-spike.md` on draft PR #69 (branch `spike/cloudflare-workers`),
 which also holds the spike code (`apps/edge/`). Read it before changing any of the decisions here.
@@ -79,23 +79,31 @@ Each of these was measured; none is visible from reading the code.
 - [ ] Auth IP forwarding: enable it in Supabase and send `Sb-Forwarded-For: <CF-Connecting-IP>` from a dedicated
       auth-only client using a secret key. A test must prove that client never runs data queries: without a user token a
       secret key acts as service_role and bypasses RLS.
-- [ ] Statement timeouts set on the `tutors_events` and `tutors_worker` roles in the release grant step, verified through the
-      pooler.
+- [x] Statement timeouts set on the `tutors_events` (5 s) and `tutors_worker` (60 s) roles in the release grant step.
+      Still to verify through the pooler after the first release that runs it.
 - [ ] Workers Paid plan on the Cloudflare account.
 - [ ] Custom SMTP for Supabase Auth (the built-in sender is heavily rate-limited).
 - [ ] A paid Supabase plan (and compute size) chosen for production.
 
-### B. Refactor (step 2, code only)
+### B. Refactor (step 2, code only) — done
 
-- [ ] Promote `apps/edge` from spike to production: delete the `/spike/*` routes and `spike-jobs.ts`, keep the
-      headers, 405 guard, error catch-all and `waitUntil` wiring.
-- [ ] Scheduled and Queue handlers calling the existing job functions; remove pg-boss, `apps/worker`, `queue.ts` and the
-      `app_jobs` migration step (keep the role grants).
-- [ ] Webhook fast path: apply provider events immediately after acceptance, inbox kept for durability and retries.
-- [ ] R2 lifecycle rule for recording expiry.
-- [ ] Worker-runtime tests in CI (wrangler/workerd), so cross-request I/O and Node-only library calls are caught.
-- [ ] A deploy workflow: CI, then migrations, then `wrangler deploy`, with `wrangler rollback` documented.
-- [ ] Exit: all existing suites pass, plus Worker-runtime tests; one LiveKit egress *start* exercised in a real test call.
+- [x] `apps/edge` promoted from spike to production: `/spike/*` routes and `spike-jobs.ts` deleted; headers, 405 guard,
+      error catch-all and `waitUntil` wiring kept.
+- [x] Cron Trigger (every minute, plus daily expiry) and Queue consumer calling the existing job functions through a host-agnostic
+      runner (`packages/jobs/src/runner.ts`). The job functions no longer import pg-boss (`lesson-work.ts`), and the VPS worker
+      uses the same event effects.
+- [x] Webhook fast path: a newly stored provider event enqueues an `events` job at once; the inbox and sweep remain the safety net.
+- [x] Worker-runtime checks in CI (`scripts/ci/worker-smoke.mjs` boots the Worker in workerd; it catches a reintroduced
+      synchronous Stripe check).
+- [x] Deploy workflow (`deploy-cloudflare.yml`): CI, migrations, role grants, `wrangler deploy`, health check; manual with
+      typed confirmation; refuses to run while a Worker secret is missing.
+- [ ] Recording expiry stays the daily job (proven R2 delete) rather than an R2 lifecycle rule: expiry is per recording in the
+      database, not a fixed age, so a bucket rule would need a matching margin. Add one later as a backstop.
+- [ ] Exit still open: one LiveKit egress *start* in a real test call (needs a live room; part of phase C acceptance).
+
+**Changed from the original plan:** removing the VPS worker, pg-boss and `app_jobs` moved from phase B to phase E. Phase C runs
+the new job path alongside the VPS worker, and every merge to `main` still redeploys staging's VPS until the cutover, so deleting
+the worker earlier would have stopped staging's transcripts and summaries before anything replaced them.
 
 ### C. Staged cutover on staging (step 3, needs approval)
 
@@ -113,7 +121,8 @@ Each of these was measured; none is visible from reading the code.
 
 ### E. Retire (step 4)
 
-- [ ] Delete the worker code, Docker images, Caddy, `deploy-vps.yml`, the Oracle VMs and the Vercel workflows and projects.
+- [ ] Delete the worker code (`apps/worker`, `lesson-jobs.ts`, `queue.ts`, pg-boss, the `app_jobs` grants and schema), Docker images,
+      Caddy, `deploy-vps.yml`, the Oracle VMs and the Vercel workflows and projects.
 
 ## Rollback
 

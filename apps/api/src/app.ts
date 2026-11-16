@@ -39,7 +39,11 @@ import { scheduleInput, requestScheduleInput, rescheduleInput, cancelInput, requ
 type Variables = { requestId: string; client: SupabaseClient; identity: Identity };
 type VerifiedStripeEvent = { id: string; type: string; data: { object: Record<string, unknown> } };
 type StripeEventVerifier = (rawBody: string, signature: string) => VerifiedStripeEvent | Promise<VerifiedStripeEvent>;
-type Dependencies = { client?: typeof requestClient; identify?: typeof identify; live?: LiveProvider | null; billing?: Billing | null; events?: EventIntake | null; verifyStripe?: StripeEventVerifier | null; chatModel?: LanguageModel; verifyLiveKit?: ((rawBody: string, authorization: string | undefined) => Promise<WebhookEvent>) | null };
+type Dependencies = {
+  /** Called after a provider event is newly stored, so a host can process it at once. Failure here never fails the webhook:
+   * the event is durable and the next sweep applies it. */
+  onEventAccepted?: () => Promise<void>;
+  client?: typeof requestClient; identify?: typeof identify; live?: LiveProvider | null; billing?: Billing | null; events?: EventIntake | null; verifyStripe?: StripeEventVerifier | null; chatModel?: LanguageModel; verifyLiveKit?: ((rawBody: string, authorization: string | undefined) => Promise<WebhookEvent>) | null };
 
 export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
   const config = configSchema.parse(input);
@@ -123,6 +127,11 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     return c.json({ sessions: await calendarSessions(c.get("client"), identity, range.from, range.to) });
   });
   let eventsCache: EventIntake | null | undefined;
+  const notifyAccepted = async () => {
+    if (!dependencies.onEventAccepted) return;
+    try { await dependencies.onEventAccepted(); }
+    catch { console.error(JSON.stringify({ event: "event_notify_failed" })); }
+  };
   const live = () => dependencies.live === undefined ? liveProvider() : dependencies.live;
   app.use("/v1/lessons/*", async (c, next) => {
     c.set("identity", await (dependencies.identify ?? identify)(c.get("client"))); await next();
@@ -223,8 +232,10 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     if (!normalized) return c.json({ received: true });
     const intake = dependencies.events !== undefined ? dependencies.events : (eventsCache ??= eventIntake());
     if (!intake) throw new AppError(503, "events_unavailable", "Event intake is not configured");
-    try { await intake.accept("stripe", event.id, event.type, normalized); }
+    let accepted: boolean;
+    try { accepted = await intake.accept("stripe", event.id, event.type, normalized); }
     catch { throw new AppError(503, "events_unavailable", "Could not record this event; please retry"); }
+    if (accepted) await notifyAccepted();
     return c.json({ received: true });
   });
   // LiveKit events follow the same rule: persist the signed event, acknowledge, let the worker act on it.
@@ -239,8 +250,10 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     if (!normalized || !event.id) return c.json({ received: true });
     const intake = dependencies.events !== undefined ? dependencies.events : (eventsCache ??= eventIntake());
     if (!intake) throw new AppError(503, "events_unavailable", "Event intake is not configured");
-    try { await intake.accept("livekit", event.id, event.event, normalized); }
+    let accepted: boolean;
+    try { accepted = await intake.accept("livekit", event.id, event.event, normalized); }
     catch { throw new AppError(503, "events_unavailable", "Could not record this event; please retry"); }
+    if (accepted) await notifyAccepted();
     return c.json({ received: true });
   });
   app.get("/v1/contacts", async (c) => {
