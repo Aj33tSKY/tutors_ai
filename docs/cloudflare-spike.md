@@ -153,9 +153,32 @@ Auth round trip.
 6. **Weak evidence to treat with care:** one client machine in London; ramp only to 50 clients; cold start has one sample per cell; the soak stall
    was blamed on Supabase memory by correlation, not proof; chat CPU has three samples.
 
+## Round 6: background-job building blocks on Workers (2026-11-16)
+
+Scheduled trigger (every minute, 6 runs) plus a Cloudflare Queue, in the spike Worker, read-only against staging data. Code: `apps/edge/src/spike-jobs.ts`.
+
+| Building block | Result |
+| --- | --- |
+| Database as `tutors_worker` via the transaction pooler, per-invocation connection | Works; candidate queries run (0 pending of each kind) |
+| Stripe test-mode call with the app's default client | Works; no fetch-client change needed |
+| R2 presigned upload, the app's own `sign()` and `remove()`, read-after-delete | 200 / 200 / content matches / 404 |
+| LiveKit egress describe, stop-stray, token minting | Works (after the fix below) |
+| Queue retry | Retried once, acknowledged on the second attempt |
+| Real AI summary (structured output + 768-dimension embeddings) in a queue job | Works; job ran 43-45 s, beyond the 30 s `waitUntil` window |
+| CPU | Scheduled runs 59-105 ms; queue jobs 0-62 ms |
+
+Notes:
+- Cron schedules took about 11 minutes to start after registration (Cloudflare documents up to 15).
+- Cron triggers and queue consumers require an account `workers.dev` subdomain; registered `hybridtutors.workers.dev` (the Worker itself stays off it).
+- `Date.now()` does not advance during computation inside Workers, so in-code timings read 0 ms; use the platform's wall and CPU figures.
+
+**Latent bug found and fixed (affects the current Node worker too):** LiveKit answers `not_found` for an egress it no longer knows. `describe()`
+threw, and the reconciler reads a throw as "server unreachable, retry later", so a forgotten recording stayed "active" for ever and its lesson
+never got a summary. `describe()` now returns null for `not_found` (verified against staging LiveKit on Node and on the Worker); unit test added.
+
 ## Not yet tested (must be before any decision)
 - Heavier routes (booking, lesson tokens, uploads) for CPU time.
-- Stripe API calls, R2 presign and upload, LiveKit token minting and egress control on the Worker runtime.
+- LiveKit egress *start* (only describe, stop-stray and tokens were exercised; starting needs a live room).
 - A live webhook insert into the event inbox through the Worker (pattern proven, write not exercised).
 - Sign-in bursts through each host, to observe the per-IP Auth limit directly.
 - A second ramp round at a different time of day, and any load that does not run through the Free Supabase project.

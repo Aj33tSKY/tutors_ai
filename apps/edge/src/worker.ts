@@ -3,10 +3,11 @@
 // `nodejs_compat` populates process.env from them, which is what the API reads.
 import { createApp } from "../../api/src/app.js";
 import { readConfig } from "../../api/src/config.js";
+import { spikeQueue, spikeScheduled, type SpikeJobsEnv } from "./spike-jobs.js";
 
 type ExecutionContextLike = Parameters<ReturnType<typeof createApp>["fetch"]>[2];
 type Assets = { fetch(request: Request): Promise<Response> };
-type Env = { ASSETS: Assets; SPIKE?: string };
+type Env = SpikeJobsEnv & { ASSETS: Assets; SPIKE?: string };
 let app: ReturnType<typeof createApp> | undefined;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let sharedPool: any;
@@ -34,6 +35,9 @@ export default {
       return hardened(Response.json({ error: { code: "internal_error", message: "Something went wrong" } }, { status: 500 }), pathname);
     }
   },
+  // SPIKE ONLY: background-job building blocks (see spike-jobs.ts).
+  async scheduled(_controller: unknown, env: Env) { await spikeScheduled(env); },
+  async queue(batch: Parameters<typeof spikeQueue>[0]) { await spikeQueue(batch); },
 };
 
 async function route(request: Request, env: Env, ctx: ExecutionContextLike, pathname: string): Promise<Response> {
