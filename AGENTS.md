@@ -11,6 +11,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 ## Where things are documented
 
 - [docs/development-workflow.md](docs/development-workflow.md) — which branch to start from, how to open a pull request, how to write a migration. Read this first.
+- [docs/cloudflare-migration-plan.md](docs/cloudflare-migration-plan.md) — the approved hosting target (one Cloudflare Worker for web, API and jobs), its measured constraints and the phases still to do.
 - [docs/CI-CD.md](docs/CI-CD.md) — the pipeline itself, environment configuration, and what is still outstanding.
 - [docs/transcription.md](docs/transcription.md) — how session transcripts are produced.
 - [infra/livekit/README.md](infra/livekit/README.md) — the self-hosted LiveKit stack: server setup, firewall, DNS, sizing, rollback, upgrades and the Deploy LiveKit workflow.
@@ -33,3 +34,8 @@ Each of these cost real debugging time. They are not obvious from reading the co
 - **Egress silently refuses jobs it thinks will not fit.** The stock CPU cost for the stereo audio mix fills a 2-vCPU server, so the same call's screen share, or another call's audio, is turned away; LiveKit reports it 10 s later as `request canceled` and the recording is marked `failed`. `egress.yaml.template` sets the costs; read its comment and the infra README's capacity section before touching them or resizing the server.
 - **`NEXT_PUBLIC_LIVEKIT_URL` is baked in at build time.** Changing it in Vercel does nothing until the app is redeployed.
 - **Adding a permission to `ci.yml` breaks its callers.** `staging.yml` and `production.yml` call it as a reusable workflow, and a called workflow cannot request more permissions than its caller grants. `scripts/ci/verify-workflow-permissions.mjs` checks this in CI.
+- **Supabase's pooler ignores the connection-level `statement_timeout`.** Both pooler modes drop the `pg` option; the server keeps its 2-minute default. Set timeouts on the database role instead.
+- **On Cloudflare Workers a connection cannot outlive its request.** A module-level `pg` Pool works for two requests, then fails with error 1101. Open and close a connection per request or job, through the transaction pooler (port 6543): the session pooler rejects clients beyond its pool size (15 on Free).
+- **Supabase Auth rate-limits sign-ins and token refreshes per IP, and the API calls Auth from the server.** Without forwarding the user's IP (`Sb-Forwarded-For` from an auth-only secret-key client), every user shares the server's budget: 30 sign-ins per 5 minutes on staging.
+- **LiveKit answers `not_found` for a recording it has forgotten**, for example after a restart. Treating that as "unreachable, retry" leaves the recording active for ever and its lesson never gets a summary; it must be settled as ended.
+- **New Cloudflare Cron schedules can take up to 15 minutes to start firing** (11 observed), and Cron Triggers and Queues refuse to deploy until the account has a `workers.dev` subdomain.

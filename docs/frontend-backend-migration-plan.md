@@ -1,7 +1,7 @@
 # Frontend/backend migration plan
 
 Status: in progress on `feature/portable-frontend-backend`; API/UI and durable lesson processing extraction underway.
-Updated: 15 November 2026.
+Updated: 15 November 2026. Hosting target changed on 16 November 2026: see [cloudflare-migration-plan.md](cloudflare-migration-plan.md).
 
 Read [migration-progress.md](migration-progress.md) for implemented work, verification and
 remaining scope. Unchecked phase exits remain outstanding even where individual foundations exist.

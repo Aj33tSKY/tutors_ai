@@ -1,5 +1,9 @@
 # Portable lesson worker handover
 
+> **To be replaced.** The Node worker and pg-boss are removed in favour of a Cron Trigger and a Cloudflare Queue in the
+> Worker; see [cloudflare-migration-plan.md](cloudflare-migration-plan.md). The job functions and database claims described here stay; the process
+> and its installation steps do not.
+
 The Node worker now handles stereo transcription, summary/embedding generation,
 recording retention and LiveKit recording control. The API persists signed LiveKit
 webhooks (`POST /v1/webhooks/livekit`) and the worker starts and stops Egress. See

@@ -1,5 +1,8 @@
 # Hosting alternatives assessment
 
+> **Decision record, superseded.** The hosting choice was settled on 16 November 2026 after measured tests: Cloudflare
+> Workers for web, API and jobs. See [cloudflare-migration-plan.md](cloudflare-migration-plan.md).
+
 Research date: 14 November 2026. Recommendation based on repository documentation, application code, deployment workflows, installed Next.js deployment guides, and current provider documentation. No provider accounts, invoices, production usage, or live configuration were inspected. Prices are public list prices or explicitly labelled planning allowances; exclude VAT, currency conversion, engineering time, and usage unless stated.
 
 **Recommendation: retain managed Supabase, R2, and Hetzner LiveKit; evaluate Cloudflare Workers as the replacement for Vercel.** Cloudflare offers the clearest managed hosting saving, but this app needs two compatibility issues resolved first. Hetzner plus Coolify is the alternative for a standard Node runtime and greater control, provided an available server quote actually saves money. Moving both the app and database at once is a poor trade for the existing reliability and release process.

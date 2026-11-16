@@ -5,6 +5,9 @@
 
 # Portable application runtime
 
+> **Interim.** These containers run the staging VPS until the Cloudflare cutover; they are retired in phase E of
+> [../../docs/cloudflare-migration-plan.md](../../docs/cloudflare-migration-plan.md).
+
 This directory implements the first migration slice on `feature/portable-frontend-backend`.
 It is **not ready to replace the complete Next app**. Current functionality is API-owned
 authentication and a participant-scoped calendar/booking read and rename flow. The worker
