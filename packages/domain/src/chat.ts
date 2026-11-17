@@ -55,7 +55,7 @@ export async function chatInstructions(client: SupabaseClient, studentId: string
  * disconnect so the reply is still saved. Nothing is shared between processes: any replica
  * can serve any turn.
  */
-export async function chatTurn(client: SupabaseClient, identity: Identity, request: ChatRequest, options: { model?: LanguageModel } = {}): Promise<Response> {
+export async function chatTurn(client: SupabaseClient, identity: Identity, request: ChatRequest, options: { model?: LanguageModel; keepAlive?: (work: PromiseLike<unknown>) => void } = {}): Promise<Response> {
   requireRole(identity, ["student"]);
   // Checked before the allowance is spent: an unconfigured assistant must cost the student nothing.
   if (!options.model && !aiConfigured()) throw new AppError(503, "assistant_unavailable", "The revision assistant is not available yet. Please try again later.");
@@ -86,7 +86,10 @@ export async function chatTurn(client: SupabaseClient, identity: Identity, reque
     messages: await convertToModelMessages(history),
     maxOutputTokens: MAX_OUTPUT_TOKENS,
   });
-  result.consumeStream();
+  // Keep generating (and saving the reply) if the client leaves. Runtimes that cancel a request when its client goes away
+  // (Cloudflare Workers) are told to keep this work alive through `keepAlive`; Node needs nothing.
+  const finished = result.consumeStream();
+  options.keepAlive?.(finished);
   return createUIMessageStreamResponse({
     stream: toUIMessageStream({
       stream: result.stream,

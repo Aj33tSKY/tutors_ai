@@ -12,6 +12,7 @@
     "dev:web": "vite --config apps/web/vite.config.ts",
     "dev:worker": "tsx apps/worker/src/index.ts",
     "build:portable": "node scripts/migration/build.mjs",
+    "build:edge-assets": "rm -rf apps/edge/.assets && cp -R apps/web/dist apps/edge/.assets && cp apps/edge/_headers apps/edge/.assets/_headers",
     "prerender:web": "tsx scripts/migration/prerender.mts",
     "typecheck:portable": "tsc -p tsconfig.portable.json --noEmit",
     "test:portable": "node --import tsx --test tests/portable/*.test.ts",

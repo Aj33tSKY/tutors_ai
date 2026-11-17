@@ -1,0 +1,231 @@
+name: Deploy to Cloudflare
+
+# Releases the whole application (static frontend, API, background jobs) as one Cloudflare Worker. See
+# docs/cloudflare-deployment.md. Manual only and confirmed for both environments: the first staging release takes the
+# staging hostname over from the VPS, which is the cutover itself (docs/cloudflare-migration-plan.md, phase C).
+# Order: verify -> migrate database -> re-grant restricted logins -> deploy compatible code -> prove health.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options: [staging, production]
+        required: true
+      confirm:
+        description: Type "deploy" to confirm
+        required: true
+        default: ""
+
+permissions:
+  contents: read
+  # ci.yml is called as a reusable workflow below; a called workflow cannot request more than its caller grants.
+  pull-requests: read
+
+concurrency:
+  group: cloudflare-${{ inputs.environment }}-deployment
+  cancel-in-progress: false
+
+jobs:
+  preflight:
+    name: Check the release is allowed
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      environment: ${{ steps.target.outputs.environment }}
+    env:
+      TARGET: ${{ inputs.environment }}
+      CONFIRM: ${{ inputs.confirm }}
+      # Both sets are exposed so selection happens in shell: a ternary expression would fall back to the staging value
+      # when a production one is empty, which must never happen.
+      STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+      PRODUCTION_SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
+      STAGING_SUPABASE_PROJECT_ID: ${{ vars.STAGING_SUPABASE_PROJECT_ID }}
+      PRODUCTION_SUPABASE_PROJECT_ID: ${{ vars.PRODUCTION_SUPABASE_PROJECT_ID }}
+      STAGING_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_URL: ${{ vars.PRODUCTION_SUPABASE_URL }}
+      STAGING_SUPABASE_ANON_KEY: ${{ vars.STAGING_SUPABASE_ANON_KEY }}
+      PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.PRODUCTION_SUPABASE_ANON_KEY }}
+      STAGING_SUPABASE_POOLER_HOST: ${{ vars.STAGING_SUPABASE_POOLER_HOST }}
+      PRODUCTION_SUPABASE_POOLER_HOST: ${{ vars.PRODUCTION_SUPABASE_POOLER_HOST }}
+      STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+      PRODUCTION_SITE_URL: ${{ vars.PRODUCTION_SITE_URL }}
+      STAGING_MIGRATIONS_BASELINED: ${{ vars.STAGING_MIGRATIONS_BASELINED }}
+      PRODUCTION_MIGRATIONS_BASELINED: ${{ vars.PRODUCTION_MIGRATIONS_BASELINED }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_SEND_METRICS: "false"
+      # Set once per environment with `wrangler secret put --env <name>`. Names only are compared, never values.
+      REQUIRED_WORKER_SECRETS: >-
+        APP_EVENTS_DATABASE_URL APP_JOBS_DATABASE_URL STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET LIVEKIT_API_KEY
+        LIVEKIT_API_SECRET NEXT_PUBLIC_LIVEKIT_URL R2_ENDPOINT R2_BUCKET R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY DEEPGRAM_API_KEY
+    steps:
+      - id: target
+        run: |
+          case "$TARGET" in staging|production) ;; *) echo "::error::Unknown environment."; exit 1 ;; esac
+          echo "environment=$TARGET" >> "$GITHUB_OUTPUT"
+      - name: Limit releases to main
+        env:
+          DEPLOY_REF: ${{ github.ref }}
+        run: |
+          if [ "$DEPLOY_REF" != "refs/heads/main" ]; then echo "::error::Releases can only be made from main."; exit 1; fi
+      - name: Require an explicit confirmation
+        run: |
+          if [ "$CONFIRM" != "deploy" ]; then echo "::error::Type deploy in the confirmation field to release $TARGET."; exit 1; fi
+      - name: Require a confirmed migration baseline
+        run: |
+          flag="${TARGET^^}_MIGRATIONS_BASELINED"
+          if [ "${!flag:-}" != "true" ]; then echo "::error::Set the repository variable $flag=true after reconciling migration history."; exit 1; fi
+      - name: Require the credentials the release needs
+        run: |
+          prefix="${TARGET^^}"
+          missing=""
+          for name in SUPABASE_ACCESS_TOKEN CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID "${prefix}_SUPABASE_DB_PASSWORD" "${prefix}_SUPABASE_PROJECT_ID" \
+                      "${prefix}_SUPABASE_URL" "${prefix}_SUPABASE_ANON_KEY" "${prefix}_SUPABASE_POOLER_HOST" "${prefix}_SITE_URL"; do
+            if [ -z "${!name:-}" ]; then missing="$missing $name"; fi
+          done
+          if [ -n "$missing" ]; then echo "::error::Missing required $TARGET secrets/variables:$missing"; exit 1; fi
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Require every secret the Worker reads
+        working-directory: apps/edge
+        run: |
+          present="$(npx --no-install wrangler secret list --env "$TARGET" --format json | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).map(x=>x.name).join(" ")))')"
+          missing=""
+          for name in $REQUIRED_WORKER_SECRETS; do case " $present " in *" $name "*) ;; *) missing="$missing $name" ;; esac; done
+          if [ -n "$missing" ]; then echo "::error::Worker secrets missing for $TARGET:$missing (wrangler secret put <NAME> --env $TARGET)"; exit 1; fi
+
+  verify:
+    name: Verify the commit being released
+    needs: preflight
+    uses: ./.github/workflows/ci.yml
+    with:
+      # A release never skips the database checks.
+      migration_validation: always
+
+  deploy:
+    name: Migrate the database and deploy the Worker
+    needs: [preflight, verify]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # Tags production releases. Job-level permissions replace the workflow-level grant.
+      contents: write
+    env:
+      TARGET: ${{ needs.preflight.outputs.environment }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
+      PRODUCTION_SUPABASE_DB_PASSWORD: ${{ secrets.PRODUCTION_SUPABASE_DB_PASSWORD }}
+      STAGING_SUPABASE_PROJECT_ID: ${{ vars.STAGING_SUPABASE_PROJECT_ID }}
+      PRODUCTION_SUPABASE_PROJECT_ID: ${{ vars.PRODUCTION_SUPABASE_PROJECT_ID }}
+      STAGING_SUPABASE_BASELINE_VERSION: ${{ vars.STAGING_SUPABASE_BASELINE_VERSION }}
+      PRODUCTION_SUPABASE_BASELINE_VERSION: ${{ vars.PRODUCTION_SUPABASE_BASELINE_VERSION }}
+      STAGING_SUPABASE_URL: ${{ vars.STAGING_SUPABASE_URL }}
+      PRODUCTION_SUPABASE_URL: ${{ vars.PRODUCTION_SUPABASE_URL }}
+      STAGING_SUPABASE_ANON_KEY: ${{ vars.STAGING_SUPABASE_ANON_KEY }}
+      PRODUCTION_SUPABASE_ANON_KEY: ${{ vars.PRODUCTION_SUPABASE_ANON_KEY }}
+      STAGING_SUPABASE_POOLER_HOST: ${{ vars.STAGING_SUPABASE_POOLER_HOST }}
+      PRODUCTION_SUPABASE_POOLER_HOST: ${{ vars.PRODUCTION_SUPABASE_POOLER_HOST }}
+      STAGING_SITE_URL: ${{ vars.STAGING_SITE_URL }}
+      PRODUCTION_SITE_URL: ${{ vars.PRODUCTION_SITE_URL }}
+      STAGING_PRERENDER_API_ORIGIN: ${{ vars.STAGING_PRERENDER_API_ORIGIN }}
+      PRODUCTION_PRERENDER_API_ORIGIN: ${{ vars.PRODUCTION_PRERENDER_API_ORIGIN }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+      CLOUDFLARE_SEND_METRICS: "false"
+      APP_JOBS_RUNTIME_ROLE: tutors_worker
+      APP_EVENTS_ROLE: tutors_events
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+
+      - name: Select this environment's settings
+        run: |
+          prefix="${TARGET^^}"
+          pick() { local v="${prefix}_$1"; if [ -z "${!v:-}" ]; then echo "::error::$v is not set."; exit 1; fi; printf '%s' "${!v}"; }
+          pw="$(pick SUPABASE_DB_PASSWORD)"; echo "::add-mask::$pw"
+          ref="$(pick SUPABASE_PROJECT_ID)"; pooler="$(pick SUPABASE_POOLER_HOST)"
+          [[ "$ref" =~ ^[a-z0-9]{20}$ && "$pooler" =~ ^[a-z0-9.-]+\.pooler\.supabase\.com$ ]] || { echo "::error::Unexpected project id or pooler host."; exit 1; }
+          owner="postgresql://postgres.${ref}:$(node -e 'console.log(encodeURIComponent(process.argv[1]))' "$pw")@${pooler}:5432/postgres"
+          echo "::add-mask::$owner"
+          prerender_var="${prefix}_PRERENDER_API_ORIGIN"
+          {
+            echo "SUPABASE_DB_PASSWORD=$pw"
+            echo "SUPABASE_PROJECT_ID=$ref"
+            echo "SUPABASE_BASELINE_VERSION=$(pick SUPABASE_BASELINE_VERSION)"
+            echo "APP_JOBS_MIGRATION_DATABASE_URL=$owner"
+            echo "SITE_URL=$(pick SITE_URL)"
+            echo "PUBLIC_SUPABASE_URL=$(pick SUPABASE_URL)"
+            echo "PUBLIC_SUPABASE_ANON_KEY=$(pick SUPABASE_ANON_KEY)"
+            echo "PRERENDER_API_ORIGIN=${!prerender_var:-}"
+          } >> "$GITHUB_ENV"
+
+      - name: Link Supabase CLI to this environment
+        run: npx --no-install supabase link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Verify remote migration history
+        run: |
+          npx --no-install supabase migration list --linked --output-format json > "$RUNNER_TEMP/migrations.json"
+          node scripts/ci/verify-supabase-migration-history.mjs "$RUNNER_TEMP/migrations.json"
+      - name: Preview migrations
+        run: npx --no-install supabase db push --linked --dry-run
+      - name: Apply migrations before the code that needs them
+        run: npx --no-install supabase db push --linked --yes
+      - name: Re-grant the restricted job and intake logins
+        # Each migration can add private functions these logins must be allowed to call; also sets their statement timeouts.
+        run: npx --no-install tsx scripts/migration/grant-roles.ts
+
+      - name: Build the frontend
+        run: npm run build:portable
+      - name: Prerender public pages against the target API
+        if: env.PRERENDER_API_ORIGIN != ''
+        run: PUBLIC_SITE_ORIGIN="$SITE_URL" PRERENDER_REQUIRED=1 npm run prerender:web
+      - name: Assemble the Worker's static assets
+        run: npm run build:edge-assets
+      - name: Create the job queues if they do not exist yet
+        working-directory: apps/edge
+        run: |
+          for queue in "tutors-jobs-$TARGET" "tutors-jobs-$TARGET-failed"; do
+            if ! out="$(npx --no-install wrangler queues create "$queue" 2>&1)"; then
+              echo "$out" | grep -qi "already" || { echo "$out"; exit 1; }
+            fi
+          done
+      - name: Deploy the Worker
+        working-directory: apps/edge
+        run: |
+          npx --no-install wrangler deploy --env "$TARGET" \
+            --var NODE_ENV:production \
+            --var "APP_COMMIT_SHA:$GITHUB_SHA" \
+            --var "APP_WEB_ORIGIN:$SITE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_URL:$PUBLIC_SUPABASE_URL" \
+            --var "NEXT_PUBLIC_SUPABASE_ANON_KEY:$PUBLIC_SUPABASE_ANON_KEY"
+      - name: Check the public site
+        run: bash scripts/ci/smoke-check-deployment.sh "$SITE_URL" /health/ready
+      - name: Record what was released
+        if: needs.preflight.outputs.environment == 'production'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="production-$(date -u +%Y%m%d)-${GITHUB_RUN_NUMBER}"
+          if gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$tag" -f "sha=$GITHUB_SHA" >/dev/null 2>&1; then
+            echo "Released \`$tag\` — $GITHUB_SHA" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Could not create the tag $tag. The release succeeded regardless."
+          fi
+      - name: Explain how to recover
+        if: failure()
+        run: |
+          {
+            echo "### Release failed"
+            echo "- Code: \`cd apps/edge && npx wrangler rollback --env $TARGET\` returns the previous Worker version."
+            echo "- Database: migrations are forward-only and must stay compatible with the previous release; do not reverse them by hand."
+            echo "- Details: docs/cloudflare-deployment.md."
+          } >> "$GITHUB_STEP_SUMMARY"
