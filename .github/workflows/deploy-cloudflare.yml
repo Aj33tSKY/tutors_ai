@@ -181,7 +181,7 @@ jobs:
         run: npx --no-install supabase db push --linked --yes
       - name: Re-grant the restricted job and intake logins
         # Each migration can add private functions these logins must be allowed to call; also sets their statement timeouts.
-        run: npx --no-install tsx scripts/migration/grant-roles.ts
+        run: npx --no-install tsx scripts/migration/grant-roles.mts
 
       - name: Build the frontend
         run: npm run build:portable

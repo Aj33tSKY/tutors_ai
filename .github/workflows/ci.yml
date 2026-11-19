@@ -54,6 +54,12 @@ jobs:
         run: npm run check:web-deploy
         env:
           CLOUDFLARE_SEND_METRICS: "false"
+      - name: Release-only scripts must at least load
+        # They run only during a release, so a module-format or syntax error would otherwise surface mid-release
+        # (grant-roles.ts once failed that way). Without its settings the script must stop with its own clear error.
+        run: |
+          out="$(npx --no-install tsx scripts/migration/grant-roles.mts 2>&1 || true)"
+          echo "$out" | grep -q "are required" || { echo "$out"; echo "::error::grant-roles.mts did not start cleanly"; exit 1; }
       - name: Run the Worker in Cloudflare's runtime and check runtime-specific behaviour
         # Node tests cannot catch runtime differences (Stripe's synchronous signature check failed only on Workers).
         run: |
