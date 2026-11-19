@@ -23,7 +23,14 @@ const unavailable = () => new AppError(503, "payments_unavailable", "Payments ar
 const provider = (billing: Billing | null) => { if (!billing) throw unavailable(); return billing(); };
 async function viaProvider<T>(work: () => Promise<T>): Promise<T> {
   try { return await work(); }
-  catch (error) { if (error instanceof AppError) throw error; console.error(JSON.stringify({ event: "payment_provider_failed" })); throw new AppError(502, "payments_failed", "The payment provider could not complete that; please try again"); }
+  catch (error) {
+    if (error instanceof AppError) throw error;
+    // Class and code only: provider messages can carry personal data, but "connection error" versus "invalid request" is
+    // what an operator needs to tell a runtime problem from a configuration one.
+    const detail = error as { type?: string; code?: string; statusCode?: number; name?: string; cause?: { code?: string } };
+    console.error(JSON.stringify({ event: "payment_provider_failed", type: detail?.type ?? detail?.name, code: detail?.code, status: detail?.statusCode, cause: detail?.cause?.code }));
+    throw new AppError(502, "payments_failed", "The payment provider could not complete that; please try again");
+  }
 }
 
 async function customerFor(client: SupabaseClient, identity: Identity, billing: BillingProvider) {
