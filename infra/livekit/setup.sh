@@ -33,11 +33,13 @@ fi
 
 : "${LIVEKIT_DOMAIN:?Set LIVEKIT_DOMAIN, e.g. livekit-staging.example.com}"
 : "${TURN_DOMAIN:?Set TURN_DOMAIN, e.g. turn-staging.example.com}"
-: "${WEBHOOK_URL:?Set WEBHOOK_URL to the /api/webhooks/livekit URL of the app}"
+: "${WEBHOOK_URL:?Set WEBHOOK_URL to the /v1/webhooks/livekit URL of the app}"
 
+# Two receivers exist during the migration: the legacy Next app (/api/webhooks/livekit) and the portable API
+# (/v1/webhooks/livekit). Anything else is a typo, and a wrong path still answers 200 and silently drops every event.
 case "$WEBHOOK_URL" in
-  https://*/api/webhooks/livekit) ;;
-  *) echo "WEBHOOK_URL must look like https://<app-domain>/api/webhooks/livekit (a wrong path still returns 200 and silently drops every event)." >&2; exit 1 ;;
+  https://*/api/webhooks/livekit | https://*/v1/webhooks/livekit) ;;
+  *) echo "WEBHOOK_URL must look like https://<app-domain>/v1/webhooks/livekit (or the legacy /api/webhooks/livekit). A wrong path still returns 200 and silently drops every event." >&2; exit 1 ;;
 esac
 
 echo "==> Installing packages"
