@@ -37,30 +37,57 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
-      - run: npm run lint
+      # Decide which checks this change can affect (scripts/ci/changed-scope.mjs). The job always runs and always reports, so
+      # the required check never sits pending; the slow steps below are conditional. Releases and manual runs have no pull
+      # request, so they get "unknown" and run everything.
+      - name: Decide which checks this change needs
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then changed="$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')"; else changed='*'; fi
+          printf '%s\n' "$changed" | node scripts/ci/changed-scope.mjs | tee -a "$GITHUB_OUTPUT"
+      - name: Install dependencies
+        if: steps.scope.outputs.code == 'true'
+        run: npm ci
+      - name: Lint
+        if: steps.scope.outputs.code == 'true'
+        run: npm run lint
       - name: Generate Next.js route types
+        if: steps.scope.outputs.next == 'true'
         run: npx next typegen
-      - run: npx tsc --noEmit
+      - name: Typecheck the legacy Next application
+        if: steps.scope.outputs.next == 'true'
+        run: npx tsc --noEmit
       - name: Typecheck the portable application
+        if: steps.scope.outputs.code == 'true'
         run: npm run typecheck:portable
       - name: Test API contracts and authorization boundaries
+        if: steps.scope.outputs.code == 'true'
         run: npm run test:portable
       - name: Build portable API, worker and static frontend
+        if: steps.scope.outputs.code == 'true'
         run: npm run build:portable
       - name: Verify every bundle import is a declared runtime dependency
+        if: steps.scope.outputs.code == 'true'
         run: node scripts/ci/verify-bundle-deps.mjs
       - name: Validate the Cloudflare static-assets adapter without deploying
+        if: steps.scope.outputs.webdeploy == 'true'
         run: npm run check:web-deploy
         env:
           CLOUDFLARE_SEND_METRICS: "false"
       - name: Release-only scripts must at least load
+        if: steps.scope.outputs.code == 'true'
         # They run only during a release, so a module-format or syntax error would otherwise surface mid-release
         # (grant-roles.ts once failed that way). Without its settings the script must stop with its own clear error.
         run: |
           out="$(npx --no-install tsx scripts/migration/grant-roles.mts 2>&1 || true)"
           echo "$out" | grep -q "are required" || { echo "$out"; echo "::error::grant-roles.mts did not start cleanly"; exit 1; }
       - name: Run the Worker in Cloudflare's runtime and check runtime-specific behaviour
+        if: steps.scope.outputs.worker == 'true'
         # Node tests cannot catch runtime differences (Stripe's synchronous signature check failed only on Workers).
         run: |
           npm run build:edge-assets
@@ -68,18 +95,22 @@ jobs:
         env:
           CLOUDFLARE_SEND_METRICS: "false"
       - name: Verify the standalone container runtime
+        if: steps.scope.outputs.docker == 'true'
         run: |
           docker build -f infra/app/Dockerfile -t tutors-portable:ci .
           node scripts/migration/container-smoke.mjs tutors-portable:ci
       - name: Verify the web image (Caddy routing, caching, headers and API proxy)
+        if: steps.scope.outputs.docker == 'true'
         run: |
           docker build -f infra/app/Dockerfile --target web -t tutors-web:ci .
           node scripts/migration/web-smoke.mjs tutors-web:ci tutors-portable:ci
       # The manifest is what the production parity check trusts, so it has to
       # keep matching the code or it quietly stops covering a variable.
       - name: Check the environment manifest matches the code
+        if: steps.scope.outputs.code == 'true'
         run: node scripts/ci/verify-env-manifest.mjs
-      - name: Build the application
+      - name: Build the legacy Next application
+        if: steps.scope.outputs.next == 'true'
         # Placeholders only: this job never sees a real environment's secrets.
         run: npm run build
         env:
@@ -104,16 +135,33 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - run: npm ci
+      # Decide which checks this change can affect (scripts/ci/changed-scope.mjs). The job always runs and always reports, so
+      # the required check never sits pending; the slow steps below are conditional. Releases and manual runs have no pull
+      # request, so they get "unknown" and run everything.
+      - name: Decide which checks this change needs
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          PR: ${{ github.event.pull_request.number }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          if [ "$EVENT" = "pull_request" ]; then changed="$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')"; else changed='*'; fi
+          printf '%s\n' "$changed" | node scripts/ci/changed-scope.mjs | tee -a "$GITHUB_OUTPUT"
+      - name: Install dependencies
+        if: steps.scope.outputs.workflows == 'true'
+        run: npm ci
       # actionlint covers expression typos, bad needs references, unknown action
       # inputs, and shellcheck over every run block. Pinned by tag, and the
       # image ships the shellcheck it needs.
       - name: actionlint
+        if: steps.scope.outputs.workflows == 'true'
         run: docker run --rm -v "$PWD":/repo -w /repo rhysd/actionlint:1.7.12 -color
       # actionlint does not check that a reusable workflow's callers grant the
       # permissions it requests; GitHub only enforces that at run time, which is
       # how an unrunnable staging.yml once reached the default branch.
       - name: Verify reusable workflow permissions
+        if: steps.scope.outputs.workflows == 'true'
         run: node scripts/ci/verify-workflow-permissions.mjs
 
   migrations:
