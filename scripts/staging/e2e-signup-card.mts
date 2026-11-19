@@ -93,7 +93,8 @@ await page.screenshot({ path: `${shots}/dashboard.png` });
 
 // 3. Save a card through the sandbox checkout.
 await page.goto(`${base}/dashboard/student/billing`);
-await page.getByRole("button", { name: "Save a payment method" }).click();
+// A student who already has a card sees "Replace payment method" instead.
+await page.getByRole("button", { name: /^(Save a payment method|Replace payment method)$/ }).click();
 await page.waitForURL(/checkout\.stripe\.com/, { timeout: 45000 }).catch(() => fail("did not reach Stripe's checkout"));
 await page.waitForLoadState("domcontentloaded");
 await page.waitForTimeout(2500);
