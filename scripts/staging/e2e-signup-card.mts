@@ -61,7 +61,7 @@ for (let i = 0; i < 24 && !link; i++) {
   if (list?.length) {
     const message = (await mail("GET", `/messages/${list[0].id}`, undefined, mailToken)).data;
     const body = `${(message.text as string | undefined) ?? ""} ${((message.html as string[] | undefined) ?? []).join(" ")}`;
-    link = (body.match(/https:\/\/[^\s"'<>)]+\/auth\/v1\/verify[^\s"'<>)]+/) ?? [""])[0].replace(/&amp;/g, "&");
+    link = (body.match(/https:\/\/[^\s"'<>)\]]+\/auth\/v1\/verify[^\s"'<>)\]]+/) ?? [""])[0].replace(/&amp;/g, "&");
     if (!link) await fail("the email had no confirmation link");
   } else await new Promise((r) => setTimeout(r, 8000));
 }
