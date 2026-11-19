@@ -1,7 +1,7 @@
 # Cloudflare migration plan
 
-Status: **approved 16 November 2026.** Step 1 (spike) and phase B (refactor) are complete in code; phase C (staged cutover on
-staging) is next and needs approval. Nothing on the live staging or production sites has changed yet. Operations: [cloudflare-deployment.md](cloudflare-deployment.md).
+Status: **approved 16 November 2026.** Spike, phase B (refactor) and the phase C staging cutover are done; staging has run on the
+Worker since 19 November 2026. Open: real-call acceptance and an observation window, then phase A prerequisites for production. Operations: [cloudflare-deployment.md](cloudflare-deployment.md).
 
 Evidence for every claim below is in `docs/cloudflare-spike.md` on draft PR #69 (branch `spike/cloudflare-workers`),
 which also holds the spike code (`apps/edge/`). Read it before changing any of the decisions here.
@@ -105,14 +105,23 @@ Each of these was measured; none is visible from reading the code.
 the new job path alongside the VPS worker, and every merge to `main` still redeploys staging's VPS until the cutover, so deleting
 the worker earlier would have stopped staging's transcripts and summaries before anything replaced them.
 
-### C. Staged cutover on staging (step 3, needs approval)
+### C. Staged cutover on staging — done 19 November 2026 (acceptance still open)
 
-- [ ] Deploy the Worker to the staging hostname. Run the new job path alongside the existing VPS worker (claims make both safe),
-      then stop the VPS worker.
-- [ ] Switch the Stripe and LiveKit staging webhook URLs one at a time. Never run two receivers of one webhook.
-- [ ] Observe for several days: backlog, errors, CPU, cold start; acceptance runs for sign-up/email, a real call with
-      recording and summary, chat, and a Stripe sandbox invoice.
-- [ ] Exit: an agreed observation window with no unexplained failures.
+- [x] Worker `tutors-staging` deployed with 13 secrets, the `tutors-jobs-staging` queue and its dead-letter queue, a minute-by-minute
+      sweep and a daily expiry run. The staging A record (Oracle VPS) was removed and the hostname moved to the Worker
+      (about 2½ minutes unreachable).
+- [x] Stripe sandbox webhook destination `tutors-staging` created for `/v1/webhooks/stripe`; a sandbox `invoice.paid` was
+      delivered with HTTP 200 and the correct response.
+- [x] LiveKit staging server switched to `/v1/webhooks/livekit` (one line in `/opt/livekit/.env`, redeployed with nobody connected);
+      signatures verified at the new endpoint. `setup.sh` now accepts the new path.
+- [x] Four consecutive sweeps clean (16-34 ms CPU, no failure logs); the VPS worker was then stopped and set not to restart.
+- [x] Role-level statement timeouts (5 s intake, 60 s worker) verified enforced through both pooler modes.
+- [x] Every merge to `main` now deploys staging to the Worker; the VPS workflow is manual-only.
+- [ ] **Needs a person:** a real lesson with a recording and a summary (also exercises LiveKit egress *start*), sign-up with email
+      confirmation, and a Stripe sandbox card setup through the app.
+- [ ] Observe for several days: backlog, errors, CPU, first-request latency after idle (chat's first reply was 3-5 s cold).
+- [ ] Re-run `Deploy to Cloudflare` once for a clean green run (the first run attached the code but failed on the custom domain,
+      which was then attached by hand).
 
 ### D. Production
 

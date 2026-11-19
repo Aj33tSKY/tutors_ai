@@ -54,15 +54,15 @@ suite), applies migrations, re-grants the restricted logins (which also sets the
 pooler ignores the connection-level setting), builds and prerenders the frontend, creates the queues if needed, deploys,
 and checks `/health/ready`.
 
-### The first staging release is the cutover
+### Releases
 
-`env.staging` claims `staging.hybridtutors.co.uk`, which today points at the Oracle VPS. Follow phase C of the plan:
+Every merge to `main` deploys **staging** automatically (no CI re-run, since the merge already passed it). Production is only
+ever a manual dispatch with the typed confirmation. Staging was cut over from the Oracle VPS on 19 November 2026.
 
-1. Set the Worker secrets and GitHub variables above.
-2. Remove the existing `staging` A record in Cloudflare DNS (a custom domain cannot replace a record it does not own), then
-   run the release straight away; the hostname is down between the two steps.
-3. Watch the first sweeps and jobs (`npx wrangler tail --env staging`), then stop the VPS worker. Until then both run safely.
-4. Point the Stripe and LiveKit staging webhooks at the same URLs (they are unchanged; only the host behind them moved).
+**A custom domain cannot replace a DNS record it does not own.** The first release of a hostname that already has an A, AAAA
+or CNAME record fails with "already has externally managed DNS records" at the very end, after the code has deployed. Delete
+the old record first (note its settings so it can be restored), then run the release, or attach the domain afterwards with
+`cd apps/edge && npx wrangler triggers deploy --env <env>`. Production will need the same step.
 
 ## Rollback
 

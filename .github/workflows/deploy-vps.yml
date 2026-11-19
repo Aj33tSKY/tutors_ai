@@ -1,12 +1,12 @@
 name: Deploy to VPS
 
-# The release path for the VPS hosts (Vercel is being retired). Every merge to main deploys staging;
-# production is only ever deployed by a human dispatching this workflow and typing the confirmation.
+# RETIRED RELEASE PATH (staging moved to Cloudflare on 19 November 2026; see deploy-cloudflare.yml). Manual only now: a push
+# no longer redeploys the idle staging VPS, which would also restart the worker that was deliberately stopped. Kept as the
+# rollback path until phase E of docs/cloudflare-migration-plan.md deletes it.
+# Originally: every merge to main deployed staging; production was a typed-confirmation dispatch.
 # Same order as the earlier pipeline: verify -> build artifacts -> migrate database -> deploy compatible
 # code -> prove health. A failed health check rolls the host back to the previous release automatically.
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
