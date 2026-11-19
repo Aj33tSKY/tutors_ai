@@ -22,13 +22,13 @@ async function mail(method: string, path: string, body?: unknown, token?: string
   for (let attempt = 0; attempt < 6; attempt++) {
     const response = await fetch(`https://api.mail.tm${path}`, { method, headers: { "content-type": "application/json", "user-agent": UA, ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: body ? JSON.stringify(body) : undefined });
     if (response.status === 429) { await new Promise((r) => setTimeout(r, 6000)); continue; }
-    return { status: response.status, data: await response.json().catch(() => ({})) as Record<string, any> };
+    return { status: response.status, data: await response.json().catch(() => ({})) as Record<string, unknown> };
   }
   throw new Error("mail.tm kept rate limiting");
 }
 if (!existing) {
   // A throwaway inbox (mail.tm): random address and password, nothing personal.
-  const domain = (await mail("GET", "/domains")).data["hydra:member"][0].domain as string;
+  const domain = ((await mail("GET", "/domains")).data["hydra:member"] as Array<{ domain: string }>)[0].domain;
   address = `tutors-e2e-${randomBytes(4).toString("hex")}@${domain}`;
   const mailPassword = randomBytes(12).toString("base64url");
   if ((await mail("POST", "/accounts", { address, password: mailPassword })).status !== 201) throw new Error("could not create the throwaway inbox");
@@ -60,7 +60,7 @@ for (let i = 0; i < 24 && !link; i++) {
   const list = (await mail("GET", "/messages", undefined, mailToken)).data["hydra:member"] as Array<{ id: string }> | undefined;
   if (list?.length) {
     const message = (await mail("GET", `/messages/${list[0].id}`, undefined, mailToken)).data;
-    const body = `${message.text ?? ""} ${(message.html ?? []).join(" ")}`;
+    const body = `${(message.text as string | undefined) ?? ""} ${((message.html as string[] | undefined) ?? []).join(" ")}`;
     link = (body.match(/https:\/\/[^\s"'<>)]+\/auth\/v1\/verify[^\s"'<>)]+/) ?? [""])[0].replace(/&amp;/g, "&");
     if (!link) await fail("the email had no confirmation link");
   } else await new Promise((r) => setTimeout(r, 8000));
@@ -125,7 +125,7 @@ step("card saved in the Stripe sandbox and returned to the app");
 let saved = false;
 for (let i = 0; i < 30 && !saved; i++) {
   const response = await page.request.get(`${base}/v1/student/billing`);
-  const billing = await response.json() as Record<string, any>;
+  const billing = await response.json() as Record<string, unknown>;
   saved = Boolean(billing.savedMethod ?? billing.paymentMethod ?? billing.card ?? billing.defaultPaymentMethod);
   if (!saved) { await page.waitForTimeout(4000); }
   else step("saved card shows on the account", JSON.stringify(billing.savedMethod ?? billing.paymentMethod ?? billing.card).slice(0, 60));

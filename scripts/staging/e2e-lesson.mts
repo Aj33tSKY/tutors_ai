@@ -39,7 +39,7 @@ function writeWav(path: string, samples: Int16Array) {
   h.writeUInt32LE(48000, 24); h.writeUInt32LE(96000, 28); h.writeUInt16LE(2, 32); h.writeUInt16LE(16, 34); h.write("data", 36); h.writeUInt32LE(samples.length * 2, 40);
   writeFileSync(path, Buffer.concat([h, Buffer.from(samples.buffer, samples.byteOffset, samples.byteLength)]));
 }
-const cursor = { tutor: LEAD * 48000, student: LEAD * 48000 }; const parts: Array<{ who: "tutor" | "student"; at: number; pcm: Int16Array }> = [];
+const parts: Array<{ who: "tutor" | "student"; at: number; pcm: Int16Array }> = [];
 let t = LEAD * 48000;
 script.forEach((line, i) => {
   const aiff = join(work, `line${i}.aiff`), wav = join(work, `line${i}.wav`);
