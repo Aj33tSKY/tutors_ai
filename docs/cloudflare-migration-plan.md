@@ -82,7 +82,8 @@ Each of these was measured; none is visible from reading the code.
 - [x] Statement timeouts set on the `tutors_events` (5 s) and `tutors_worker` (60 s) roles in the release grant step.
       Still to verify through the pooler after the first release that runs it.
 - [ ] Workers Paid plan on the Cloudflare account.
-- [ ] Custom SMTP for Supabase Auth (the built-in sender is heavily rate-limited).
+- [ ] Custom SMTP for Supabase Auth. **Proven necessary on 19 November:** the built-in sender allowed two confirmation emails, then
+      answered `over_email_send_rate_limit` to everyone else for the next hour. Needs a sending domain (SPF/DKIM records) and a provider account.
 - [ ] A paid Supabase plan (and compute size) chosen for production.
 
 ### B. Refactor (step 2, code only) — done
@@ -117,11 +118,21 @@ the worker earlier would have stopped staging's transcripts and summaries before
 - [x] Four consecutive sweeps clean (16-34 ms CPU, no failure logs); the VPS worker was then stopped and set not to restart.
 - [x] Role-level statement timeouts (5 s intake, 60 s worker) verified enforced through both pooler modes.
 - [x] Every merge to `main` now deploys staging to the Worker; the VPS workflow is manual-only.
-- [ ] **Needs a person:** a real lesson with a recording and a summary (also exercises LiveKit egress *start*), sign-up with email
-      confirmation, and a Stripe sandbox card setup through the app.
+- [x] **A full lesson with simulated people** (19 November, `scripts/staging/e2e-lesson.mts`): two real browsers with fake cameras and
+      synthesised speech joined a LiveKit room; the tutor consented and recorded; LiveKit egress started through the new path
+      (19 webhooks, all 200); the recording was ready 15 s after the call, transcribed 30 s later (voices correctly separated into
+      `[Tutor]` and `[Student]` turns), and summarised 15 s after that (7 fields, talk ratio, embeddings).
+- [x] **Stripe sandbox card setup** (`scripts/staging/e2e-signup-card.mts --existing`): saved the published test card through
+      Stripe's sandbox checkout; the webhook reached the Worker and its queue and attached the card (shown as `visa 4242`).
+      This found and fixed a bug that affected every host: Stripe now requires a `currency` on setup-mode Checkout Sessions.
+- [x] Staging Auth settings: Site URL and redirect allow-list were still `localhost`; set to the staging site.
+- [x] Observation so far (6 hours including all tests): 433 Worker invocations, 0 errors; CPU median 4 ms, p99 78 ms, p99.9 160 ms.
+- [x] A clean green release: merging to `main` deployed staging through the pipeline (run succeeded).
+- [x] Spike resources removed (Worker, queue, hostname, throwaway Vercel project).
+- [ ] **Email sign-up end to end:** the real form, the real confirmation email and the real link worked up to the click, then Supabase's
+      built-in sender hit its limit (about 2 emails an hour per project, `over_email_send_rate_limit`). Re-run when the window clears,
+      and fix properly with custom SMTP (phase A).
 - [ ] Observe for several days: backlog, errors, CPU, first-request latency after idle (chat's first reply was 3-5 s cold).
-- [ ] Re-run `Deploy to Cloudflare` once for a clean green run (the first run attached the code but failed on the custom domain,
-      which was then attached by hand).
 
 ### D. Production
 

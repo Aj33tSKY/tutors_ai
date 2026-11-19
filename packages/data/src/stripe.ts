@@ -21,7 +21,9 @@ export function stripeBilling(secretKey = process.env.STRIPE_SECRET_KEY, stripe 
     },
     async setupSession({ customerId, successUrl, cancelUrl }) {
       // Setup-mode Checkout keeps card details off this app and surfaces whichever methods the account enables.
-      const session = await api.checkout.sessions.create({ mode: "setup", customer: customerId, success_url: successUrl, cancel_url: cancelUrl });
+      // Stripe's current API version rejects a setup-mode session without a currency (parameter_missing), which is what lets it
+      // choose the payment methods to offer. Lessons are priced in pounds.
+      const session = await api.checkout.sessions.create({ mode: "setup", currency: "gbp", customer: customerId, success_url: successUrl, cancel_url: cancelUrl });
       if (!session.url) throw new Error("Checkout returned no URL");
       return session.url;
     },

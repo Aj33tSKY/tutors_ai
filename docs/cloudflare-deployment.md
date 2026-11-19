@@ -64,6 +64,22 @@ or CNAME record fails with "already has externally managed DNS records" at the v
 the old record first (note its settings so it can be restored), then run the release, or attach the domain afterwards with
 `cd apps/edge && npx wrangler triggers deploy --env <env>`. Production will need the same step.
 
+## Staging test accounts and end-to-end checks
+
+`scripts/staging/` holds repeatable, staging-guarded tooling (each refuses to run against any other Supabase project):
+
+- `seed-fixtures.mts` lists the seeded demo tutors in the catalogue (`is_demo` is a trust control that excludes them from the public
+  site, search and lesson requests; staging only holds fake data) and creates a test tutor. Re-running `supabase/seed.mjs` turns
+  `is_demo` back on.
+- `e2e-signup-card.mts [--existing]` signs up with a throwaway mailbox (mail.tm) and confirms through the real email link, then saves
+  Stripe's published test card in the sandbox checkout. It will not type a card number unless Stripe shows test/sandbox mode and stops
+  at any visible CAPTCHA. Supabase's built-in email sender allows about 2 emails an hour, so run the sign-up half sparingly;
+  `--existing` runs only the card half with the pre-confirmed test student.
+- `e2e-lesson.mts` runs a recorded lesson with two browsers (fake camera, synthesised speech via macOS `say`) and follows it to a summary.
+
+Test credentials live in `~/.tutors-backups/cf-test/` (never in the repo). Cloudflare's bot protection rejects scripted clients with a
+default library User-Agent (error 1010); send a browser User-Agent.
+
 ## Rollback
 
 `cd apps/edge && npx wrangler rollback --env <env>` returns the previous Worker version within seconds. Database
