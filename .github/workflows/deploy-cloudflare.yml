@@ -1,10 +1,13 @@
 name: Deploy to Cloudflare
 
 # Releases the whole application (static frontend, API, background jobs) as one Cloudflare Worker. See
-# docs/cloudflare-deployment.md. Manual only and confirmed for both environments: the first staging release takes the
-# staging hostname over from the VPS, which is the cutover itself (docs/cloudflare-migration-plan.md, phase C).
+# docs/cloudflare-deployment.md. Every merge to main deploys staging; production is only ever deployed by a human dispatching
+# this workflow and typing the confirmation. A push has no inputs and always means staging, and it skips the CI re-run because
+# the merge already passed the same required checks on its pull request.
 # Order: verify -> migrate database -> re-grant restricted logins -> deploy compatible code -> prove health.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       environment:
@@ -14,7 +17,7 @@ on:
         required: true
       confirm:
         description: Type "deploy" to confirm
-        required: true
+        required: false
         default: ""
 
 permissions:
@@ -23,7 +26,7 @@ permissions:
   pull-requests: read
 
 concurrency:
-  group: cloudflare-${{ inputs.environment }}-deployment
+  group: cloudflare-${{ inputs.environment || 'staging' }}-deployment
   cancel-in-progress: false
 
 jobs:
@@ -34,8 +37,10 @@ jobs:
     outputs:
       environment: ${{ steps.target.outputs.environment }}
     env:
-      TARGET: ${{ inputs.environment }}
+      # A push to main has no inputs and always means staging.
+      TARGET: ${{ inputs.environment || 'staging' }}
       CONFIRM: ${{ inputs.confirm }}
+      EVENT: ${{ github.event_name }}
       # Both sets are exposed so selection happens in shell: a ternary expression would fall back to the staging value
       # when a production one is empty, which must never happen.
       STAGING_SUPABASE_DB_PASSWORD: ${{ secrets.STAGING_SUPABASE_DB_PASSWORD }}
@@ -70,9 +75,9 @@ jobs:
           DEPLOY_REF: ${{ github.ref }}
         run: |
           if [ "$DEPLOY_REF" != "refs/heads/main" ]; then echo "::error::Releases can only be made from main."; exit 1; fi
-      - name: Require an explicit confirmation
+      - name: Require an explicit confirmation for manual releases
         run: |
-          if [ "$CONFIRM" != "deploy" ]; then echo "::error::Type deploy in the confirmation field to release $TARGET."; exit 1; fi
+          if [ "$EVENT" = "workflow_dispatch" ] && [ "$CONFIRM" != "deploy" ]; then echo "::error::Type deploy in the confirmation field to release $TARGET."; exit 1; fi
       - name: Require a confirmed migration baseline
         run: |
           flag="${TARGET^^}_MIGRATIONS_BASELINED"
@@ -103,6 +108,8 @@ jobs:
   verify:
     name: Verify the commit being released
     needs: preflight
+    # A merge to main already passed these exact required checks on its pull request; dispatches always run the full suite.
+    if: github.event_name != 'push'
     uses: ./.github/workflows/ci.yml
     with:
       # A release never skips the database checks.
@@ -111,6 +118,7 @@ jobs:
   deploy:
     name: Migrate the database and deploy the Worker
     needs: [preflight, verify]
+    if: ${{ !cancelled() && needs.preflight.result == 'success' && (needs.verify.result == 'success' || needs.verify.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:

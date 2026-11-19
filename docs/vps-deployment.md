@@ -1,6 +1,9 @@
 # Deploying to a VPS
 
-> **Interim.** Staging runs here today, but the target is Cloudflare Workers ([cloudflare-migration-plan.md](cloudflare-migration-plan.md)). This
+> **Retired for staging on 19 November 2026.** Staging now runs as a Cloudflare Worker. This host is an idle, manual-only
+> rollback path (its worker is stopped and set not to restart); to roll back, recreate the `staging` A record
+> (132.145.11.201, DNS only, TTL auto), remove the Worker's custom domain, and run `Deploy to VPS`. It is deleted in phase E.
+> It was an interim staging host; the target is Cloudflare Workers ([cloudflare-migration-plan.md](cloudflare-migration-plan.md)). This
 > runbook, the Docker images and `deploy-vps.yml` are retired in that plan's phase E. Do not provision a production VPS.
 
 The portable stack runs on one Linux VPS per environment: **Caddy** (TLS, static frontend, API
