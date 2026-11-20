@@ -38,7 +38,7 @@
     "clsx": "^2.1.1",
     "cn": "^0.5.2",
     "date-fns": "^4.4.0",
-    "framer-motion": "^13.4.1",
+    "framer-motion": "^14.14.0",
     "livekit-client": "^2.23.0",
     "livekit-server-sdk": "^2.19.2",
     "lucide-react": "^1.70.0",
