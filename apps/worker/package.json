@@ -5,9 +5,9 @@
   "type": "module",
   "dependencies": {
     "@ai-sdk/openai": "^4.0.118",
-    "@livekit/protocol": "1.53.4",
+    "@livekit/protocol": "1.54.1",
     "@tutors/jobs": "0.1.0",
-    "livekit-server-sdk": "2.19.2",
+    "livekit-server-sdk": "2.20.0",
     "pg-boss": "12.38.2",
     "stripe": "22.6.2"
   }
