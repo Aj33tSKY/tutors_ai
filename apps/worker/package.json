@@ -9,6 +9,6 @@
     "@tutors/jobs": "0.1.0",
     "livekit-server-sdk": "2.19.2",
     "pg-boss": "12.38.2",
-    "stripe": "22.6.2"
+    "stripe": "23.1.0"
   }
 }
