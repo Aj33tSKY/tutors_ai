@@ -24,7 +24,7 @@ What this means:
 - **Insurance:** consider public liability, professional indemnity and cyber cover before launch.
 - **VAT:** only needed above the registration threshold (£90,000 at the time of writing, **verify**).
 
-**Open item: the legal text still says "Hybridtutors Ltd".** The Terms and Privacy pages (`src/components/marketing/legal-document.tsx`, constant `LEGAL`) and the footer name a limited company. For a sole trader this must read "[your legal name], trading as Hybridtutors", with a real contact email. Needs from the founder: legal name and contact email. Until then the pages name a controller that does not exist.
+**Decided (26 November 2026):** the legal text names "Ajeet Joseph Prabu, trading as Hybridtutors" (constant `LEGAL` in `src/components/marketing/legal-document.tsx`, and the footer), with contact address `hello@hybridtutors.co.uk`. **The mailbox must exist before launch**: set up Cloudflare Email Routing to forward `hello@hybridtutors.co.uk` to the founder's personal email. A UK address for correspondence may also be needed on the site (sole traders trading under a business name must disclose the owner's name and an address; **verify**, a virtual office avoids publishing a home address). If the business is later incorporated, change `LEGAL.company` and the footer.
 
 ## 3. Stripe: what to do, in order
 
@@ -35,7 +35,8 @@ These steps need personal and bank details, so the founder does them in the Stri
 3. **Branding** (Settings, Business, Branding): logo and colours.
 4. **Keys:** the live secret key never goes in chat or a file. When production is built, the founder runs the secret-setting command themselves. Prefer a **restricted key** with only the permissions the app needs; the list will be produced when production is built.
 5. **Staging stays on sandbox keys.** Nothing in the app changes until production exists.
-6. **Publish a refund and cancellation policy** and link it. Stripe typically wants one on the site. The Terms currently do not cover refunds or cancellations; the founder needs to decide the rules (for example free cancellation up to 24 hours before a lesson).
+6. **Enable Connect on the sandbox first**, then on live. Dashboard, Connect, platform setup. Choose the platform/marketplace option where connected accounts have their own full Stripe account and handle their own fees and losses.
+7. **Publish a refund and cancellation policy** and link it. Stripe typically wants one on the site. The Terms currently do not cover refunds or cancellations; the founder needs to decide the rules (for example free cancellation up to 24 hours before a lesson).
 
 Whether a sole trader can run a Connect platform in the UK is **not confirmed from Stripe's own documentation**; check by starting activation and reading what Connect offers. The general guidance is that sole traders need only HMRC registration ([Stripe's UK guide](https://stripe.com/resources/more/how-to-register-a-business-in-the-uk)).
 
@@ -47,38 +48,42 @@ Each lesson invoice is created on the **platform's** Stripe account and charged 
 
 Consequence: this is a **destination charge**, so the platform (the founder, personally, as a sole trader) is the seller of record. Per [Stripe's risk guidance](https://docs.stripe.com/connect/risk-management), for charges created on the platform the platform is responsible for related negative balances. Refunds and card disputes land on the platform, and the setting above makes the platform liable for tutors' negative balances too.
 
-### Recommended: direct charges
+### Decision: direct charges (implemented in PR #91)
 
-Charge **on the tutor's connected account** (direct charges). Stripe's guidance is that refunds and disputes then affect the connected account's balance, so the seller carries that risk, and Stripe recommends giving Stripe responsibility for negative balances on those accounts ([recommended integrations](https://docs.stripe.com/connect/integration-recommendations)). The platform still takes its fee through `application_fee_amount`.
+Charge **on the tutor's connected account**. Stripe's guidance is that refunds and disputes then affect the connected account's balance, so the seller carries that risk, and Stripe recommends it take responsibility for negative balances on those accounts ([recommended integrations](https://docs.stripe.com/connect/integration-recommendations)). The platform still takes its fee through `application_fee_amount`.
 
-| | Today (destination) | Direct charges |
+| | Before (destination) | Now (direct charges) |
 | --- | --- | --- |
 | Seller of record | Platform | The tutor |
 | Who bears refunds and disputes | Platform | The tutor's balance |
-| Negative balances | Platform (`losses_collector: application`) | Stripe, if set to `stripe` (**verify** it is allowed with the account type used) |
-| Card statement and invoice name | Hybridtutors | The tutor (a platform note can be added) |
-| Platform fee | Kept via application fee | Kept via application fee |
+| Negative balances | Platform (`losses_collector: application`) | Stripe (`losses_collector: stripe`) |
+| Card statement and invoice name | Hybridtutors | The tutor |
+| Platform fee | Application fee (15%) | Application fee (15%) |
 | Student support work | Platform | Still the platform in practice |
 
-Changes needed to adopt it:
+How it works now:
 
-- Create the invoice with the connected account as the Stripe account (the `Stripe-Account` header) and keep `application_fee_amount`; drop `transfer_data`.
-- The student's saved card lives on the platform customer. To charge on a tutor's account, the payment method must be shared or cloned to that account (Stripe supports sharing customers and payment methods across connected accounts; **verify** the exact calls and any fee impact).
-- Set the account responsibilities so Stripe collects losses and requirements, and confirm which dashboard type Stripe allows with that combination.
-- Tutor onboarding gets slightly heavier, because the tutor becomes the merchant. They already pass identity checks, so the extra friction is small.
-- Update webhooks: events for direct charges arrive as Connect events carrying the account id, and the job code must handle that.
-- Rewrite the tests that assume destination charges, and re-run the sandbox end-to-end card check.
-- Update the Terms so the tutor is clearly the seller and responsible for refunds for lesson quality, with the platform handling only its own fee and support.
+- **Tutor accounts** are created through Accounts v2 as `dashboard: "full"` with `fees_collector` and `losses_collector` both `stripe`. Stripe documents that a full dashboard requires both to be `stripe`, and that is the generally available combination (Express with Stripe owning losses exists only on preview API versions, so it was avoided). Only the merchant configuration (`card_payments`) is requested, because nothing is transferred to the tutor. Tutors manage payouts, refunds and disputes in their own Stripe dashboard.
+- **Invoices** are created on the tutor's account with the `Stripe-Account` header; the invoice, its item, finalising and sending all run there.
+- **Automatic payment:** the student saves a card once on the platform customer. For each invoice that card is cloned onto the tutor's account and attached to the student's customer there, so the invoice is charged off-session on the tutor's account. Without a saved card a hosted invoice is emailed.
+- **No fallback to a platform invoice.** A tutor whose account cannot take payments yet gets "Finish connecting your Stripe account in Payouts before invoicing", because a platform invoice would make you the seller again.
+- **Student customer per tutor:** `private.stripe_connected_customers` remembers the student's customer on each tutor's account (first write wins, tutor-only functions).
+- **Webhooks:** invoice events from tutors' accounts arrive through a separate **Connect** endpoint with its own signing secret, `STRIPE_CONNECT_WEBHOOK_SECRET`. Both endpoints post to `/v1/webhooks/stripe`; the API accepts a signature from either secret.
+- **Terms and Privacy** now say the tutor is the seller, that refunds and disputes are between student and tutor through Stripe, and that name, email and saved method are shared with the tutor's Stripe account.
+
+Known gaps and things to verify:
+
+- **Not yet proven against real Stripe.** The sandbox account has not been set up for Connect (Stripe returns `non_connect_platform_accounts_v2_access_blocked`), and the platform account itself is not activated. Order: enable Connect in the sandbox (dashboard, Connect, platform setup), then run `scripts/staging/setup-connect-webhook.mts` (creates the Connect webhook endpoint and stores its secret on the staging Worker) and `scripts/staging/e2e-direct-charge.mts` (a real sandbox invoice, card clone and application fee, on a throwaway Custom account).
+- **Tutor onboarding** for a full-dashboard account needs a person (identity checks), so it cannot be fully automated; test it by hand with a second Stripe login.
+- A card is cloned for each automatically charged invoice, so a student charged repeatedly by the same tutor accumulates cloned methods on that tutor's account. Reusing one would be a refinement.
+- Refunds and disputes happen in the tutor's Stripe dashboard. The app does not yet show dispute events (a `charge.dispute.created` handler would let the platform support students and tutors).
+- Existing Express-style accounts: none exist, because payout onboarding never worked in the sandbox, so no migration was needed.
 
 ### Other options, and why I would not lead with them
 
 - **Off-platform payment** (tutors invoice students themselves): zero liability for you, but you lose the fee, payment protection and the lesson history that makes the product worth using. Students and tutors also drift off-platform.
 - **Pre-paid credits sold by the platform:** the platform is the seller and holds customers' money, which raises both liability and regulatory questions.
 - **Other marketplace payment providers:** they also generally leave the platform responsible for sellers unless a Connect-style structure is used. Stripe Connect with direct charges is the cleanest fit for this app.
-
-### Until the switch is made
-
-If launch must happen before direct charges are built: form the limited company first, publish the refund policy, keep the lesson price small and the first lesson free (as now), and make the Terms explicit about who handles complaints. Reconsider before volumes grow.
 
 ## 5. Email
 
@@ -110,8 +115,9 @@ See the migration plan for detail. In short:
 
 ## 8. Decisions waiting on the founder
 
-1. Legal name and contact email for the legal pages (sole trader wording).
-2. Refund and cancellation rules, for the policy and the Terms.
-3. Whether to move to direct charges before launch (recommended) or form the company and launch on today's design.
+1. ~~Legal name and contact email~~ Done: Ajeet Joseph Prabu, trading as Hybridtutors; hello@hybridtutors.co.uk (mailbox still to set up).
+2. Refund and cancellation rules. With direct charges the tutor is the seller, so decide whether the platform sets a default policy for all tutors or each tutor sets their own, then publish it and link it from the Terms.
+3. ~~Direct charges~~ Done, pending the sandbox proof above.
 4. When to form a limited company.
-5. Whether to set up the `hello@` forwarding address.
+5. Set up the `hello@` forwarding (Cloudflare Email Routing).
+6. Enable Connect on the Stripe sandbox (then on live).
