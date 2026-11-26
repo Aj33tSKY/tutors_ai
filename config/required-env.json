@@ -34,6 +34,15 @@
       ]
     },
     {
+      "name": "SUPABASE_AUTH_SECRET_KEY",
+      "required": false,
+      "secret": true,
+      "purpose": "Supabase secret key (sb_secret_...) attached only to Auth calls with the visitor's IP (Sb-Forwarded-For), so Auth rate limits apply per visitor, not to the whole server. Enable IP address forwarding in the project's Auth rate-limit settings first.",
+      "requiredIn": [
+        "api"
+      ]
+    },
+    {
       "name": "SUPABASE_SERVICE_ROLE_KEY",
       "required": true,
       "secret": true,
