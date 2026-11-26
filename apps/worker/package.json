@@ -4,11 +4,11 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.118",
-    "@livekit/protocol": "1.53.4",
+    "@ai-sdk/openai": "^4.0.122",
+    "@livekit/protocol": "1.54.1",
     "@tutors/jobs": "0.1.0",
-    "livekit-server-sdk": "2.19.2",
-    "pg-boss": "12.38.2",
+    "livekit-server-sdk": "2.20.1",
+    "pg-boss": "12.39.0",
     "stripe": "22.6.2"
   }
 }
