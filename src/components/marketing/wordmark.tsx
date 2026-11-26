@@ -7,10 +7,10 @@ import { useId } from "react";
  * public/favicon.svg and public/logo.svg (same shapes) in step if you change it.
  */
 const SLAB = "M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z";
-const LENS = ["M11.90 23.00H27.90A16.0 22.56 0 0 1 11.90 45.56Z", "M36.10 17.64H52.10A16.0 22.56 0 0 1 36.10 40.20Z"] as const;
+const LENS = ["M11.90 24.31H27.90A16.0 19.94 0 0 1 11.90 44.25Z", "M36.10 18.95H52.10A16.0 19.94 0 0 1 36.10 38.89Z"] as const;
 const UNDER = ["M10.90 36.28L28.90 32.29V70H10.90Z", "M35.10 30.91L53.10 26.92V70H35.10Z"] as const;
 const STEMS = ["translate(11.9 4)", "translate(36.1 10.6)"] as const;
-const BAND = "translate(32.0 31.60) rotate(77.5) scale(1.16) translate(-8.0 -24.3)";
+const BAND = "translate(32.0 31.60) rotate(77.5) scale(1.0) translate(-8.0 -24.3)";
 const COLORS = { upper: "#58CC02", lower: "#34B857", band: "#9A8BFF", deep: "#2E1F73" };
 
 export function LogoMark({ className = "size-8" }: { className?: string }) {
