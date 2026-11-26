@@ -7,10 +7,6 @@ export const availabilityInput = z.object({
 }).strict().refine((input) => input.startTime < input.endTime, { message: "End time must follow start time" });
 export type AvailabilitySlot = { id: string; tutor_id: string; day_of_week: number; start_time: string; end_time: string };
 export type Contact = { id: string; fullName: string; email: string; sessionCount: number };
-export type LinkedChild = { id: string; profiles: { full_name: string; email: string } | { full_name: string; email: string }[] };
-export type FamilyBooking = { id: string; student_id: string; tutor_id: string; lesson_name?: string | null; subject: string | null;
-  start_time: string; end_time: string; status: string; payment_status: string; is_trial?: boolean };
-export type FamilyOverview = { children: LinkedChild[]; bookings: FamilyBooking[] };
 export type PendingTutor = { id: string; hourly_rate: number; dbs_verified: boolean; subjects: string[];
   profiles: { full_name: string; email: string } | { full_name: string; email: string }[] };
 export type AdminOverview = { profileCount: number; bookingCount: number; pendingTutors: PendingTutor[] };

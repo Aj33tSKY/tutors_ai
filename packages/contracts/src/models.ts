@@ -1,4 +1,4 @@
-export type UserRole = "student" | "parent" | "tutor" | "admin";
+export type UserRole = "student" | "tutor" | "admin";
 
 export type ExamBoard = "AQA" | "Edexcel" | "OCR_A" | "OCR_B" | "WJEC" | "CIE";
 

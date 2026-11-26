@@ -61,7 +61,6 @@ export const openapi = {
     "/v1/lessons/{id}/start": { parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], post: operation("Tutor starts a scheduled lesson") },
     "/v1/lessons/{id}/consent": { parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], post: operation("Tutor records consent using caller-scoped RLS") },
     "/v1/lessons/{id}/presence": { parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], get: operation("Student checks tutor presence in their open lesson") },
-    "/v1/parent/overview": { get: operation("Read linked children and their upcoming and recent lessons") },
     "/v1/admin/overview": { get: operation("Read administrator counts and verification queue") },
     "/v1/admin/tutors/{id}/approve": { parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], post: operation("Approve a tutor with recorded safeguarding evidence", tutorApproval) },
     "/v1/contacts": { get: operation("Read contacts related by bookings or lesson requests") },

@@ -14,7 +14,7 @@ An all-in-one tutor management agency and learning platform tailored for UK A-Le
 
 * **Backend & Database:** Supabase
 
-  * **Auth:** Supabase Auth (Role-Based Access Control: `student`, `parent`, `tutor`, `admin`)
+  * **Auth:** Supabase Auth (Role-Based Access Control: `student`, `tutor`, `admin`; the `parent` role was removed in November 2026)
 
   * **Database:** PostgreSQL (with `pgvector` extension enabled for AI embeddings)
 
@@ -42,7 +42,7 @@ An all-in-one tutor management agency and learning platform tailored for UK A-Le
 
 3. **Session Delivery:** Conduct WebRTC sessions directly in-browser; optional quick note jotting during calls.
 
-### B. Students & Parents
+### B. Students (parent accounts were dropped from scope in November 2026)
 
 1. **Discovery & Matching:** Filter tutors by Subject, Exam Board, Hourly Rate, Rating, and Availability.
 
@@ -241,7 +241,7 @@ CREATE INDEX ON session_embeddings USING ivfflat (embedding vector_cosine_ops);
 
   * Mandatory DBS (Disclosure and Barring Service) upload gate for tutor verification.
 
-  * Parent account linkage for under-18 students, allowing parents full view of session analytics, transcripts, and chatbot logs.
+  * ~~Parent account linkage for under-18 students~~ — removed from scope (November 2026); there are no parent accounts.
 
 ````
 

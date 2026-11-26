@@ -36,7 +36,7 @@ async function withBrowser(input: { url: string; anonKey: string }, run: (page: 
   }
 }
 
-export async function checkBrowser(input: { url: string; anonKey: string; studentEmail: string; tutorEmail: string; parentEmail: string; adminEmail: string; outsiderEmail: string; password: string; bookingId: string }) {
+export async function checkBrowser(input: { url: string; anonKey: string; studentEmail: string; tutorEmail: string; adminEmail: string; outsiderEmail: string; password: string; bookingId: string }) {
   return withBrowser(input, async (page, origin) => {
     // Public pages render from the static bundle with no script errors, in the marketing frame.
     const pageErrors: string[] = [];
@@ -114,12 +114,6 @@ export async function checkBrowser(input: { url: string; anonKey: string; studen
     await page.getByRole("button", { name: "Start session", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Continue this session", exact: true })).toBeVisible();
     await page.goto(`${origin}/dashboard`);
-    await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await page.getByLabel("Email", { exact: true }).fill(input.parentEmail);
-    await page.getByLabel("Password", { exact: true }).fill(input.password);
-    await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Family overview", exact: true })).toBeVisible();
-    await expect(page.getByText(input.studentEmail, { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await page.getByLabel("Email", { exact: true }).fill(input.adminEmail);
     await page.getByLabel("Password", { exact: true }).fill(input.password);

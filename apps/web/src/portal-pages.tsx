@@ -3,7 +3,6 @@ import { Link, Navigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AvailabilityView } from "../../../src/components/dashboard/availability-view.js";
 import { ContactsList } from "../../../src/components/dashboard/contacts-list.js";
-import { FamilyOverviewView } from "../../../src/components/dashboard/family-overview.js";
 import { AdminOverviewView } from "../../../src/components/dashboard/admin-overview.js";
 import { TutorReviewFields } from "../../../src/components/dashboard/tutor-review-fields.js";
 import { api, ApiFailure } from "./api.js";
@@ -44,12 +43,6 @@ export function ContactsPage({ role }: { role: "student" | "tutor" }) {
   if (!contacts.data) return <p role="status">Loading contacts…</p>;
   const singular = role === "student" ? "Tutor" : "Student";
   return <main className="mx-auto max-w-6xl space-y-6 p-8"><Link to="/dashboard">← Dashboard</Link><ContactsList title={`My ${singular.toLowerCase()}s`} singular={singular} contacts={contacts.data.contacts}/></main>;
-}
-export function FamilyPage() {
-  const data = useQuery({ queryKey: ["family"], queryFn: api.family });
-  if (data.error) return <Failure error={data.error}/>;
-  if (!data.data) return <p role="status">Loading family overview…</p>;
-  return <PortalFrame><FamilyOverviewView family={data.data}/></PortalFrame>;
 }
 export function AdminPage() {
   const client = useQueryClient();

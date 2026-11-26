@@ -21,4 +21,4 @@ export type BookingSummary = {
 };
 
 export type BookingDetail = { booking: BookingSummary; counterpartName: string; canRename: boolean };
-export type Identity = { id: string; email: string; profile: { id: string; full_name: string; role: "student" | "parent" | "tutor" | "admin"; role_confirmed?: boolean } };
+export type Identity = { id: string; email: string; profile: { id: string; full_name: string; role: "student" | "tutor" | "admin"; role_confirmed?: boolean } };

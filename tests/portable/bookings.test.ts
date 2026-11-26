@@ -12,7 +12,6 @@ test("a missing RLS-visible booking is not found", async () => {
 test("a nonparticipant cannot rename, even if a repository returns a row", async () => {
   const repo: BookingRepository = { find: async () => booking, name: async () => "Tutor", rename: async () => { throw Error("must not write"); } };
   await assert.rejects(renameLesson(repo, { ...identity, id: "stranger" }, "booking", "Forged"), { status: 404 });
-  await assert.rejects(renameLesson(repo, { ...identity, id: "parent", profile: { ...identity.profile, role: "parent" } }, "booking", "Forged"), { status: 403 });
 });
 test("cancelled lessons cannot be renamed", async () => {
   const repo: BookingRepository = { find: async () => ({ ...booking, status: "cancelled" }), name: async () => "Tutor", rename: async () => { throw Error("must not write"); } };

@@ -12,7 +12,7 @@ import { requestClient, identify } from "./auth.js";
 import { configSchema, type ApiConfig } from "./config.js";
 import { openapi } from "../../../packages/contracts/src/openapi.js";
 import { availabilityInput, tutorApproval, type AvailabilitySlot } from "../../../packages/contracts/src/portal.js";
-import { contacts, familyOverview, adminOverview, requireRole, databaseResult } from "../../../packages/domain/src/portal.js";
+import { contacts, adminOverview, requireRole, databaseResult } from "../../../packages/domain/src/portal.js";
 import { participantLesson } from "../../../packages/domain/src/lessons.js";
 import { liveProvider, type LiveProvider } from "./livekit-provider.js";
 import { sessionReview } from "../../../packages/domain/src/reviews.js";
@@ -277,7 +277,6 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     const identity = await (dependencies.identify ?? identify)(c.get("client"));
     return c.json({ contacts: await contacts(c.get("client"), identity) });
   });
-  app.get("/v1/parent/overview", async (c) => c.json(await familyOverview(c.get("client"), await (dependencies.identify ?? identify)(c.get("client")))));
   app.get("/v1/admin/overview", async (c) => c.json(await adminOverview(c.get("client"), await (dependencies.identify ?? identify)(c.get("client")))));
   app.post("/v1/admin/tutors/:id/approve", async (c) => {
     const identity = await (dependencies.identify ?? identify)(c.get("client"));

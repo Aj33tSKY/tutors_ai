@@ -1,25 +1,23 @@
 -- Participant scoping on bookings: a lesson must be visible to its student, its
--- tutor, that student's linked parent and an admin, and to nobody else.
+-- tutor and an admin, and to nobody else.
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(11);
+select plan(10);
 
 -- Fixtures are created as the owner, which bypasses RLS on purpose.
 insert into auth.users (id, email, raw_user_meta_data) values
   ('aaaaaaaa-0000-0000-0000-000000000001', 'student@test.local', '{"role":"student","full_name":"Student"}'),
   ('bbbbbbbb-0000-0000-0000-000000000002', 'tutor@test.local',   '{"role":"tutor","full_name":"Tutor"}'),
-  ('cccccccc-0000-0000-0000-000000000003', 'parent@test.local',  '{"role":"parent","full_name":"Parent"}'),
   ('dddddddd-0000-0000-0000-000000000004', 'other@test.local',   '{"role":"student","full_name":"Stranger"}'),
   ('eeeeeeee-0000-0000-0000-000000000005', 'admin@test.local',   '{"role":"student","full_name":"Admin"}');
 -- Admin promotion is a trusted database operation, never signup metadata.
 update public.profiles set role = 'admin' where id = 'eeeeeeee-0000-0000-0000-000000000005';
 
-insert into public.student_profiles (id, parent_id)
-values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000003')
-on conflict (id) do update set parent_id = excluded.parent_id;
+insert into public.student_profiles (id) values ('aaaaaaaa-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
 
--- The stranger is a student too, but with no parent link to anyone.
+-- The stranger is a student too, with no lessons with anyone.
 insert into public.student_profiles (id) values ('dddddddd-0000-0000-0000-000000000004')
 on conflict (id) do nothing;
 
@@ -51,9 +49,6 @@ select is((select count(*) from public.bookings)::int, 1, 'the student sees thei
 
 select pg_temp.act_as('bbbbbbbb-0000-0000-0000-000000000002');
 select is((select count(*) from public.bookings)::int, 1, 'the tutor sees the lesson they teach');
-
-select pg_temp.act_as('cccccccc-0000-0000-0000-000000000003');
-select is((select count(*) from public.bookings)::int, 1, 'the linked parent sees their child''s lesson');
 
 select pg_temp.act_as('eeeeeeee-0000-0000-0000-000000000005');
 select is((select count(*) from public.bookings)::int, 1, 'an admin sees the lesson');

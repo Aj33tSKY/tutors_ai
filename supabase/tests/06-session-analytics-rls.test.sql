@@ -1,4 +1,4 @@
--- session_analytics: readable by the booking's participants (+ linked parent
+-- session_analytics: readable by the booking's participants (and admins
 -- and admin, same as bookings), but only the tutor can edit notes_markdown.
 begin;
 create extension if not exists pgtap with schema extensions;

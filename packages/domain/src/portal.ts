@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Identity } from "../../contracts/src/index.js";
-import type { Contact, FamilyOverview, LinkedChild, FamilyBooking, AdminOverview, PendingTutor } from "../../contracts/src/portal.js";
+import type { Contact, AdminOverview, PendingTutor } from "../../contracts/src/portal.js";
 import { AppError } from "./errors";
 
 export function requireRole(identity: Identity, roles: string[]) {
@@ -25,23 +25,6 @@ export async function contacts(client: SupabaseClient, identity: Identity): Prom
   const profiles = await client.from("profiles").select("id,full_name,email").in("id", [...counts.keys()]);
   databaseResult(profiles.error);
   return (profiles.data ?? []).map((row) => ({ id: row.id, fullName: row.full_name, email: row.email, sessionCount: counts.get(row.id) ?? 0 }));
-}
-export async function familyOverview(client: SupabaseClient, identity: Identity): Promise<FamilyOverview> {
-  requireRole(identity, ["parent"]);
-  const children = await client.from("student_profiles").select("id,profiles!student_profiles_id_fkey(full_name,email)")
-    .eq("parent_id", identity.id).returns<LinkedChild[]>();
-  databaseResult(children.error);
-  const ids = (children.data ?? []).map((child) => child.id);
-  if (!ids.length) return { children: [], bookings: [] };
-  const columns = "id,student_id,tutor_id,lesson_name,subject,start_time,end_time,status,payment_status,is_trial";
-  const [upcoming, recent] = await Promise.all([
-    client.from("bookings").select(columns).in("student_id", ids).eq("status", "scheduled")
-      .gte("end_time", new Date().toISOString()).order("start_time").limit(3).returns<FamilyBooking[]>(),
-    client.from("bookings").select(columns).in("student_id", ids).eq("status", "completed")
-      .order("start_time", { ascending: false }).limit(4).returns<FamilyBooking[]>(),
-  ]);
-  databaseResult(upcoming.error); databaseResult(recent.error);
-  return { children: children.data ?? [], bookings: [...upcoming.data ?? [], ...recent.data ?? []] };
 }
 export async function adminOverview(client: SupabaseClient, identity: Identity): Promise<AdminOverview> {
   requireRole(identity, ["admin"]);

@@ -14,7 +14,6 @@ import type { UserRole } from "@/lib/types";
 
 const ROLES: { value: UserRole; label: string; desc: string; icon: typeof GraduationCap }[] = [
   { value: "student", label: "Student", desc: "Book tutors & revise", icon: GraduationCap },
-  { value: "parent", label: "Parent", desc: "Track your child's progress", icon: Users },
   { value: "tutor", label: "Tutor", desc: "Teach & get paid", icon: BookOpen },
 ];
 
@@ -42,7 +41,7 @@ function SignUpForm() {
     >
       <h1 className="display-lg">Join Kindling</h1>
       <p className="mt-5 text-muted-foreground">
-        Sign up as a student, parent or tutor — it takes under a minute.
+        Sign up as a student or tutor — it takes under a minute.
       </p>
 
       <div role="radiogroup" aria-label="Account type" className="mt-10 grid grid-cols-3 gap-3">
