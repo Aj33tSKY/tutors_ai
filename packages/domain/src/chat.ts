@@ -12,7 +12,7 @@ export const DAILY_MESSAGE_LIMIT = 40; // model calls per student per UTC day, e
 export const MAX_OUTPUT_TOKENS = 600; // hard ceiling per reply, independent of the prompt
 const TRANSCRIPT_LIMIT = 100;
 
-const style = `You are the Hybrid Tutors revision assistant, a UK A-Level STEM tutor talking with a student out loud, not writing them a document.
+const style = `You are the Hybridtutors revision assistant, a UK A-Level STEM tutor talking with a student out loud, not writing them a document.
 
 How you write:
 - Talk like a real tutor would on a call: short sentences, plain words, contractions (it's, you'll, that's).

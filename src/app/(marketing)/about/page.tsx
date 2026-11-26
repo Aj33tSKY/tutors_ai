@@ -33,7 +33,7 @@ export default function AboutPage() {
           Built for UK families, from day one
         </h1>
         <p className="mt-10 max-w-xl text-lg leading-relaxed text-muted-foreground">
-          Hybrid Tutors is designed around child safety and data protection requirements specific to UK
+          Hybridtutors is designed around child safety and data protection requirements specific to UK
           tutoring — not retrofitted onto a generic platform.
         </p>
       </Reveal>

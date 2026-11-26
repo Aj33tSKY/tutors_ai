@@ -52,13 +52,13 @@ try {
     await write(slug, page({ title, description, path, body: html, data: slug ? {} : { catalogue } }));
   }
   pages.push("/tutors");
-  await write("tutors", page({ title: "Find a tutor | Hybrid Tutors", description: `Browse ${catalogue.total} approved A-Level STEM tutors and request a free first lesson.`, path: "/tutors", body: views.catalogueHtml(catalogue), data: { catalogue } }));
+  await write("tutors", page({ title: "Find a tutor | Hybridtutors", description: `Browse ${catalogue.total} approved A-Level STEM tutors and request a free first lesson.`, path: "/tutors", body: views.catalogueHtml(catalogue), data: { catalogue } }));
   for (const summary of catalogue.tutors) {
     const { tutor } = await get<{ tutor: PublicTutor }>(`/v1/public/tutors/${summary.id}`);
     const subjects = tutor.subjects.map(subjectLabel).join(", ");
     const path = `/tutors/${tutor.id}`;
     pages.push(path);
-    await write(`tutors/${tutor.id}`, page({ title: `${tutor.fullName}, ${subjects} tutor | Hybrid Tutors`, description: (tutor.headline ?? tutor.bio ?? `${subjects} tutoring`).slice(0, 160), path,
+    await write(`tutors/${tutor.id}`, page({ title: `${tutor.fullName}, ${subjects} tutor | Hybridtutors`, description: (tutor.headline ?? tutor.bio ?? `${subjects} tutoring`).slice(0, 160), path,
       body: views.profileHtml(tutor), data: { tutor },
       ld: { "@context": "https://schema.org", "@type": "ProfilePage", mainEntity: { "@type": "Person", name: tutor.fullName, description: tutor.headline ?? undefined, knowsAbout: tutor.subjects.map(subjectLabel) } } }));
   }

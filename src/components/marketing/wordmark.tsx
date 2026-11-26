@@ -1,8 +1,8 @@
 import { useId } from "react";
 
 /**
- * The Hybrid Tutors mark. Three identical slabs make the H: two stems and a crossbar that is the same slab turned on its side.
- * The crossbar is see-through; where it passes over a stem the colour deepens, and that overlap is bounded by a curve running from
+ * The Hybridtutors mark. Three identical slabs make the H: two stems and a crossbar that is the same slab turned on its side.
+ * The crossbar is violet (the complement of the green) and see-through; where it passes over a stem the colour deepens, and that overlap is bounded by a curve running from
  * the band's lower edge at the stem's left to its upper edge at the stem's right. The geometry is generated, so keep
  * public/favicon.svg and public/logo.svg (same shapes) in step if you change it.
  */
@@ -11,7 +11,7 @@ const LENS = ["M11.90 23.00H27.90A16.0 22.56 0 0 1 11.90 45.56Z", "M36.10 17.64H
 const UNDER = ["M10.90 36.28L28.90 32.29V70H10.90Z", "M35.10 30.91L53.10 26.92V70H35.10Z"] as const;
 const STEMS = ["translate(11.9 4)", "translate(36.1 10.6)"] as const;
 const BAND = "translate(32.0 31.60) rotate(77.5) scale(1.16) translate(-8.0 -24.3)";
-const COLORS = { upper: "#58CC02", lower: "#34B857", band: "#62DEC6", deep: "#0D4A30" };
+const COLORS = { upper: "#58CC02", lower: "#34B857", band: "#9A8BFF", deep: "#2E1F73" };
 
 export function LogoMark({ className = "size-8" }: { className?: string }) {
   const id = useId().replace(/:/g, "");
@@ -41,7 +41,7 @@ export function Wordmark({ className = "", compact = false }: { className?: stri
       <LogoMark className="size-9 shrink-0" />
       {!compact && (
         <span className="font-heading text-[1.25rem] leading-none tracking-[-0.025em]">
-          <span className="font-semibold">Hybrid</span> <span className="font-normal">Tutors</span>
+          <span className="font-semibold">Hybrid</span><span className="font-normal">tutors</span>
         </span>
       )}
     </span>

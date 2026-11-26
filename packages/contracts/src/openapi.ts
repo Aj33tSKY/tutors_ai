@@ -18,7 +18,7 @@ const operation = (summary: string, body?: z.ZodType, authenticated = true) => (
 
 export const openapi = {
   openapi: "3.1.0",
-  info: { title: "Hybrid Tutors portable API", version: "0.2.0", description: "Extracted authentication, portal, booking reviews and live lesson operations. Remaining legacy billing, messaging, scheduling and webhook operations are not exposed by this API yet." },
+  info: { title: "Hybridtutors portable API", version: "0.2.0", description: "Extracted authentication, portal, booking reviews and live lesson operations. Remaining legacy billing, messaging, scheduling and webhook operations are not exposed by this API yet." },
   components: { securitySchemes: { sessionCookie: { type: "apiKey", in: "cookie", name: "sb-project-auth-token", description: "Example name only: HttpOnly cookies are issued by the API and their names depend on the Supabase project hostname. Supabase may chunk long cookies." } } },
   paths: {
     "/v1/public/tutors": { get: { summary: "Approved tutors, filterable by subject, board, price band and weekday (public, short cache)", parameters: ["subject", "board", "maxPrice", "day"].map((name) => ({ name, in: "query", schema: { type: "string" } })), responses: { "200": result } } },

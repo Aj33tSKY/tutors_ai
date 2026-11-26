@@ -41,7 +41,7 @@ export async function checkBrowser(input: { url: string; anonKey: string; studen
     // Public pages render from the static bundle with no script errors, in the marketing frame.
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
-    for (const [path, title, text] of [["/", /^Hybrid Tutors/, null], ["/pricing", /Pricing/, null], ["/how-it-works", /How it works/, null], ["/about", /Safeguarding/, null], ["/tutors", /Find a tutor/, "Find your"]] as const) {
+    for (const [path, title, text] of [["/", /^Hybridtutors/, null], ["/pricing", /Pricing/, null], ["/how-it-works", /How it works/, null], ["/about", /Safeguarding/, null], ["/tutors", /Find a tutor/, "Find your"]] as const) {
       await page.goto(`${origin}${path}`);
       await expect(page).toHaveTitle(title);
       await expect(page.getByRole("link", { name: /^Sign in$/i }).first()).toBeVisible();

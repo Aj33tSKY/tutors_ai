@@ -2,8 +2,8 @@ import type { ReactNode } from "react";
 
 /** Facts every legal page states. Set the contact address before launch: a privacy policy must give people a way to reach the controller. */
 export const LEGAL = {
-  company: "Hybrid Tutors Ltd",
-  product: "Hybrid Tutors",
+  company: "Hybridtutors Ltd",
+  product: "Hybridtutors",
   updated: "26 November 2026",
   contactEmail: null as string | null,
 };
