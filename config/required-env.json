@@ -153,6 +153,15 @@
       ]
     },
     {
+      "name": "STRIPE_CONNECT_WEBHOOK_SECRET",
+      "required": false,
+      "secret": true,
+      "purpose": "Signing secret of the Stripe webhook endpoint that listens to Connected accounts. Lesson invoices are direct charges on each tutor's own account, so their paid/failed events arrive through that endpoint, not the platform one. Same URL as the platform endpoint; the API accepts either secret.",
+      "requiredIn": [
+        "api"
+      ]
+    },
+    {
       "name": "CRON_SECRET",
       "required": true,
       "secret": true,

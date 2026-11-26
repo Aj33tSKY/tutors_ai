@@ -12,7 +12,7 @@ const SECTIONS: LegalSection[] = [
       <><strong>Lessons:</strong> lesson requests and bookings, times, lesson names, and messages between you and your tutor or student.</>,
       <><strong>Lesson recordings and notes:</strong> when a tutor starts a recorded lesson, the audio of the lesson and any screen the tutor shares. Cameras are never recorded. From the audio we create a written transcript and a summary of the lesson.</>,
       <><strong>Revision assistant:</strong> the questions you ask the revision assistant and its answers, which draw on your own lesson notes.</>,
-      <><strong>Payments:</strong> we do not store card numbers. Our payment provider holds them; we keep a reference to your customer record, the card brand and last four digits, and the status of invoices.</>,
+      <><strong>Payments:</strong> we do not store card numbers. Our payment provider holds them; we keep a reference to your customer record, the card brand and last four digits, and the status of invoices. To take a payment for a lesson, your name, email and saved payment method are shared with your tutor’s own Stripe account, which is how the tutor is paid.</>,
       <><strong>Technical data:</strong> sign-in sessions, your IP address and device information in security and server logs, used to keep the service running and secure.</>,
     ]}/></> },
   { id: "why", title: "Why we use it", body: <>

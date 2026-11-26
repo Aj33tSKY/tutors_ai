@@ -10,6 +10,7 @@ import { AppError } from "../../../packages/domain/src/errors.js";
 import { bookingRepository, bookingColumns } from "../../../packages/data/src/bookings.js";
 import { requestClient, identify } from "./auth.js";
 import { configSchema, type ApiConfig } from "./config.js";
+import { stripeVerifier } from "./stripe-webhook.js";
 import { openapi } from "../../../packages/contracts/src/openapi.js";
 import { availabilityInput, tutorApproval, type AvailabilitySlot } from "../../../packages/contracts/src/portal.js";
 import { contacts, adminOverview, requireRole, databaseResult } from "../../../packages/domain/src/portal.js";
@@ -23,7 +24,6 @@ import { autoChargeInput } from "../../../packages/contracts/src/billing.js";
 import { studentBilling, startPaymentMethodSetup, openBillingPortal, setAutoCharge, payoutState, startPayoutOnboarding, openPayoutDashboard, sendLessonInvoice, type Billing } from "../../../packages/domain/src/billing.js";
 import { stripeBilling } from "../../../packages/data/src/stripe.js";
 import { eventIntake, normalizeStripeEvent, type EventIntake } from "../../../packages/jobs/src/provider-events.js";
-import Stripe from "stripe";
 import { WebhookReceiver, type WebhookEvent } from "livekit-server-sdk";
 import { normalizeLiveKitEvent } from "../../../packages/jobs/src/livekit-events.js";
 import { tutorQuery, lessonRequestInput } from "../../../packages/contracts/src/tutors.js";
@@ -239,9 +239,8 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
   // provider retries; everything after persistence is the worker's job. Unhandled event types are acknowledged unstored.
   app.post("/v1/webhooks/stripe", async (c) => {
     const signature = c.req.header("stripe-signature");
-    const verify = dependencies.verifyStripe !== undefined ? dependencies.verifyStripe : (process.env.STRIPE_WEBHOOK_SECRET
-      // The async form runs on Node and on runtimes that only provide asynchronous Web Crypto (Cloudflare Workers).
-      ? (raw: string, header: string) => Stripe.webhooks.constructEventAsync(raw, header, process.env.STRIPE_WEBHOOK_SECRET!) as unknown as Promise<VerifiedStripeEvent> : null);
+    const verify = dependencies.verifyStripe !== undefined ? dependencies.verifyStripe
+      : stripeVerifier([process.env.STRIPE_WEBHOOK_SECRET, process.env.STRIPE_CONNECT_WEBHOOK_SECRET]) as unknown as ((raw: string, header: string) => Promise<VerifiedStripeEvent>) | null;
     if (!signature || !verify) throw new AppError(400, "webhook_not_configured", "Webhook not configured");
     let event: VerifiedStripeEvent;
     try { event = await verify(await c.req.text(), signature); } catch { throw new AppError(400, "invalid_signature", "Invalid signature"); }

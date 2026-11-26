@@ -13,7 +13,7 @@ const SECTIONS: LegalSection[] = [
       "One person, one account.",
     ]}/></> },
   { id: "tutors", title: "Tutors", body: <>
-    <P>A tutor’s profile appears in search only after our team has approved it, which includes reviewing their identity and safeguarding evidence. Approval is not a guarantee of any outcome and does not make the tutor our employee. Tutors set their own hourly rates and availability, must be honest about their qualifications, and must follow the lesson rules below.</P></> },
+    <P>A tutor’s profile appears in search only after our team has approved it, which includes reviewing their identity and safeguarding evidence. Approval is not a guarantee of any outcome and does not make the tutor our employee. Tutors set their own hourly rates and availability, must be honest about their qualifications, and must follow the lesson rules below. Tutors are the sellers of their lessons: they are responsible for refunds for the quality of their lessons, and for their own tax.</P></> },
   { id: "lessons", title: "Booking and lessons", body: <>
     <List items={[
       "Prices are set by tutors and shown before you request a lesson. Your first lesson with each tutor is free.",
@@ -24,7 +24,9 @@ const SECTIONS: LegalSection[] = [
   { id: "recording", title: "Recording and notes", body: <>
     <P>A tutor may record a lesson’s audio and any screen they share, but only after confirming that everyone present has agreed. Cameras are never recorded. Recordings are deleted automatically after 90 days. We create a transcript and a summary from the audio, which stay available to the student and tutor involved. Details are in the <Link href="/privacy" className="underline underline-offset-4">Privacy policy</Link>.</P></> },
   { id: "payments", title: "Payments", body: <>
-    <P>After your free first lesson with a tutor, completed lessons are invoiced and paid through our payment provider, Stripe. By saving a payment method you authorise charges for lessons you have had. Tutors receive their earnings through Stripe and must complete Stripe’s checks to be paid. We do not store card numbers.</P></> },
+    <P>Lessons are sold by the tutor, not by {LEGAL.product}. After your free first lesson with a tutor, the tutor invoices each completed lesson through Stripe and you pay the tutor, either by paying the invoice or, if you turn on automatic payment, from the card you saved. The invoice, receipt and card statement show the tutor’s business as the seller. {LEGAL.product} takes a platform fee from the tutor’s payment (currently 15%).</P>
+    <P>By saving a payment method you authorise charges for lessons you have had. Tutors are paid through their own Stripe account and must complete Stripe’s checks. We do not store card numbers.</P>
+    <P>Because the tutor is the seller, a refund request or a card dispute about a lesson is between you and the tutor through Stripe. If a problem cannot be resolved, contact us at <Contact/> and we will help where we can.</P></> },
   { id: "ai", title: "The revision assistant", body: <>
     <P>The revision assistant uses artificial intelligence and works from your own lesson notes. It can be wrong or incomplete. Check important facts against your tutor, your exam board’s specification, or your textbook. It is a study aid, not a substitute for a tutor or for official guidance.</P></> },
   { id: "conduct", title: "Acceptable use", body: <>
