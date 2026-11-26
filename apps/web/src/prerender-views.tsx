@@ -13,15 +13,19 @@ import { TutorCatalogueView, TutorProfileView, LessonRequestForm } from "../../.
 import Pricing from "../../../src/app/(marketing)/pricing/page.js";
 import HowItWorksPage from "../../../src/app/(marketing)/how-it-works/page.js";
 import About from "../../../src/app/(marketing)/about/page.js";
+import Terms from "../../../src/app/(marketing)/terms/page.js";
+import Privacy from "../../../src/app/(marketing)/privacy/page.js";
 import type { PublicTutor, TutorCatalogue } from "../../../packages/contracts/src/tutors.js";
 
 const framed = (content: React.ReactNode) => renderToString(<div><SiteHeader/><main className="flex-1">{content}</main><SiteFooter/></div>);
 export const marketingPages = (catalogue: TutorCatalogue): Array<{ slug: string; title: string; description: string; html: string }> => [
-  { slug: "", title: "Kindling — A-Level STEM Tutoring, Grounded in Every Session", description: "UK A-Level Maths, Further Maths, Physics, Chemistry, Biology and Computing tutoring. Live sessions, automatic topic mapping, and an AI revision assistant grounded in your own tutor's words.",
+  { slug: "", title: "Hybridtutors — A-Level STEM Tutoring, Grounded in Every Session", description: "UK A-Level Maths, Further Maths, Physics, Chemistry, Biology and Computing tutoring. Live sessions, automatic topic mapping, and an AI revision assistant grounded in your own tutor's words.",
     html: framed(<><Hero/><LearningConnection/><FeatureShowcase/><TutorShowcase tutors={catalogue.tutors.slice(0, 6)}/><HowItWorks/><CtaSection/></>) },
-  { slug: "pricing", title: "Pricing · Kindling", description: "Your first lesson with every tutor is free. Later lessons are invoiced after they happen.", html: framed(<Pricing/>) },
-  { slug: "how-it-works", title: "How it works · Kindling", description: "Request a lesson, meet your tutor live, and revise from your own session notes.", html: framed(<HowItWorksPage/>) },
-  { slug: "about", title: "Safeguarding & compliance · Kindling", description: "How tutors are approved, how recordings are consented to and kept, and how your data is protected.", html: framed(<About/>) },
+  { slug: "pricing", title: "Pricing · Hybridtutors", description: "Your first lesson with every tutor is free. Later lessons are invoiced after they happen.", html: framed(<Pricing/>) },
+  { slug: "how-it-works", title: "How it works · Hybridtutors", description: "Request a lesson, meet your tutor live, and revise from your own session notes.", html: framed(<HowItWorksPage/>) },
+  { slug: "about", title: "Safeguarding & compliance · Hybridtutors", description: "How tutors are approved, how recordings are consented to and kept, and how your data is protected.", html: framed(<About/>) },
+  { slug: "terms", title: "Terms of service · Hybridtutors", description: "The rules for using Hybridtutors: accounts, tutors, lessons and recording, payments, and the revision assistant.", html: framed(<Terms/>) },
+  { slug: "privacy", title: "Privacy policy · Hybridtutors", description: "What personal data Hybridtutors collects, why, who sees it, how long it is kept, and your rights.", html: framed(<Privacy/>) },
 ];
 export const catalogueHtml = (catalogue: TutorCatalogue) => framed(<TutorCatalogueView catalogue={catalogue} query={{}}/>);
 // Open times are dynamic, so the static form renders with none and the app fills them in.

@@ -22,7 +22,7 @@ export default function SignInPage() {
       className="w-full max-w-md"
     >
       <h1 className="display-lg">Welcome back</h1>
-      <p className="mt-5 text-muted-foreground">Sign in to your Kindling account.</p>
+      <p className="mt-5 text-muted-foreground">Sign in to your Hybridtutors account.</p>
 
       <form action={formAction} className="mt-10 space-y-5">
         <div className="space-y-1.5">
@@ -47,7 +47,7 @@ export default function SignInPage() {
       </form>
 
       <p className="mt-8 text-sm text-muted-foreground">
-        New to Kindling?{" "}
+        New to Hybridtutors?{" "}
         <Link href="/sign-up" className="link-draw text-brand-strong">
           Create an account
         </Link>

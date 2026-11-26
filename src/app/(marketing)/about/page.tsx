@@ -7,9 +7,9 @@ const POINTS = [
     body: "Only tutors approved by our team appear in public search. We review their identity and relevant safeguarding evidence before approving a profile.",
   },
   {
-    id: "parents",
-    title: "Parent linkage for under-18 students",
-    body: "Linked parent accounts can see their children's lesson schedule and completed session reviews. Private student conversations and revision chats remain private.",
+    id: "private",
+    title: "Private by design",
+    body: "Student messages, lesson recordings, transcripts and revision chats are visible only to the people involved in them and to the administrators who run the service.",
   },
   {
     id: "privacy",
@@ -33,7 +33,7 @@ export default function AboutPage() {
           Built for UK families, from day one
         </h1>
         <p className="mt-10 max-w-xl text-lg leading-relaxed text-muted-foreground">
-          Kindling is designed around child safety and data protection requirements specific to UK
+          Hybridtutors is designed around child safety and data protection requirements specific to UK
           tutoring — not retrofitted onto a generic platform.
         </p>
       </Reveal>

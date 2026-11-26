@@ -73,7 +73,7 @@ const open = async (browser: typeof tutorBrowser, who: Record<string, string>) =
   await page.goto(`${base}/sign-in`);
   await page.getByLabel("Email", { exact: true }).fill(who.email); await page.getByLabel("Password", { exact: true }).fill(who.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("heading", { name: /Welcome back/ }).waitFor({ timeout: 30000 });
+  await page.getByRole("heading", { name: /^Welcome back, / }).waitFor({ timeout: 30000 });
   return page;
 };
 const [tutorPage, studentPage] = [await open(tutorBrowser, tutor), await open(studentBrowser, student)];

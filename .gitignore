@@ -54,3 +54,6 @@ node_modules/
 # Local Worker secrets for the Cloudflare spike
 apps/edge/.dev.vars
 apps/edge/.assets/
+
+# Local screenshots (design references are not part of the repo)
+Screenshot*.png

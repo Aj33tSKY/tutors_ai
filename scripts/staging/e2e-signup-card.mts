@@ -47,10 +47,10 @@ if (!existing) {
 // 1. Sign up through the real form.
 await page.goto(`${base}/sign-up`);
 await page.getByLabel("Full name").fill("Mock Signup Student");
-await page.getByLabel("Email").fill(address);
-await page.getByLabel("Password").fill(appPassword);
-await page.getByLabel("I am a").selectOption("student");
-await page.locator("form button").first().click();
+await page.getByLabel("Email", { exact: true }).fill(address);
+await page.getByLabel("Password", { exact: true }).fill(appPassword);
+await page.getByRole("radio", { name: /Student/ }).check({ force: true });
+await page.getByRole("button", { name: "Create account", exact: true }).click();
 await page.getByRole("status").filter({ hasText: /check your email/i }).waitFor({ timeout: 30000 }).catch(() => fail("sign-up did not report that an email was sent"));
 step("sign-up accepted by the app");
 
@@ -87,7 +87,7 @@ await page.screenshot({ path: `${shots}/dashboard.png` });
   await page.getByLabel("Email", { exact: true }).fill(creds.email);
   await page.getByLabel("Password", { exact: true }).fill(creds.password);
   await page.getByRole("button", { name: "Sign in", exact: true }).click();
-  await page.getByRole("heading", { name: /Welcome back/ }).waitFor({ timeout: 30000 }).catch(() => fail("sign-in as the test student failed"));
+  await page.getByRole("heading", { name: /^Welcome back, / }).waitFor({ timeout: 30000 }).catch(() => fail("sign-in as the test student failed"));
   step("signed in as the pre-confirmed test student");
 }
 

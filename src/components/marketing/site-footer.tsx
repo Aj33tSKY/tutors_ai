@@ -26,6 +26,8 @@ const COLUMNS = [
       { href: "/about", label: "Safeguarding & DBS" },
       { href: "/about#privacy", label: "GDPR & data retention" },
       { href: "/about#compliance", label: "Compliance" },
+      { href: "/terms", label: "Terms of service" },
+      { href: "/privacy", label: "Privacy policy" },
     ],
   },
 ];
@@ -64,9 +66,9 @@ export function SiteFooter() {
 
         <div className="mt-20 flex flex-col gap-3 border-t border-hairline pt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="eyebrow">
-            © {new Date().getFullYear()} Kindling Education Ltd
+            © {new Date().getFullYear()} Hybridtutors Ltd
           </p>
-          <p className="eyebrow">Tutor approval · Parent visibility · UK A-Level focus</p>
+          <p className="eyebrow">Tutor approval · Private by design · UK A-Level focus</p>
         </div>
       </div>
     </footer>

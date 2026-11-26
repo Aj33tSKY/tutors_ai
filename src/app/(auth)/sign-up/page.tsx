@@ -39,7 +39,7 @@ function SignUpForm() {
       transition={{ duration: 0.75, ease: [0.19, 1, 0.22, 1] }}
       className="w-full max-w-md"
     >
-      <h1 className="display-lg">Join Kindling</h1>
+      <h1 className="display-lg">Join Hybridtutors</h1>
       <p className="mt-5 text-muted-foreground">
         Sign up as a student or tutor — it takes under a minute.
       </p>

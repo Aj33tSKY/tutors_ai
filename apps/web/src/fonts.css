@@ -1,6 +1,8 @@
 /* Self-hosted: the app never requests fonts from a third party. */
 @import "@fontsource-variable/geist/index.css";
 @import "@fontsource-variable/roboto-mono/index.css";
+/* Google Sans Medium (SIL OFL): the typeface Google's branding guidelines specify for the Sign in with Google button. */
+@import "@fontsource/google-sans/latin-500.css";
 @font-face {
   font-family: "Newsreader";
   src: url("../../../src/app/(marketing)/fonts/newsreader-latin.woff2") format("woff2");

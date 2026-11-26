@@ -41,19 +41,26 @@ export async function checkBrowser(input: { url: string; anonKey: string; studen
     // Public pages render from the static bundle with no script errors, in the marketing frame.
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
-    for (const [path, title, text] of [["/", /^Kindling/, null], ["/pricing", /Pricing/, null], ["/how-it-works", /How it works/, null], ["/about", /Safeguarding/, null], ["/tutors", /Find a tutor/, "Find your"]] as const) {
+    for (const [path, title, text] of [["/", /^Hybridtutors/, null], ["/pricing", /Pricing/, null], ["/how-it-works", /How it works/, null], ["/about", /Safeguarding/, null], ["/tutors", /Find a tutor/, "Find your"]] as const) {
       await page.goto(`${origin}${path}`);
       await expect(page).toHaveTitle(title);
       await expect(page.getByRole("link", { name: /^Sign in$/i }).first()).toBeVisible();
       if (text) await expect(page.getByRole("heading", { name: new RegExp(text) })).toBeVisible();
     }
     assert.deepEqual(pageErrors, [], "public pages raise no script errors");
+    for (const [path, heading] of [["/terms", "Terms of service"], ["/privacy", "Privacy policy"]] as const) {
+      await page.goto(`${origin}${path}`);
+      await expect(page.getByRole("heading", { name: heading, exact: true, level: 1 })).toBeVisible();
+    }
+    await page.goto(`${origin}/sign-up`);
+    await expect(page.getByRole("link", { name: "Terms of service" })).toHaveAttribute("href", "/terms");
+    await expect(page.getByRole("link", { name: "Privacy policy" })).toHaveAttribute("href", "/privacy");
     await page.goto(`${origin}/sign-in`);
     await expect(page.locator("html")).toHaveClass(/dark/);
     await page.getByLabel("Email", { exact: true }).fill(input.studentEmail);
     await page.getByLabel("Password", { exact: true }).fill(input.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Welcome back, / })).toBeVisible();
     assert.equal((await page.evaluate(() => document.cookie)).includes("sb-"), false, "Supabase credentials must be HttpOnly");
     await page.goto(`${origin}/dashboard/bookings/${input.bookingId}`);
     await page.getByLabel("Lesson name", { exact: true }).fill("Browser revision");
@@ -69,13 +76,13 @@ export async function checkBrowser(input: { url: string; anonKey: string; studen
     await expect(page.getByRole("button", { name: "Save a payment method", exact: true })).toBeDisabled();
     await page.goto(`${origin}/dashboard`);
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Sign in to Kindling" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome back", exact: true })).toBeVisible();
     await page.goto(`${origin}/dashboard/bookings/${input.bookingId}`);
-    await expect(page.getByRole("heading", { name: "Sign in to Kindling" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Welcome back", exact: true })).toBeVisible();
     await page.getByLabel("Email", { exact: true }).fill(input.outsiderEmail);
     await page.getByLabel("Password", { exact: true }).fill(input.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Welcome back, / })).toBeVisible();
     await page.goto(`${origin}/dashboard/bookings/${input.bookingId}`);
     await expect(page.getByRole("alert")).toHaveText("Booking not found");
     assert.equal(await page.getByText("Browser revision", { exact: true }).count(), 0);
@@ -108,7 +115,7 @@ export async function checkBrowser(input: { url: string; anonKey: string; studen
     await page.getByRole("link", { name: "Accept & schedule", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Confirm lesson schedule", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Confirm and message student", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Welcome back, / })).toBeVisible();
     await page.goto(`${origin}/session/${input.bookingId}`);
     await expect(page.getByRole("heading", { name: "Ready to begin?", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Start session", exact: true }).click();
@@ -133,7 +140,7 @@ export async function checkReviewBrowser(input: { url: string; anonKey: string; 
     await page.getByLabel("Email", { exact: true }).fill(input.tutorEmail);
     await page.getByLabel("Password", { exact: true }).fill(input.password);
     await page.getByRole("button", { name: "Sign in", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Welcome back/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Welcome back, / })).toBeVisible();
     await page.goto(`${origin}/dashboard/student/bookings/${input.bookingId}`);
     await expect(page.getByRole("heading", { name: "Browser revision", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Edit", exact: true }).click();

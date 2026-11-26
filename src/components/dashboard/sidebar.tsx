@@ -112,7 +112,7 @@ export function DashboardSidebar({
       )}
     >
       <div className={cn("flex h-16 shrink-0 items-center justify-between", collapsed ? "px-3" : "px-5")}>
-        <Link href="/" aria-label="Kindling — home">
+        <Link href="/" aria-label="Hybridtutors — home">
           <Wordmark compact={collapsed} />
         </Link>
         <button

@@ -275,13 +275,13 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
   const apiServer = serve({ fetch: (request) => app.fetch(request), hostname: "127.0.0.1", port: 0 });
   const apiAddress = await new Promise<number>((ready) => { if (apiServer.listening) ready((apiServer.address() as { port: number }).port); else apiServer.on("listening", () => ready((apiServer.address() as { port: number }).port)); });
   const publicDist = await mkdtemp(join(tmpdir(), "tutors-prerender-"));
-  await writeFile(join(publicDist, "index.html"), '<!doctype html><html><head><title>Kindling</title></head><body><div id="root"></div></body></html>');
+  await writeFile(join(publicDist, "index.html"), '<!doctype html><html><head><title>Hybridtutors</title></head><body><div id="root"></div></body></html>');
   try {
     await promisify(execFile)(process.execPath, ["--import", "tsx", "scripts/migration/prerender.mts"], { env: { ...process.env, PRERENDER_API_ORIGIN: `http://127.0.0.1:${apiAddress}`, PUBLIC_SITE_ORIGIN: "https://kindling.example", PRERENDER_DIST: publicDist, PRERENDER_REQUIRED: "1" }, timeout: 60000 });
     const listing = await readFile(join(publicDist, "tutors/index.html"), "utf8");
     const profilePage = await readFile(join(publicDist, `tutors/${tutor.id}/index.html`), "utf8");
     assert.match(listing, /<link rel="canonical" href="https:\/\/kindling.example\/tutors"\/>/); assert.match(listing, /Find your/);
-    assert.match(profilePage, /<title>tutor, Mathematics tutor \| Kindling<\/title>/); assert.match(profilePage, /application\/ld\+json/);
+    assert.match(profilePage, /<title>tutor, Mathematics tutor \| Hybridtutors<\/title>/); assert.match(profilePage, /application\/ld\+json/);
     for (const html of [listing, profilePage]) assert.equal(html.includes(injected), false, "tutor text cannot close a script or inject markup");
     assert.match(await readFile(join(publicDist, "sitemap.xml"), "utf8"), new RegExp(`https://kindling.example/tutors/${tutor.id}`));
     for (const [slug, text] of [["", /A little <span>more<\/span> from every lesson/], ["pricing", /[Pp]ricing/], ["how-it-works", /<h1/], ["about", /<h1/]] as const) {

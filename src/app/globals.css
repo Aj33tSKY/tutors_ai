@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ---------------------------------------------------------------------------
-   Kindling design system — consumer app pass.
+   Hybridtutors design system — consumer app pass.
    Light, neutral surfaces; one friendly sans everywhere; soft shadows
    and generous rounding instead of hairlines and tight radii. Green
    (#58cc02) is the single brand accent, blue (#1cb0f6) is the quiet
@@ -58,6 +58,10 @@
   --color-brand-strong: var(--brand-strong);
   --color-rust: var(--rust);
   --color-violet: var(--violet);
+  --color-brand-2: var(--brand-2);
+  --color-brand-2-soft: var(--brand-2-soft);
+  --color-brand-2-deep: var(--brand-2-deep);
+  --color-brand-2-ink: var(--brand-2-ink);
 
   /* Restrained corners keep controls and content panels crisp. */
   --radius-xs: 0.125rem;
@@ -87,7 +91,13 @@
   --saffron: #58cc02;
   --brand-strong: #237000;
   --rust: #1272a0;
-  --violet: #1cb0f6;
+  /* second brand colour: violet, the complement of the green. Used for the logo band, the "you" / student voice and secondary
+     accents; green stays the one loud voice for actions. */
+  --brand-2: #7c5cff;
+  --brand-2-soft: #9a8bff;
+  --brand-2-deep: #2e1f73;
+  --brand-2-ink: #6b4ee6;
+  --violet: var(--brand-2);
   --ember-flame: #0ea5e9;
 
   --background: #ffffff;
@@ -141,6 +151,7 @@
 
 :root.dark {
   color-scheme: dark;
+  --brand-2-ink: #b6a3ff;
   --ink: #edf2f4;
   --raised: #131b24;
   --hairline: #29343d;
@@ -164,6 +175,7 @@
   --sidebar-foreground: #edf2f4;
   --sidebar-border: #29343d;
 }
+
 
 @layer base {
   * {
@@ -537,7 +549,7 @@
   --conversation-subtle: #829092;
   --conversation-line: #ffffff12;
   --conversation-tutor: var(--primary);
-  --conversation-student: #b6a3ff;
+  --conversation-student: var(--brand-2-ink);
   position: relative;
   width: 100%;
   max-width: 680px;
@@ -595,7 +607,7 @@
   --conversation-subtle: #61736d;
   --conversation-line: #203c2915;
   --conversation-tutor: var(--primary);
-  --conversation-student: #7450be;
+  --conversation-student: var(--brand-2-ink);
   border-color: #00000016;
   background: transparent;
   box-shadow: 0 24px 80px #00000008, inset 0 1px 0 #fff;

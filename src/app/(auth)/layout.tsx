@@ -6,7 +6,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="flex min-h-screen flex-col">
       <div className="border-b border-border/70">
         <div className="shell flex h-16 items-center">
-          <Link href="/" aria-label="Kindling — home">
+          <Link href="/" aria-label="Hybridtutors — home">
             <Wordmark />
           </Link>
         </div>

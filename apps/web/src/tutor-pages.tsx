@@ -14,7 +14,7 @@ export function TutorsPage() {
   const key = JSON.stringify(query);
   const embedded = typeof window !== "undefined" && key === "{}" ? window.__PUBLIC_DATA__?.catalogue : undefined;
   const result = useQuery({ queryKey: ["public-tutors", key], queryFn: () => api.publicTutors(params.toString()), initialData: embedded, staleTime: 60_000 });
-  useTitle("Find a tutor | Kindling");
+  useTitle("Find a tutor | Hybridtutors");
   if (result.error) return <main className="shell py-16"><p role="alert">We couldn’t load tutors. Please try again.</p></main>;
   if (!result.data) return <main className="shell py-16"><p role="status">Loading tutors…</p></main>;
   return <TutorCatalogueView catalogue={result.data} query={query}/>;
@@ -33,7 +33,7 @@ export function TutorProfilePage() {
     const meta = document.createElement("meta"); meta.name = "robots"; meta.content = "noindex"; document.head.append(meta);
     return () => meta.remove();
   }, [profile.error]);
-  useTitle(profile.data ? `${profile.data.fullName} | Kindling` : "Tutor | Kindling");
+  useTitle(profile.data ? `${profile.data.fullName} | Hybridtutors` : "Tutor | Hybridtutors");
   if (profile.error instanceof ApiFailure && profile.error.status === 404) return <main className="shell py-16"><h1 className="display-md">This tutor is no longer available</h1><Link to="/tutors">Find another tutor</Link></main>;
   if (profile.error) return <main className="shell py-16"><p role="alert">We couldn’t load this tutor. Please try again.</p></main>;
   if (!profile.data) return <main className="shell py-16"><p role="status">Loading tutor…</p></main>;

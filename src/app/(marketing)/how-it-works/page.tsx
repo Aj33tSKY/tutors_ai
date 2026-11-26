@@ -11,7 +11,7 @@ const DETAILS = [
   {
     n: "02",
     title: "Vetting you can trust",
-    body: "Only approved tutors appear in search. Linked parents can follow lesson schedules and completed lesson reviews.",
+    body: "Only approved tutors appear in search. Your lessons, messages and notes stay private to you and your tutor.",
   },
   {
     n: "03",
