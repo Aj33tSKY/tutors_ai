@@ -4,7 +4,7 @@ import { secureHeaders } from "hono/secure-headers";
 import { bodyLimit } from "hono/body-limit";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { z, ZodError } from "zod";
-import { credentials, signup, resetRequest, passwordUpdate, authCode, uuid, renameBooking, calendarRange, type Identity } from "../../../packages/contracts/src/index.js";
+import { credentials, signup, resetRequest, passwordUpdate, authCode, roleChoice, uuid, renameBooking, calendarRange, type Identity } from "../../../packages/contracts/src/index.js";
 import { getBooking, renameLesson } from "../../../packages/domain/src/bookings.js";
 import { AppError } from "../../../packages/domain/src/errors.js";
 import { bookingRepository, bookingColumns } from "../../../packages/data/src/bookings.js";
@@ -93,12 +93,21 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     return c.json({ message: "Check your email to confirm your account" }, 202);
   });
   // Google sign-in (PKCE). The browser asks for the provider URL; the verifier cookie is set on this response, so the
-  // return to /auth/confirm completes in the same browser. New Google accounts become students (the profile trigger's
-  // default); parents and tutors register with the email form, because tutors are vetted before they appear.
+  // return to /auth/confirm completes in the same browser. New Google accounts start as unconfirmed students and choose
+  // student or tutor once afterwards (POST /v1/auth/role).
   app.post("/v1/auth/oauth/google", async (c) => {
     const { data, error } = await c.get("client").auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${config.webOrigin}/auth/confirm?oauth=1`, skipBrowserRedirect: true } });
     if (error || !data.url) throw new AppError(503, "oauth_unavailable", "Google sign-in is not available right now");
     return c.json({ url: data.url });
+  });
+  // An account made with Google starts as an unconfirmed student; the database lets its owner choose student or tutor once.
+  app.post("/v1/auth/role", async (c) => {
+    const identity = await (dependencies.identify ?? identify)(c.get("client"));
+    const { role } = roleChoice.parse(await c.req.json());
+    const { data, error } = await c.get("client").from("profiles").update({ role, role_confirmed: true }).eq("id", identity.id).eq("role_confirmed", false).select("id");
+    if (error) throw new AppError(503, "database_unavailable", "Could not save your choice; please try again");
+    if (!data?.length) throw new AppError(409, "role_already_chosen", "Your account type has already been chosen");
+    return c.json({ identity: await (dependencies.identify ?? identify)(c.get("client")) });
   });
   app.post("/v1/auth/refresh", async (c) => {
     // getUser refreshes expired cookie sessions through the SSR client adapter.

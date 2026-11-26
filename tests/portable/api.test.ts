@@ -57,3 +57,18 @@ test("Google sign-in returns the provider URL and sends the user back to the con
   const off = await failing.request("/v1/auth/oauth/google", { method: "POST", headers: { origin: config.webOrigin }, body: "{}" });
   assert.equal(off.status, 503); assert.equal((await off.json()).error.code, "oauth_unavailable");
 });
+
+test("choosing an account type works once for an unconfirmed account and only student or tutor", async () => {
+  const identity = { id: "aaaaaaaa-0000-4000-8000-000000000001", email: "g@example.test", profile: { id: "aaaaaaaa-0000-4000-8000-000000000001", full_name: "G", role: "tutor" as const, role_confirmed: true } };
+  const updates: unknown[] = [];
+  const clientFor = (rows: unknown[]) => ({ from: () => ({ update: (values: unknown) => { updates.push(values); const chain = { eq: () => chain, select: async () => ({ data: rows, error: null }) }; return chain; } }) }) as unknown as SupabaseClient;
+  const post = (application: ReturnType<typeof createApp>, role: string) => application.request("/v1/auth/role", { method: "POST", headers: { origin: config.webOrigin, "content-type": "application/json" }, body: JSON.stringify({ role }) });
+  const first = createApp(config, { client: () => clientFor([{ id: identity.id }]), identify: async () => identity });
+  assert.equal((await post(first, "tutor")).status, 200);
+  assert.deepEqual(updates, [{ role: "tutor", role_confirmed: true }]);
+  assert.equal((await post(first, "admin")).status, 400);
+  assert.equal((await post(first, "parent")).status, 400);
+  const second = createApp(config, { client: () => clientFor([]), identify: async () => identity });
+  const again = await post(second, "student");
+  assert.equal(again.status, 409); assert.equal((await again.json()).error.code, "role_already_chosen");
+});

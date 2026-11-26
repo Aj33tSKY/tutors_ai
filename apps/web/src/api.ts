@@ -81,6 +81,7 @@ export const api = {
   resetPassword: (email: string) => request<{ message: string }>("/v1/auth/reset-password", { method: "POST", body: JSON.stringify({ email }) }),
   updatePassword: (password: string) => request("/v1/auth/password", { method: "POST", body: JSON.stringify({ password }) }),
   googleSignIn: () => request<{ url: string }>("/v1/auth/oauth/google", { method: "POST", body: "{}" }),
+  chooseRole: (role: "student" | "tutor") => request<{ identity: Identity }>("/v1/auth/role", { method: "POST", body: JSON.stringify({ role }) }),
   exchange: (code: string) => request("/v1/auth/exchange", { method: "POST", body: JSON.stringify({ code }) }),
   calendar: (from: string, to: string) => request<{ bookings: BookingSummary[] }>(`/v1/bookings/calendar?${new URLSearchParams({ from, to })}`),
   booking: (id: string) => request<BookingDetail>(`/v1/bookings/${encodeURIComponent(id)}`),
