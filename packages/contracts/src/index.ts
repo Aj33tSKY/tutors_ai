@@ -2,7 +2,8 @@ import { z } from "zod";
 
 export const uuid = z.uuid();
 export const credentials = z.object({ email: z.email().max(254), password: z.string().min(1).max(256) });
-export const signup = credentials.extend({ password: z.string().min(8).max(256), fullName: z.string().trim().min(1).max(150), role: z.enum(["student", "parent", "tutor"]) });
+export const signup = credentials.extend({ password: z.string().min(8).max(256), fullName: z.string().trim().min(1).max(150), role: z.enum(["student", "tutor"]) });
+export const roleChoice = z.object({ role: z.enum(["student", "tutor"]) });
 export const resetRequest = z.object({ email: z.email().max(254) });
 export const passwordUpdate = z.object({ password: z.string().min(8).max(256) });
 export const authCode = z.object({ code: z.string().min(1).max(4096) });
@@ -20,4 +21,4 @@ export type BookingSummary = {
 };
 
 export type BookingDetail = { booking: BookingSummary; counterpartName: string; canRename: boolean };
-export type Identity = { id: string; email: string; profile: { id: string; full_name: string; role: "student" | "parent" | "tutor" | "admin" } };
+export type Identity = { id: string; email: string; profile: { id: string; full_name: string; role: "student" | "parent" | "tutor" | "admin"; role_confirmed?: boolean } };

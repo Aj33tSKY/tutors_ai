@@ -43,7 +43,7 @@ export function requestClient(c: Context, config: ApiConfig): SupabaseClient {
 export async function identify(client: SupabaseClient): Promise<Identity> {
   const { data: { user }, error } = await client.auth.getUser();
   if (error || !user) throw new AppError(401, "unauthenticated", "Please sign in");
-  const { data: profile, error: profileError } = await client.from("profiles").select("id,full_name,role").eq("id", user.id).maybeSingle();
+  const { data: profile, error: profileError } = await client.from("profiles").select("id,full_name,role,role_confirmed").eq("id", user.id).maybeSingle();
   if (profileError) throw new AppError(503, "database_unavailable", "Could not load your profile");
   if (!profile) throw new AppError(403, "profile_required", "Your account profile is unavailable");
   return { id: user.id, email: user.email ?? "", profile };
