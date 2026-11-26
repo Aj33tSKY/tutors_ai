@@ -1,9 +1,9 @@
 import React, { useState, lazy, Suspense } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { BrowserRouter, Link, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiFailure } from "./api.js";
-import { AccountForm, AuthConfirm, ChooseRole, GoogleButton } from "./auth-pages.js";
+import { AccountForm, AuthConfirm, ChooseRole, SignInPage } from "./auth-pages.js";
 import { WebNavigationProvider } from "./navigation-provider.js";
 import { DashboardLayout, MarketingLayout } from "./layouts.js";
 import { ThemeProvider } from "../../../src/components/theme-provider.js";
@@ -31,21 +31,6 @@ const LessonPage = lazy(() => import("./lesson-page.js").then((module) => ({ def
 
 const cache = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: 10000 } } });
 function Notice({ error }: { error: unknown }) { return <p role="alert">{error instanceof Error ? error.message : "Could not load this page"}</p>; }
-function SignIn() {
-  const navigate = useNavigate();
-  const [search] = useSearchParams();
-  const client = useQueryClient();
-  const [error, setError] = useState<unknown>();
-  const [pending, setPending] = useState(false);
-  // Only same-site paths are honoured, so a crafted link cannot send a signed-in user elsewhere.
-  const next = search.get("next"); const destination = next && /^\/(?![/\\])/.test(next) ? next : "/dashboard";
-  return <main className="mx-auto max-w-md space-y-5 p-8"><h1 className="display-md">Sign in to Kindling</h1><GoogleButton label="Continue with Google"/><form className="space-y-4" onSubmit={async (event) => {
-    event.preventDefault(); setPending(true); setError(undefined);
-    const form = new FormData(event.currentTarget);
-    try { const result = await api.signIn(String(form.get("email")), String(form.get("password"))); client.clear(); client.setQueryData(["identity"], result); navigate(destination); }
-    catch (cause) { setError(cause); } finally { setPending(false); }
-  }}><label className="block">Email<input className="block w-full rounded border p-2" name="email" type="email" autoComplete="email" required/></label><label className="block">Password<input className="block w-full rounded border p-2" name="password" type="password" autoComplete="current-password" required/></label><button className="rounded bg-primary px-4 py-2 text-primary-foreground" disabled={pending}>{pending ? "Signing in…" : "Sign in"}</button>{error ? <Notice error={error}/> : null}</form><p><Link to="/sign-up">Create an account</Link> · <Link to="/forgot-password">Forgot password?</Link></p></main>;
-}
 function Dashboard() {
   const identity = useQuery({ queryKey: ["identity"], queryFn: api.me });
   if (identity.error instanceof ApiFailure && identity.error.status === 401) return <Navigate to="/sign-in" replace/>;
@@ -73,7 +58,7 @@ function Booking() {
   }}><label className="block">Lesson name<input className="block w-full rounded border p-2" key={booking.lesson_name} name="name" maxLength={120} defaultValue={booking.lesson_name ?? ""}/></label><button disabled={pending} className="rounded bg-primary px-4 py-2 text-primary-foreground">{pending ? "Saving…" : "Save name"}</button>{error ? <Notice error={error}/> : null}</form>}</main>;
 }
 // Client-rendered routes use the provider effects; its SSR bootstrap script stays inert.
-createRoot(document.getElementById("root")!).render(<React.StrictMode><QueryClientProvider client={cache}><BrowserRouter><ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} scriptProps={{ type: "text/plain" }}><WebNavigationProvider><Suspense fallback={<p role="status">Loading page…</p>}><Routes><Route path="/sign-in" element={<SignIn/>}/><Route path="/sign-up" element={<AccountForm mode="signup"/>}/><Route path="/forgot-password" element={<AccountForm mode="reset"/>}/><Route path="/reset-password" element={<AccountForm mode="password"/>}/><Route path="/choose-role" element={<ChooseRole/>}/><Route path="/auth/confirm" element={<AuthConfirm/>}/><Route path="/session/:id" element={<LessonPage/>}/>
+createRoot(document.getElementById("root")!).render(<React.StrictMode><QueryClientProvider client={cache}><BrowserRouter><ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false} scriptProps={{ type: "text/plain" }}><WebNavigationProvider><Suspense fallback={<p role="status">Loading page…</p>}><Routes><Route path="/sign-in" element={<SignInPage/>}/><Route path="/sign-up" element={<AccountForm mode="signup"/>}/><Route path="/forgot-password" element={<AccountForm mode="reset"/>}/><Route path="/reset-password" element={<AccountForm mode="password"/>}/><Route path="/choose-role" element={<ChooseRole/>}/><Route path="/auth/confirm" element={<AuthConfirm/>}/><Route path="/session/:id" element={<LessonPage/>}/>
 <Route element={<MarketingLayout/>}><Route path="/" element={<LandingPage/>}/><Route path="/pricing" element={<PricingPage/>}/><Route path="/how-it-works" element={<HowItWorksPage/>}/><Route path="/about" element={<AboutPage/>}/><Route path="/tutors" element={<TutorsPage/>}/><Route path="/tutors/:id" element={<TutorProfilePage/>}/></Route>
 <Route element={<DashboardLayout/>}><Route path="/dashboard/student/bookings/:id" element={<ReviewPage/>}/><Route path="/dashboard" element={<Dashboard/>}/><Route path="/dashboard/admin" element={<AdminPage/>}/><Route path="/dashboard/student" element={<Dashboard/>}/><Route path="/dashboard/tutor" element={<Dashboard/>}/><Route path="/dashboard/tutor/requests/:id" element={<RequestPage/>}/><Route path="/dashboard/tutor/availability" element={<AvailabilityPage/>}/><Route path="/dashboard/tutor/students" element={<ContactsPage role="tutor"/>}/><Route path="/dashboard/student/tutors" element={<ContactsPage role="student"/>}/><Route path="/dashboard/student/chat" element={<ChatIndexPage/>}/><Route path="/dashboard/student/chat/:id" element={<ChatPage/>}/><Route path="/dashboard/student/billing" element={<StudentBillingPage/>}/><Route path="/dashboard/tutor/payouts" element={<PayoutsPage/>}/><Route path="/dashboard/messages/:counterpartId" element={<MessagesPage/>}/><Route path="/dashboard/bookings/:id" element={<Booking/>}/><Route path="/dashboard/student/bookings" element={<Navigate to="/dashboard/student" replace/>}/></Route>
 <Route path="*" element={<main className="p-8"><h1>Page not found</h1><Link to="/dashboard">Return to your lessons</Link></main>}/></Routes></Suspense></WebNavigationProvider></ThemeProvider></BrowserRouter></QueryClientProvider></React.StrictMode>);
