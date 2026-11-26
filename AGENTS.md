@@ -13,6 +13,7 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 - [docs/development-workflow.md](docs/development-workflow.md) — which branch to start from, how to open a pull request, how to write a migration. Read this first.
 - [docs/cloudflare-migration-plan.md](docs/cloudflare-migration-plan.md) — the approved hosting target (one Cloudflare Worker for web, API and jobs), its measured constraints and the phases still to do.
 - [docs/CI-CD.md](docs/CI-CD.md) — the pipeline itself, environment configuration, and what is still outstanding.
+- [docs/launch-guide.md](docs/launch-guide.md) — business structure (sole trader), Stripe activation, the payments design and the recommended move to direct charges, email, and what is left for production.
 - [docs/transcription.md](docs/transcription.md) — how session transcripts are produced.
 - [infra/livekit/README.md](infra/livekit/README.md) — the self-hosted LiveKit stack: server setup, firewall, DNS, sizing, rollback, upgrades and the Deploy LiveKit workflow.
 - [docs/testing-plan.md](docs/testing-plan.md) — proposed application and database upgrade coverage, repeatable fixtures, and defects found during design.
