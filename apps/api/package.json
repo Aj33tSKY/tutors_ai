@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@ai-sdk/openai": "^4.0.118",
-    "@hono/node-server": "2.1.8",
+    "@ai-sdk/openai": "^4.0.122",
+    "@hono/node-server": "2.1.11",
     "@supabase/ssr": "0.12.7",
-    "@supabase/supabase-js": "2.119.0",
+    "@supabase/supabase-js": "2.119.2",
     "@tutors/jobs": "0.1.0",
-    "ai": "7.0.166",
-    "hono": "4.13.18",
-    "livekit-server-sdk": "2.19.2",
+    "ai": "7.0.181",
+    "hono": "4.13.21",
+    "livekit-server-sdk": "2.20.1",
     "stripe": "22.6.2",
     "zod": "4.6.7"
   }
