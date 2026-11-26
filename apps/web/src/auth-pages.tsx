@@ -1,6 +1,17 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api } from "./api.js";
+
+// Starts Google sign-in: the API sets the PKCE cookie, then the browser goes to Google and returns to /auth/confirm?oauth=1.
+export function GoogleButton({ label }: { label: string }) {
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState("");
+  return <div className="space-y-2"><button type="button" className="w-full rounded border p-2" disabled={pending} onClick={async () => {
+    setPending(true); setError("");
+    try { window.location.assign((await api.googleSignIn()).url); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Google sign-in is not available right now"); setPending(false); }
+  }}>{pending ? "Opening Google…" : label}</button>{error && <p role="alert">{error}</p>}<p className="text-center text-sm">or use your email</p></div>;
+}
 
 export function AccountForm({ mode }: { mode: "signup" | "reset" | "password" }) {
   const [pending, setPending] = useState(false);
@@ -8,7 +19,7 @@ export function AccountForm({ mode }: { mode: "signup" | "reset" | "password" })
   const [error, setError] = useState("");
   const navigate = useNavigate();
   const title = mode === "signup" ? "Create your account" : mode === "reset" ? "Reset your password" : "Choose a new password";
-  return <main className="mx-auto max-w-md space-y-5 p-8"><h1 className="display-md">{title}</h1><form className="space-y-4" onSubmit={async (event) => {
+  return <main className="mx-auto max-w-md space-y-5 p-8"><h1 className="display-md">{title}</h1>{mode === "signup" && <GoogleButton label="Sign up with Google (as a student)"/>}<form className="space-y-4" onSubmit={async (event) => {
     event.preventDefault(); setPending(true); setError(""); setMessage("");
     const form = new FormData(event.currentTarget);
     try {
@@ -30,10 +41,14 @@ export function AuthConfirm() {
   const navigate = useNavigate();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
-  // A deliberate click avoids prefetch/StrictMode consuming a one-time code.
-  return <main className="mx-auto max-w-md space-y-4 p-8"><h1 className="display-md">Confirm your account</h1><button disabled={pending || !params.get("code")} className="rounded bg-primary px-4 py-2 text-primary-foreground" onClick={async () => {
+  const complete = async () => {
     setPending(true);
     try { await api.exchange(params.get("code")!); navigate(params.get("recovery") === "1" ? "/reset-password" : "/dashboard", { replace: true }); }
     catch (cause) { setError(cause instanceof Error ? cause.message : "Could not confirm this link"); setPending(false); }
-  }}>{pending ? "Confirming…" : "Continue"}</button>{(!params.get("code") || error) && <p role="alert">{error || "This link is missing a confirmation code. Request a new link."}</p>}</main>;
+  };
+  // Email links need a deliberate click (prefetchers and StrictMode would consume the one-time code). A Google return is a
+  // real navigation in the browser that started it, so it completes by itself, once.
+  const started = useRef(false);
+  useEffect(() => { if (params.get("oauth") === "1" && params.get("code") && !started.current) { started.current = true; void complete(); } }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  return <main className="mx-auto max-w-md space-y-4 p-8"><h1 className="display-md">Confirm your account</h1><button disabled={pending || !params.get("code")} className="rounded bg-primary px-4 py-2 text-primary-foreground" onClick={complete}>{pending ? "Confirming…" : "Continue"}</button>{(!params.get("code") || error) && <p role="alert">{error || "This link is missing a confirmation code. Request a new link."}</p>}</main>;
 }

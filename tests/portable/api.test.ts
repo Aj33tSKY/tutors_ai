@@ -43,3 +43,17 @@ test("availability endpoints require authentication before database access", asy
     assert.equal(response.status, 401);
   }
 });
+
+test("Google sign-in returns the provider URL and sends the user back to the confirm page", async () => {
+  const calls: unknown[] = [];
+  const fake = { auth: { signInWithOAuth: async (options: unknown) => { calls.push(options); return { data: { url: "https://accounts.google.test/auth" }, error: null }; } } } as unknown as SupabaseClient;
+  const google = createApp(config, { client: () => fake });
+  const ok = await google.request("/v1/auth/oauth/google", { method: "POST", headers: { origin: config.webOrigin, "content-type": "application/json" }, body: "{}" });
+  assert.equal(ok.status, 200); assert.deepEqual(await ok.json(), { url: "https://accounts.google.test/auth" });
+  assert.deepEqual(calls, [{ provider: "google", options: { redirectTo: `${config.webOrigin}/auth/confirm?oauth=1`, skipBrowserRedirect: true } }]);
+  const wrongOrigin = await google.request("/v1/auth/oauth/google", { method: "POST", headers: { origin: "https://attacker.example" }, body: "{}" });
+  assert.equal(wrongOrigin.status, 403);
+  const failing = createApp(config, { client: () => ({ auth: { signInWithOAuth: async () => ({ data: { url: null }, error: new Error("provider disabled") }) } }) as unknown as SupabaseClient });
+  const off = await failing.request("/v1/auth/oauth/google", { method: "POST", headers: { origin: config.webOrigin }, body: "{}" });
+  assert.equal(off.status, 503); assert.equal((await off.json()).error.code, "oauth_unavailable");
+});

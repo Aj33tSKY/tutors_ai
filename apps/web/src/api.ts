@@ -80,6 +80,7 @@ export const api = {
   signUp: (email: string, password: string, fullName: string, role: string) => request<{ message: string }>("/v1/auth/sign-up", { method: "POST", body: JSON.stringify({ email, password, fullName, role }) }),
   resetPassword: (email: string) => request<{ message: string }>("/v1/auth/reset-password", { method: "POST", body: JSON.stringify({ email }) }),
   updatePassword: (password: string) => request("/v1/auth/password", { method: "POST", body: JSON.stringify({ password }) }),
+  googleSignIn: () => request<{ url: string }>("/v1/auth/oauth/google", { method: "POST", body: "{}" }),
   exchange: (code: string) => request("/v1/auth/exchange", { method: "POST", body: JSON.stringify({ code }) }),
   calendar: (from: string, to: string) => request<{ bookings: BookingSummary[] }>(`/v1/bookings/calendar?${new URLSearchParams({ from, to })}`),
   booking: (id: string) => request<BookingDetail>(`/v1/bookings/${encodeURIComponent(id)}`),

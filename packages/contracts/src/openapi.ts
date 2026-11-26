@@ -69,6 +69,7 @@ export const openapi = {
     "/v1/tutor/availability/{id}": { parameters: [{ name: "id", in: "path", required: true, schema: { type: "string", format: "uuid" } }], delete: operation("Delete an owned availability slot") },
     "/v1/auth/sign-in": { post: operation("Sign in without exposing tokens", credentials, false) },
     "/v1/auth/sign-up": { post: { ...operation("Create a public-role account", signup, false), responses: { "202": result, "400": { description: "Invalid signup" } } } },
+    "/v1/auth/oauth/google": { post: operation("Start Google sign-in; returns the provider URL", undefined, false) },
     "/v1/auth/refresh": { post: operation("Refresh the cookie session") },
     "/v1/auth/exchange": { post: operation("Exchange a one-time PKCE email code", authCode, false) },
     "/v1/auth/reset-password": { post: { ...operation("Request a reset email", resetRequest, false), responses: { "202": result, "503": { description: "Email unavailable" } } } },

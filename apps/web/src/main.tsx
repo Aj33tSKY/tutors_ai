@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { QueryClient, QueryClientProvider, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, ApiFailure } from "./api.js";
-import { AccountForm, AuthConfirm } from "./auth-pages.js";
+import { AccountForm, AuthConfirm, GoogleButton } from "./auth-pages.js";
 import { WebNavigationProvider } from "./navigation-provider.js";
 import { DashboardLayout, MarketingLayout } from "./layouts.js";
 import { ThemeProvider } from "../../../src/components/theme-provider.js";
@@ -40,7 +40,7 @@ function SignIn() {
   const [pending, setPending] = useState(false);
   // Only same-site paths are honoured, so a crafted link cannot send a signed-in user elsewhere.
   const next = search.get("next"); const destination = next && /^\/(?![/\\])/.test(next) ? next : "/dashboard";
-  return <main className="mx-auto max-w-md space-y-5 p-8"><h1 className="display-md">Sign in to Kindling</h1><form className="space-y-4" onSubmit={async (event) => {
+  return <main className="mx-auto max-w-md space-y-5 p-8"><h1 className="display-md">Sign in to Kindling</h1><GoogleButton label="Continue with Google"/><form className="space-y-4" onSubmit={async (event) => {
     event.preventDefault(); setPending(true); setError(undefined);
     const form = new FormData(event.currentTarget);
     try { const result = await api.signIn(String(form.get("email")), String(form.get("password"))); client.clear(); client.setQueryData(["identity"], result); navigate(destination); }

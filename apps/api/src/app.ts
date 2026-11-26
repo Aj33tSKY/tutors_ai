@@ -92,6 +92,14 @@ export function createApp(input: ApiConfig, dependencies: Dependencies = {}) {
     if (error) throw new AppError(400, "signup_failed", "Could not create this account");
     return c.json({ message: "Check your email to confirm your account" }, 202);
   });
+  // Google sign-in (PKCE). The browser asks for the provider URL; the verifier cookie is set on this response, so the
+  // return to /auth/confirm completes in the same browser. New Google accounts become students (the profile trigger's
+  // default); parents and tutors register with the email form, because tutors are vetted before they appear.
+  app.post("/v1/auth/oauth/google", async (c) => {
+    const { data, error } = await c.get("client").auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${config.webOrigin}/auth/confirm?oauth=1`, skipBrowserRedirect: true } });
+    if (error || !data.url) throw new AppError(503, "oauth_unavailable", "Google sign-in is not available right now");
+    return c.json({ url: data.url });
+  });
   app.post("/v1/auth/refresh", async (c) => {
     // getUser refreshes expired cookie sessions through the SSR client adapter.
     return c.json({ identity: await (dependencies.identify ?? identify)(c.get("client")) });
