@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 
-/** Facts every legal page states. Set the contact address before launch: a privacy policy must give people a way to reach the controller. */
+/** Facts every legal page states. The business is run by a sole trader for now; change `company` if it is incorporated. The contact
+ * mailbox must exist before launch (forward it to the founder): a privacy policy must give people a way to reach the controller. */
 export const LEGAL = {
-  company: "Hybridtutors Ltd",
+  company: "Ajeet Joseph Prabu, trading as Hybridtutors",
   product: "Hybridtutors",
   updated: "26 November 2026",
-  contactEmail: null as string | null,
+  contactEmail: "hello@hybridtutors.co.uk" as string | null,
 };
 
 export const Contact = () => LEGAL.contactEmail

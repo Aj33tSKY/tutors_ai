@@ -29,35 +29,58 @@ export function stripeBilling(secretKey = process.env.STRIPE_SECRET_KEY, stripe 
     },
     async portalSession({ customerId, returnUrl }) { return (await api.billingPortal.sessions.create({ customer: customerId, return_url: returnUrl })).url; },
     async createPayoutAccount({ userId, email }) {
-      // Recipient + stripe_transfers needs merchant card_payments alongside it on this platform (verified in sandbox).
+      // Direct charges: the tutor is the seller, so this is a full-dashboard account in which Stripe collects fees and carries
+      // negative balances. That is the generally available combination Stripe documents for a full dashboard (both collectors
+      // must be "stripe"); it leaves the platform with no liability for a tutor's refunds or disputes. Only the merchant
+      // configuration is needed: the tutor takes the payment themselves, nothing is transferred to them.
       const account = await api.v2.core.accounts.create({
-        contact_email: email, dashboard: "express", identity: { country: "GB" },
-        defaults: { currency: "gbp", responsibilities: { fees_collector: "application", losses_collector: "application" } },
-        configuration: { recipient: { capabilities: { stripe_balance: { stripe_transfers: { requested: true } } } }, merchant: { capabilities: { card_payments: { requested: true } } } },
+        contact_email: email, dashboard: "full", identity: { country: "GB" },
+        defaults: { currency: "gbp", responsibilities: { fees_collector: "stripe", losses_collector: "stripe" } },
+        configuration: { merchant: { capabilities: { card_payments: { requested: true } } } },
       }, { idempotencyKey: `payout-account:${userId}` });
       return account.id;
     },
     async onboardingLink({ accountId, refreshUrl, returnUrl }) {
-      return (await api.v2.core.accountLinks.create({ account: accountId, use_case: { type: "account_onboarding", account_onboarding: { configurations: ["recipient", "merchant"], refresh_url: refreshUrl, return_url: returnUrl } } })).url;
+      return (await api.v2.core.accountLinks.create({ account: accountId, use_case: { type: "account_onboarding", account_onboarding: { configurations: ["merchant"], refresh_url: refreshUrl, return_url: returnUrl } } })).url;
     },
-    async dashboardLink(accountId) { return (await api.accounts.createLoginLink(accountId)).url; },
+    // A full-dashboard account owns its Stripe dashboard (Stripe login links exist only for Express accounts).
+    async dashboardLink() { return "https://dashboard.stripe.com/"; },
     async payoutsReady(accountId) {
-      const account = await api.v2.core.accounts.retrieve(accountId, { include: ["configuration.recipient"] });
-      return account.configuration?.recipient?.capabilities?.stripe_balance?.stripe_transfers?.status === "active";
+      // "Ready" means the tutor can take card payments, which is what invoicing on their account needs.
+      const account = await api.v2.core.accounts.retrieve(accountId, { include: ["configuration.merchant"] });
+      return account.configuration?.merchant?.capabilities?.card_payments?.status === "active";
+    },
+    async createConnectedCustomer({ accountId, userId, email, name }) {
+      // The student's customer on the TUTOR's account. One per (student, tutor): the database remembers it.
+      return (await api.customers.create({ email, name, metadata: { supabase_user_id: userId } }, { stripeAccount: accountId, idempotencyKey: `connected-customer:${accountId}:${userId}` })).id;
     },
     async sendInvoice(input) {
-      const key = (step: string) => ({ idempotencyKey: `${step}:${input.bookingId}` });
+      // Direct charge: every call runs ON the tutor's account (stripeAccount), so the tutor is the seller of record and the
+      // refund and dispute risk sits with their balance. The platform's share is the application fee.
+      const on = (step: string) => ({ stripeAccount: input.accountId, idempotencyKey: `${step}:${input.bookingId}` });
+      let defaultPaymentMethod: string | undefined;
+      if (input.chargeAutomatically && input.autoChargeFromCustomerId) {
+        // The card was saved on the platform customer. Clone it onto the tutor's account and attach it to the connected
+        // customer so the invoice can be charged off-session there.
+        const platform = await api.customers.retrieve(input.autoChargeFromCustomerId);
+        const methodId = platform.deleted ? null : (typeof platform.invoice_settings?.default_payment_method === "string" ? platform.invoice_settings.default_payment_method : platform.invoice_settings?.default_payment_method?.id);
+        if (methodId) {
+          const clone = await api.paymentMethods.create({ customer: input.autoChargeFromCustomerId, payment_method: methodId }, on("method-clone"));
+          await api.paymentMethods.attach(clone.id, { customer: input.customerId }, on("method-attach"));
+          defaultPaymentMethod = clone.id;
+        }
+      }
+      const charge = Boolean(defaultPaymentMethod);
       const invoice = await api.invoices.create({
         customer: input.customerId,
         // charge_automatically tries the saved method when the invoice finalises and needs auto_advance;
         // send_invoice emails a hosted link and waits.
-        ...(input.chargeAutomatically ? { collection_method: "charge_automatically" as const, auto_advance: true } : { collection_method: "send_invoice" as const, days_until_due: 7, auto_advance: false }),
-        description: input.description, metadata: { booking_id: input.bookingId },
-        ...(input.destinationAccountId ? { transfer_data: { destination: input.destinationAccountId }, application_fee_amount: input.feePence } : {}),
-      }, key("invoice"));
-      await api.invoiceItems.create({ customer: input.customerId, invoice: invoice.id, currency: "gbp", amount: input.amountPence, description: input.itemDescription, metadata: { booking_id: input.bookingId } }, key("invoice-item"));
-      const finalized = await api.invoices.finalizeInvoice(invoice.id, undefined, key("invoice-finalize"));
-      const sent = await api.invoices.sendInvoice(finalized.id, undefined, key("invoice-send"));
+        ...(charge ? { collection_method: "charge_automatically" as const, auto_advance: true, default_payment_method: defaultPaymentMethod } : { collection_method: "send_invoice" as const, days_until_due: 7, auto_advance: false }),
+        description: input.description, metadata: { booking_id: input.bookingId }, application_fee_amount: input.feePence,
+      }, on("invoice"));
+      await api.invoiceItems.create({ customer: input.customerId, invoice: invoice.id, currency: "gbp", amount: input.amountPence, description: input.itemDescription, metadata: { booking_id: input.bookingId } }, on("invoice-item"));
+      const finalized = await api.invoices.finalizeInvoice(invoice.id, undefined, on("invoice-finalize"));
+      const sent = charge ? finalized : await api.invoices.sendInvoice(finalized.id, undefined, on("invoice-send"));
       return { id: sent.id, url: sent.hosted_invoice_url ?? null };
     },
   };

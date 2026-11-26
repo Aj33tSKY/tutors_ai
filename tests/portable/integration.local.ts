@@ -125,14 +125,15 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
   const earlier = await (await app.request(`/v1/conversations/${conversationId}/messages?before=${encodeURIComponent(firstPage.messages[0].created_at)}`, { headers: { cookie } })).json();
   assert.equal(earlier.messages.length, 7); assert.equal(earlier.hasMore, false);
   // Billing: a fake processor stands in for Stripe; no real charges are possible here.
-  const invoiceCalls: Array<{ chargeAutomatically: boolean; destinationAccountId: string | null; amountPence: number }> = [];
-  let customers = 0; let savedMethod: { brand: string; last4: string; kind: string } | null = null;
+  const invoiceCalls: Array<{ chargeAutomatically: boolean; accountId: string; customerId: string; autoChargeFromCustomerId: string | null; amountPence: number; feePence: number }> = [];
+  let customers = 0; let connectedCustomers = 0; let tutorReady = false; let savedMethod: { brand: string; last4: string; kind: string } | null = null;
   const fakeBilling: BillingProvider = {
     createCustomer: async () => `cus_test${++customers}`,
     savedMethod: async () => savedMethod,
     setupSession: async () => "https://checkout.example/setup", portalSession: async () => "https://portal.example/session",
     createPayoutAccount: async () => "acct_test1", onboardingLink: async () => "https://connect.example/onboard", dashboardLink: async () => "https://connect.example/dash",
-    payoutsReady: async () => false,
+    payoutsReady: async () => tutorReady,
+    createConnectedCustomer: async () => `cus_conn${++connectedCustomers}`,
     sendInvoice: async (input) => { invoiceCalls.push(input); return { id: `in_${input.bookingId.slice(0, 8)}`, url: "https://invoice.example/hosted" }; },
   };
   const billingApp = createApp({ webOrigin: origin, supabaseUrl: url, supabaseAnonKey: process.env.LOCAL_ANON_KEY!, secureCookies: false, commit: "integration" }, { billing: () => fakeBilling });
@@ -159,10 +160,24 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
     values($1,$2,'Mathematics','AQA',now()-interval '2 hours',now()-interval '1 hour','completed',4000) returning id`, [student.id, tutor.id]);
   const invoicedId = invoiced.rows[0].id as string; cleanupIds.push(invoicedId);
   assert.equal((await post(cookie, `/v1/bookings/${invoicedId}/invoice`)).status, 403, "students cannot invoice");
+  // Direct charges: the lesson is invoiced on the tutor's own Stripe account, never the platform's, so an account that cannot
+  // take payments yet means no invoice (there is no fallback that would make the platform the seller).
+  const notReady = await post(tutorCookie, `/v1/bookings/${invoicedId}/invoice`);
+  assert.equal(notReady.status, 409); assert.equal((await notReady.json()).error.code, "payouts_not_ready");
+  assert.equal(invoiceCalls.length, 0, "nothing is sent while the tutor's account is not ready");
+  tutorReady = true;
   const sentInvoice = await post(tutorCookie, `/v1/bookings/${invoicedId}/invoice`);
   assert.equal(sentInvoice.status, 201, await sentInvoice.clone().text());
   assert.equal((await post(tutorCookie, `/v1/bookings/${invoicedId}/invoice`)).status, 409, "an invoice is sent once");
-  assert.deepEqual(invoiceCalls.map((call) => [call.chargeAutomatically, call.destinationAccountId, call.amountPence]), [[false, null, 4000]]);
+  assert.deepEqual(invoiceCalls.map((call) => [call.chargeAutomatically, call.accountId, call.customerId, call.amountPence, call.feePence]), [[false, "acct_test1", "cus_conn1", 4000, 600]]);
+  // The student's customer on the tutor's account is made once and reused for the next lesson with the same tutor.
+  const second = await pool.query(`insert into public.bookings(student_id,tutor_id,subject,exam_board,start_time,end_time,status,amount_gbp_pence)
+    values($1,$2,'Physics','AQA',now()-interval '4 hours',now()-interval '3 hours','completed',3000) returning id`, [student.id, tutor.id]);
+  cleanupIds.push(second.rows[0].id as string);
+  assert.equal((await post(tutorCookie, `/v1/bookings/${second.rows[0].id}/invoice`)).status, 201);
+  assert.deepEqual([connectedCustomers, invoiceCalls[1].customerId], [1, "cus_conn1"], "the second lesson reuses the connected customer");
+  await pool.query("update public.bookings set payment_status='paid' where id=$1", [second.rows[0].id]); // keep the browser check below to one unpaid invoice
+  assert.deepEqual((await pool.query("select account_id, customer_id from private.stripe_connected_customers where student_id=$1", [student.id])).rows, [{ account_id: "acct_test1", customer_id: "cus_conn1" }]);
   const recorded = await pool.query("select stripe_invoice_id, payment_status from public.bookings where id=$1", [invoicedId]);
   assert.deepEqual(recorded.rows[0], { stripe_invoice_id: `in_${invoicedId.slice(0, 8)}`, payment_status: "pending" });
   // Revision chat: a mock model stands in for the AI Gateway, so no model call or cost is possible here.

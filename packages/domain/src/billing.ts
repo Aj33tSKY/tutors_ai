@@ -14,9 +14,17 @@ export interface BillingProvider {
   createPayoutAccount(input: { userId: string; email: string }): Promise<string>;
   onboardingLink(input: { accountId: string; refreshUrl: string; returnUrl: string }): Promise<string>;
   dashboardLink(accountId: string): Promise<string>;
+  /** True once the tutor's account can take card payments, which is what invoicing on it needs. */
   payoutsReady(accountId: string): Promise<boolean>;
-  sendInvoice(input: { bookingId: string; customerId: string; description: string; itemDescription: string; amountPence: number;
-    chargeAutomatically: boolean; destinationAccountId: string | null; feePence: number }): Promise<{ id: string; url: string | null }>;
+  /** The student's customer on the tutor's own account. Idempotent per (account, student). */
+  createConnectedCustomer(input: { accountId: string; userId: string; email: string; name: string }): Promise<string>;
+  /**
+   * Direct charge: the invoice is created on the tutor's account (`accountId`), with the platform's share as the application fee.
+   * `customerId` is the student's customer ON that account. `autoChargeFromCustomerId` is the student's platform customer whose
+   * saved card is cloned onto the account for automatic payment; without it a hosted invoice is emailed.
+   */
+  sendInvoice(input: { bookingId: string; accountId: string; customerId: string; description: string; itemDescription: string; amountPence: number;
+    chargeAutomatically: boolean; autoChargeFromCustomerId: string | null; feePence: number }): Promise<{ id: string; url: string | null }>;
 }
 export type Billing = () => BillingProvider;
 const unavailable = () => new AppError(503, "payments_unavailable", "Payments are not configured for this environment");
@@ -143,22 +151,29 @@ export async function sendLessonInvoice(client: SupabaseClient, identity: Identi
   ]);
   databaseResult(student.error); databaseResult(tutor.error);
   if (!student.data) throw new AppError(404, "not_found", "We couldn’t find the student for this session.");
-  // A tutor cannot write the student's profile, so the first customer is recorded through a narrow function
-  // that keeps whichever customer was stored first. This avoids duplicates once idempotency keys expire.
-  let customerId = student.data.stripe_customer_id as string | null;
-  if (!customerId) {
-    const created = await viaProvider(() => provider_.createCustomer({ userId: student.data!.id, email: student.data!.email, name: student.data!.full_name }));
-    const claimed = await client.rpc("claim_booking_student_customer_v1", { p_booking: booking.id, p_customer: created });
-    databaseResult(claimed.error); customerId = claimed.data as string;
-  }
-  const chargeCustomer = customerId;
+  // The tutor is the seller (direct charge), so the invoice can only be raised on their own Stripe account. There is no
+  // fallback to the platform account: that would make the platform the seller of record and bear the refund and dispute risk.
   const accountId = tutor.data?.stripe_account_id as string | null | undefined;
-  const payoutReady = accountId ? await viaProvider(() => provider_.payoutsReady(accountId)) : false;
+  const notReady = () => new AppError(409, "payouts_not_ready", "Finish connecting your Stripe account in Payouts before invoicing a lesson.");
+  if (!accountId) throw notReady();
+  if (!(await viaProvider(() => provider_.payoutsReady(accountId)))) throw notReady();
+  // The student's customer on the tutor's account is recorded through a narrow, first-write-wins function, one per
+  // (student, tutor account), so later lessons reuse it and a retry after the idempotency window cannot duplicate it.
+  const stored = await client.rpc("connected_customer_for_booking_v1", { p_booking: booking.id });
+  databaseResult(stored.error);
+  let connectedCustomer = stored.data as string | null;
+  if (!connectedCustomer) {
+    const created = await viaProvider(() => provider_.createConnectedCustomer({ accountId, userId: student.data!.id, email: student.data!.email, name: student.data!.full_name }));
+    const claimed = await client.rpc("claim_connected_customer_v1", { p_booking: booking.id, p_customer: created });
+    databaseResult(claimed.error); connectedCustomer = claimed.data as string;
+  }
+  const platformCustomer = student.data.stripe_customer_id as string | null;
   const sent = await viaProvider(async () => {
-    const method = student.data!.auto_charge_enabled ? await provider_.savedMethod(chargeCustomer) : null;
-    return provider_.sendInvoice({ bookingId: booking.id, customerId: chargeCustomer, description: `${subjectName(booking.subject)} lesson`,
+    // Automatic payment needs a saved card on the student's platform customer; otherwise a hosted invoice is emailed.
+    const method = student.data!.auto_charge_enabled && platformCustomer ? await provider_.savedMethod(platformCustomer) : null;
+    return provider_.sendInvoice({ bookingId: booking.id, accountId, customerId: connectedCustomer!, description: `${subjectName(booking.subject)} lesson`,
       itemDescription: `${subjectName(booking.subject)} lesson · ${new Date(booking.start_time).toLocaleDateString("en-GB")}`, amountPence: booking.amount_gbp_pence,
-      chargeAutomatically: Boolean(method), destinationAccountId: payoutReady ? accountId! : null, feePence: Math.round(booking.amount_gbp_pence * PLATFORM_FEE_RATE) });
+      chargeAutomatically: Boolean(method), autoChargeFromCustomerId: method ? platformCustomer : null, feePence: Math.round(booking.amount_gbp_pence * PLATFORM_FEE_RATE) });
   });
   const recorded = await client.rpc("record_booking_invoice_v1", { p_booking: booking.id, p_invoice: sent.id, p_url: sent.url });
   databaseResult(recorded.error);

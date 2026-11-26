@@ -65,13 +65,13 @@ export function PayoutsPage() {
   if (payouts.error) return <Guard error={payouts.error}/>;
   if (!payouts.data) return <p role="status">Loading payouts…</p>;
   const { configured, connected, payoutsEnabled } = payouts.data;
-  return <Frame title="Payouts" intro="Connect a bank account with Stripe to get paid directly for bookings.">
+  return <Frame title="Payouts" intro="Connect your own Stripe account. Students pay you directly through it, and you are the seller of each lesson.">
     {(onboarding.error || dashboard.error) && <p role="alert" className="rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive">{onboarding.error ?? dashboard.error}</p>}
     <Card><CardHeader><CardTitle className="flex items-center gap-2"><Landmark className="size-4"/> Stripe Connect</CardTitle></CardHeader><CardContent className="space-y-3">
       {!configured ? <p className="text-sm text-muted-foreground">Payments are not configured for this environment.</p>
-        : payoutsEnabled ? <><p className="text-sm text-muted-foreground">Payouts are enabled. Bookings pay out to your connected account, minus the platform fee.</p><Button type="button" variant="outline" disabled={dashboard.pending} onClick={dashboard.run}>Open Stripe dashboard <ExternalLink className="size-3.5"/></Button></>
-        : connected ? <><p className="text-sm text-muted-foreground">You&apos;ve started setup but Stripe still needs a few more details before payouts can be enabled.</p><Button type="button" disabled={onboarding.pending} onClick={onboarding.run}>Continue setup</Button></>
-        : <><p className="text-sm text-muted-foreground">You haven&apos;t connected a payout account yet. Until you do, lessons are paid out manually.</p><Button type="button" disabled={onboarding.pending} onClick={onboarding.run}>Connect Stripe</Button></>}
+        : payoutsEnabled ? <><p className="text-sm text-muted-foreground">Your Stripe account is ready. When you invoice a lesson, the student pays you directly and Hybridtutors takes its platform fee. Refunds and card disputes are handled in your Stripe dashboard.</p><Button type="button" variant="outline" disabled={dashboard.pending} onClick={dashboard.run}>Open Stripe dashboard <ExternalLink className="size-3.5"/></Button></>
+        : connected ? <><p className="text-sm text-muted-foreground">You&apos;ve started setup but Stripe still needs a few more details before you can invoice lessons.</p><Button type="button" disabled={onboarding.pending} onClick={onboarding.run}>Continue setup</Button></>
+        : <><p className="text-sm text-muted-foreground">You haven&apos;t connected a Stripe account yet. You need one before you can invoice a lesson, because students pay you through it.</p><Button type="button" disabled={onboarding.pending} onClick={onboarding.run}>Connect Stripe</Button></>}
     </CardContent></Card>
   </Frame>;
 }
