@@ -4,8 +4,8 @@ select plan(12);
 insert into auth.users(id,email,raw_user_meta_data) values
  ('aaa10000-0000-4000-8000-000000000001','live-student@test.local','{"role":"student","full_name":"Student"}'),
  ('bbb10000-0000-4000-8000-000000000002','live-tutor@test.local','{"role":"tutor","full_name":"Tutor"}'),
- ('ccc10000-0000-4000-8000-000000000003','live-parent@test.local','{"role":"parent","full_name":"Parent"}');
-insert into public.student_profiles(id,parent_id) values('aaa10000-0000-4000-8000-000000000001','ccc10000-0000-4000-8000-000000000003');
+ ('ccc10000-0000-4000-8000-000000000003','live-stranger@test.local','{"role":"student","full_name":"Stranger"}');
+insert into public.student_profiles(id) values('aaa10000-0000-4000-8000-000000000001') on conflict (id) do nothing;
 insert into public.bookings(id,student_id,tutor_id,subject,exam_board,start_time,end_time,amount_gbp_pence)
 values('eee10000-0000-4000-8000-000000000005','aaa10000-0000-4000-8000-000000000001','bbb10000-0000-4000-8000-000000000002','Mathematics','AQA',now(),now()+interval '1 hour',3500);
 select ok(not has_function_privilege('anon','public.start_booking_lesson(uuid)','execute'),'anonymous cannot start a lesson');
@@ -22,7 +22,7 @@ select is(public.start_booking_lesson('eee10000-0000-4000-8000-000000000005'),tr
 select lives_ok($$select public.consent_booking_recording('eee10000-0000-4000-8000-000000000005')$$,'tutor can save consent');
 select lives_ok($$select public.consent_booking_recording('eee10000-0000-4000-8000-000000000005')$$,'consent replay is safe');
 select set_config('request.jwt.claims','{"sub":"ccc10000-0000-4000-8000-000000000003","role":"authenticated"}',true);
-select is(public.start_booking_lesson('eee10000-0000-4000-8000-000000000005'),false,'parent cannot open lesson');
+select is(public.start_booking_lesson('eee10000-0000-4000-8000-000000000005'),false,'an unrelated user cannot open the lesson');
 reset role;
 update public.bookings set status='cancelled' where id='eee10000-0000-4000-8000-000000000005';
 set local role authenticated;

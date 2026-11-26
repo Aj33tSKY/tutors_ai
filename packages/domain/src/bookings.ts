@@ -12,8 +12,7 @@ export async function getBooking(repository: BookingRepository, identity: Identi
   const booking = await repository.find(id);
   if (!booking) throw new AppError(404, "not_found", "Booking not found");
   const participant = booking.student_id === identity.id || booking.tutor_id === identity.id;
-  // Linked parents may read through RLS but never acquire participant privileges.
-  if (!participant && identity.profile.role !== "parent" && identity.profile.role !== "admin") {
+  if (!participant && identity.profile.role !== "admin") {
     throw new AppError(404, "not_found", "Booking not found");
   }
   const counterpart = booking.student_id === identity.id ? booking.tutor_id : booking.student_id;

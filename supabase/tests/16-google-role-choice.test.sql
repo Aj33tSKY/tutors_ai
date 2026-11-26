@@ -1,6 +1,6 @@
 begin;
 create extension if not exists pgtap with schema extensions;
-select plan(10);
+select plan(11);
 
 insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
   ('aaaaaaaa-0000-0000-0000-000000000161', 'google@test.local', '{"full_name":"Google Person"}', '{"provider":"google"}'),
@@ -10,6 +10,8 @@ insert into auth.users (id, email, raw_user_meta_data, raw_app_meta_data) values
 select is((select role::text || ':' || role_confirmed::text from public.profiles where id = 'aaaaaaaa-0000-0000-0000-000000000161'), 'student:false', 'a Google account starts as an unconfirmed student');
 select is((select full_name from public.profiles where id = 'dddddddd-0000-0000-0000-000000000164'), 'Named Only', 'the name comes from Google when there is no full_name');
 select is((select role::text || ':' || role_confirmed::text from public.profiles where id = 'bbbbbbbb-0000-0000-0000-000000000162'), 'tutor:true', 'an email sign-up keeps its chosen role and is confirmed');
+
+select throws_ok($$update public.profiles set role = 'parent' where id = 'aaaaaaaa-0000-0000-0000-000000000161'$$, '23514', null, 'the parent role is blocked by a constraint, even for the platform');
 
 create or replace function pg_temp.act_as(user_id uuid) returns void language plpgsql as $$
 begin

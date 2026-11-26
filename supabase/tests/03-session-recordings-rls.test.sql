@@ -8,7 +8,7 @@
 begin;
 create extension if not exists pgtap with schema extensions;
 
-select plan(9);
+select plan(8);
 
 insert into storage.buckets (id, name, public) values
   ('session-recordings', 'session-recordings', false),
@@ -18,12 +18,10 @@ on conflict (id) do nothing;
 insert into auth.users (id, email, raw_user_meta_data) values
   ('aaaaaaaa-0000-0000-0000-000000000001', 'student@test.local', '{"role":"student","full_name":"Student"}'),
   ('bbbbbbbb-0000-0000-0000-000000000002', 'tutor@test.local',   '{"role":"tutor","full_name":"Tutor"}'),
-  ('cccccccc-0000-0000-0000-000000000003', 'parent@test.local',  '{"role":"parent","full_name":"Parent"}'),
   ('dddddddd-0000-0000-0000-000000000004', 'other@test.local',   '{"role":"student","full_name":"Stranger"}');
 
-insert into public.student_profiles (id, parent_id)
-values ('aaaaaaaa-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000003')
-on conflict (id) do update set parent_id = excluded.parent_id;
+insert into public.student_profiles (id) values ('aaaaaaaa-0000-0000-0000-000000000001')
+on conflict (id) do nothing;
 
 insert into public.bookings (id, student_id, tutor_id, subject, exam_board, start_time, end_time, amount_gbp_pence)
 values ('0000000a-0000-0000-0000-00000000000a',
@@ -60,9 +58,6 @@ select is((select count(*) from public.session_recordings)::int, 1, 'the student
 
 select pg_temp.act_as('bbbbbbbb-0000-0000-0000-000000000002');
 select is((select count(*) from public.session_recordings)::int, 1, 'the tutor sees the recording of their lesson');
-
-select pg_temp.act_as('cccccccc-0000-0000-0000-000000000003');
-select is((select count(*) from public.session_recordings)::int, 1, 'the linked parent sees the recording');
 
 select pg_temp.act_as('dddddddd-0000-0000-0000-000000000004');
 select is((select count(*) from public.session_recordings)::int, 0, 'an outsider sees no recordings');

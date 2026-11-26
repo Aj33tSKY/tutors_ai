@@ -38,7 +38,7 @@ select is_empty(
     from pg_proc p
     join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.prosecdef
-      and p.proname in ('app_current_role', 'is_linked_parent', 'handle_new_user')
+      and p.proname in ('app_current_role', 'handle_new_user')
   $$,
   'privileged security-definer helpers live outside the public schema'
 );

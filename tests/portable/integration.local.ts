@@ -32,7 +32,6 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
   const users: string[] = [];
   const cleanupIds: string[] = [];
   t.after(async () => {
-    await pool.query("update public.student_profiles set parent_id=null where parent_id=any($1::uuid[])", [users]);
     for (const id of cleanupIds) await pool.query("delete from public.bookings where id=$1", [id]);
     for (const id of users.reverse()) await admin.auth.admin.deleteUser(id);
     await pool.end();
@@ -45,9 +44,9 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
     return { id: data.user.id, email };
   }
   const student = await user("student"); const tutor = await user("tutor"); const outsider = await user("student");
-  const parent = await user("parent"); const administrator = await user("student");
+  const administrator = await user("student");
   await pool.query("update public.profiles set role='admin' where id=$1", [administrator.id]);
-  await pool.query("insert into public.student_profiles(id,parent_id) values($1,$2)", [student.id, parent.id]);
+  await pool.query("insert into public.student_profiles(id) values($1) on conflict (id) do nothing", [student.id]);
   const { rows } = await pool.query("insert into public.bookings(student_id,tutor_id,subject,exam_board,start_time,end_time,amount_gbp_pence) values($1,$2,'Mathematics','AQA',now(),now()+interval '1 hour',3500) returning id", [student.id, tutor.id]);
   const bookingId = rows[0].id as string;
   cleanupIds.push(bookingId);
@@ -66,14 +65,10 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
   const cookie = await signIn(student.email);
   const tutorCookie = await signIn(tutor.email);
   const otherCookie = await signIn(outsider.email);
-  const parentCookie = await signIn(parent.email);
-  assert.equal((await app.request(`/v1/lessons/${bookingId}`, { headers: { cookie: parentCookie } })).status, 404, "linked parent cannot access live room");
+  assert.equal((await app.request(`/v1/lessons/${bookingId}`, { headers: { cookie: otherCookie } })).status, 404, "an unrelated student cannot access the live room");
   assert.equal((await app.request(`/v1/lessons/${bookingId}/token`, { method: "POST", headers: { cookie, origin } })).status, 409, "student cannot obtain token before tutor starts");
   assert.equal((await app.request(`/v1/lessons/${bookingId}/start`, { method: "POST", headers: { cookie, origin } })).status, 403);
-  assert.equal((await app.request("/v1/parent/overview", { headers: { cookie } })).status, 403);
-  const family = await app.request("/v1/parent/overview", { headers: { cookie: parentCookie } });
-  assert.equal(family.status, 200);
-  assert.equal((await family.json()).children[0].id, student.id);
+  assert.equal((await app.request("/v1/parent/overview", { headers: { cookie } })).status, 404, "the parent route is gone");
   assert.equal((await app.request("/v1/admin/overview", { headers: { cookie } })).status, 403);
   assert.equal((await app.request(`/v1/admin/tutors/${tutor.id}/approve`, { method: "POST", headers: { cookie, origin, "content-type": "application/json" }, body: JSON.stringify({ evidenceNote: "Forged approval from student", confirmed: true }) })).status, 403);
   const deniedSlot = await app.request("/v1/tutor/availability", { method: "POST", headers: { cookie, origin, "content-type": "application/json" }, body: JSON.stringify({ dayOfWeek: 1, startTime: "16:00", endTime: "17:00" }) });
@@ -235,7 +230,7 @@ test("portable authentication, UI, RLS and durable lesson processing", async (t)
   assert.ok((await anonymous.rpc("rename_booking_lesson", { p_booking_id: bookingId, p_lesson_name: "Anonymous" })).error);
   const logout = await app.request("/v1/auth/sign-out", { method: "POST", headers: { cookie, origin } });
   assert.equal(logout.status, 200); assert.ok(logout.headers.getSetCookie().some((value) => /max-age=0/i.test(value)));
-  await checkBrowser({ url, anonKey: process.env.LOCAL_ANON_KEY!, studentEmail: student.email, tutorEmail: tutor.email, parentEmail: parent.email, adminEmail: administrator.email, outsiderEmail: outsider.email, password, bookingId });
+  await checkBrowser({ url, anonKey: process.env.LOCAL_ANON_KEY!, studentEmail: student.email, tutorEmail: tutor.email, adminEmail: administrator.email, outsiderEmail: outsider.email, password, bookingId });
   // Public catalogue, UK-time slots and the transactional lesson request.
   const publicGet = (path: string) => app.request(path);
   await pool.query("update public.tutor_profiles set dbs_verified=false where id=$1", [tutor.id]); // the browser journey approved this tutor

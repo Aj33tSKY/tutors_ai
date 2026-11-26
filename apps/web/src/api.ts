@@ -1,5 +1,5 @@
 import type { ApiError, BookingDetail, BookingSummary, Identity } from "../../../packages/contracts/src/index.js";
-import type { AvailabilitySlot, Contact, AdminOverview, FamilyOverview } from "../../../packages/contracts/src/portal.js";
+import type { AvailabilitySlot, Contact, AdminOverview } from "../../../packages/contracts/src/portal.js";
 import type { LessonRoom, LessonToken } from "../../../packages/contracts/src/lessons.js";
 import type { SessionReview } from "../../../packages/contracts/src/reviews.js";
 import type { CalendarSession } from "../../../packages/contracts/src/models.js";
@@ -67,7 +67,6 @@ export const api = {
   startLesson: (id: string) => request(`/v1/lessons/${encodeURIComponent(id)}/start`, { method: "POST" }),
   consentRecording: (id: string) => request(`/v1/lessons/${encodeURIComponent(id)}/consent`, { method: "POST" }),
   lessonPresence: (id: string) => request<{ tutorPresent: boolean }>(`/v1/lessons/${encodeURIComponent(id)}/presence`),
-  family: () => request<FamilyOverview>("/v1/parent/overview"),
   admin: () => request<AdminOverview>("/v1/admin/overview"),
   approveTutor: (id: string, evidenceNote: string, confirmed: boolean) => request(`/v1/admin/tutors/${encodeURIComponent(id)}/approve`, { method: "POST", body: JSON.stringify({ evidenceNote, confirmed }) }),
   contacts: () => request<{ contacts: Contact[] }>("/v1/contacts"),

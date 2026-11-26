@@ -24,7 +24,6 @@ export const NAV_BY_ROLE: Record<UserRole, NavItem[]> = {
     { href: "/dashboard/student/tutors", label: "My tutors", icon: Users },
     { href: "/dashboard/student/chat", label: "Revision AI", icon: MessageCircle },
   ],
-  parent: [{ href: "/dashboard/parent", label: "Overview", icon: LayoutDashboard }],
   tutor: [
     { href: "/dashboard/tutor", label: "Overview", icon: LayoutDashboard },
     { href: "/dashboard/tutor/students", label: "My students", icon: Users },
