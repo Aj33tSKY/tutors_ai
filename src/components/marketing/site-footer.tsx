@@ -66,7 +66,7 @@ export function SiteFooter() {
 
         <div className="mt-20 flex flex-col gap-3 border-t border-hairline pt-8 sm:flex-row sm:items-center sm:justify-between">
           <p className="eyebrow">
-            © {new Date().getFullYear()} Kindling Education Ltd
+            © {new Date().getFullYear()} Hybrid Tutors Ltd
           </p>
           <p className="eyebrow">Tutor approval · Private by design · UK A-Level focus</p>
         </div>

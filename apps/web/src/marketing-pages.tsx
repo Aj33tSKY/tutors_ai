@@ -15,10 +15,10 @@ import "../../../src/components/marketing/landing-page.css";
 import { api } from "./api.js";
 
 function useTitle(title: string) { useEffect(() => { document.title = title; }, [title]); }
-const titleOf = (metadata: { title?: unknown }, fallback: string) => `${typeof metadata.title === "string" ? metadata.title : fallback} · Kindling`;
+const titleOf = (metadata: { title?: unknown }, fallback: string) => `${typeof metadata.title === "string" ? metadata.title : fallback} · Hybrid Tutors`;
 
 export function LandingPage() {
-  useTitle("Kindling — A-Level STEM Tutoring, Grounded in Every Session");
+  useTitle("Hybrid Tutors — A-Level STEM Tutoring, Grounded in Every Session");
   // A catalogue outage must not take the landing page down: it simply shows no tutors.
   const tutors = useQuery({ queryKey: ["featured-tutors"], queryFn: async () => (await api.publicTutors("")).tutors.slice(0, 6), staleTime: 60_000, initialData: window.__PUBLIC_DATA__?.catalogue?.tutors.slice(0, 6) });
   return <><Hero/><LearningConnection/><FeatureShowcase/><TutorShowcase tutors={tutors.data ?? []}/><HowItWorks/><CtaSection/></>;

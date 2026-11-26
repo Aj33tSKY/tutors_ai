@@ -11,7 +11,7 @@ const STEPS = [
 export function HowItWorks() {
   return (
     <section className="landing-how landing-shell" aria-labelledby="how-title">
-      <Reveal className="landing-how__heading"><div><p className="landing-kicker">A little easier, from the start</p><h2 id="how-title">From finding a tutor<br />to finding your feet.</h2></div><Link href="/how-it-works" className="landing-text-link">How Kindling works <ArrowUpRight size={15} /></Link></Reveal>
+      <Reveal className="landing-how__heading"><div><p className="landing-kicker">A little easier, from the start</p><h2 id="how-title">From finding a tutor<br />to finding your feet.</h2></div><Link href="/how-it-works" className="landing-text-link">How Hybrid Tutors works <ArrowUpRight size={15} /></Link></Reveal>
       <div className="landing-how__steps">
         {STEPS.map((step, index) => <Reveal key={step.title} delay={index * .06} className="landing-how__step"><span className="landing-how__icon"><step.icon size={21} strokeWidth={1.5} /></span><span className="landing-how__index">0{index + 1}</span><h3>{step.title}</h3><p>{step.body}</p></Reveal>)}
       </div>

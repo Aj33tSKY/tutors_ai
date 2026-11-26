@@ -16,7 +16,7 @@ export function DashboardLayout() {
   const navigate = useNavigate();
   const client = useQueryClient();
   const identity = useQuery({ queryKey: ["identity"], queryFn: api.me });
-  useEffect(() => { document.title = "Dashboard | Kindling"; }, []);
+  useEffect(() => { document.title = "Dashboard | Hybrid Tutors"; }, []);
   if (identity.error instanceof ApiFailure && identity.error.status === 401) return <Navigate to="/sign-in" replace/>;
   if (identity.error) return <p role="alert">Could not load your account.</p>;
   if (!identity.data) return <p role="status">Loading your account…</p>;

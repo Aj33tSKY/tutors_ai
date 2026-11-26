@@ -1,4 +1,4 @@
-# Kindling — UK A-Level STEM Tutoring Platform
+# Hybrid Tutors — UK A-Level STEM Tutoring Platform
 
 For new contributors, start with [the developer workflow](docs/development-workflow.md).
 It explains the single repository, `tutors-dev` / `tutors` deployments and database

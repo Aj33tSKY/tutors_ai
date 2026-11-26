@@ -36,7 +36,7 @@ export function DashboardTopbar({ role }: { role: UserRole }) {
         <SheetContent side="left" className="w-72 border-border/70 bg-sidebar p-0">
           <SheetTitle className="sr-only">Dashboard navigation</SheetTitle>
           <div className="flex h-16 items-center px-5">
-            <Link href="/" aria-label="Kindling — home">
+            <Link href="/" aria-label="Hybrid Tutors — home">
               <Wordmark />
             </Link>
           </div>

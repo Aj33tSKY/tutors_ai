@@ -1,24 +1,33 @@
+import { useId } from "react";
+
 /**
- * Wordmark. The mark is a struck match — "kindling" — drawn as a hairline
- * so it sits in the same weight class as the rest of the chrome.
+ * The Hybrid Tutors mark: an "H" of two offset stems crossed by a translucent band, so two things (in-person warmth and online
+ * reach) overlap into something new, and the overlap is where the colour deepens. Colours are fixed: the mark reads on light and dark.
+ * Keep public/favicon.svg and public/logo.svg in step with these shapes.
  */
+export function LogoMark({ className = "size-7" }: { className?: string }) {
+  const id = useId().replace(/:/g, "");
+  const left = "M9 4h8a10 10 0 0 1 10 10v38h-8A10 10 0 0 1 9 42z";
+  const right = "M37 12h8a10 10 0 0 1 10 10v38h-8a10 10 0 0 1-10-10z";
+  return (
+    <svg viewBox="0 0 64 64" className={className} aria-hidden="true" fill="none">
+      <defs><clipPath id={`stems-${id}`}><path d={left} /><path d={right} /></clipPath></defs>
+      <path d={left} fill="#58CC02" />
+      <path d={right} fill="#3FA700" />
+      <g transform="rotate(-10 32 34)"><rect x="3" y="28" width="58" height="12" rx="6" fill="#3DD6B0" fillOpacity=".93" /></g>
+      <g clipPath={`url(#stems-${id})`}><g transform="rotate(-10 32 34)"><rect x="3" y="28" width="58" height="12" rx="6" fill="#0F5132" /></g></g>
+    </svg>
+  );
+}
+
+/** Mark plus name. The collapsed sidebar keeps just the mark: the name does not fit a 4.5rem rail. */
 export function Wordmark({ className = "", compact = false }: { className?: string; compact?: boolean }) {
   return (
     <span className={`flex items-center gap-2.5 ${className}`}>
-      <svg viewBox="0 0 16 20" className="size-4 shrink-0" aria-hidden fill="none">
-        <path
-          d="M8 1c0 3.2-4.5 4.4-4.5 9a4.5 4.5 0 0 0 9 0c0-2.2-1.6-3.6-2.6-5.4"
-          stroke="var(--saffron)"
-          strokeWidth="1.25"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <path d="M8 19v-3.5" stroke="currentColor" strokeWidth="1.25" strokeLinecap="round" />
-      </svg>
-      {/* The collapsed sidebar keeps just the mark — "Kindling" doesn't fit a 4.5rem rail. */}
+      <LogoMark className="size-8 shrink-0" />
       {!compact && (
-        <span className="font-heading text-[1.35rem] leading-none tracking-[-0.03em]">
-          Kindling
+        <span className="font-heading text-[1.25rem] leading-none tracking-[-0.025em]">
+          <span className="font-semibold">Hybrid</span> <span className="font-normal">Tutors</span>
         </span>
       )}
     </span>

@@ -21,7 +21,7 @@ export function SignInPage() {
   // Only same-site paths are honoured, so a crafted link cannot send a signed-in user elsewhere.
   const next = search.get("next"); const destination = next && /^\/(?![/\\])/.test(next) ? next : "/dashboard";
   return <AuthShell title="Welcome back" subtitle="Sign in to pick up where your last lesson left off."
-    footer={<>New to Kindling? <Link to="/sign-up" className={linkClass}>Create an account</Link></>}>
+    footer={<>New to Hybrid Tutors? <Link to="/sign-up" className={linkClass}>Create an account</Link></>}>
     <GoogleButton label="Continue with Google"/>
     <Divider/>
     <form className="space-y-4" onSubmit={async (event) => {
@@ -91,9 +91,9 @@ export function ChooseRole() {
   };
   const options = [
     { role: "student" as const, title: "I’m a student", note: "Find a tutor, book lessons and keep notes from every session.", Icon: GraduationCap },
-    { role: "tutor" as const, title: "I’m a tutor", note: "Teach on Kindling. Your profile is reviewed before it appears in search.", Icon: UserRound },
+    { role: "tutor" as const, title: "I’m a tutor", note: "Teach on Hybrid Tutors. Your profile is reviewed before it appears in search.", Icon: UserRound },
   ];
-  return <AuthShell title="How will you use Kindling?" subtitle="Pick one to finish setting up your account. This can’t be changed later.">
+  return <AuthShell title="How will you use Hybrid Tutors?" subtitle="Pick one to finish setting up your account. This can’t be changed later.">
     <div className="space-y-3">{options.map(({ role, title, note, Icon }) =>
       <button key={role} type="button" disabled={pending} onClick={() => void choose(role)}
         className="flex w-full items-start gap-4 rounded-xl border bg-background p-4 text-left outline-none transition-colors hover:border-primary hover:bg-primary/5 focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:opacity-60">

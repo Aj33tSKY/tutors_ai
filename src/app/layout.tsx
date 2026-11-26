@@ -24,8 +24,8 @@ const robotoMono = Roboto_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Kindling — A-Level STEM Tutoring, Grounded in Every Session",
-    template: "%s · Kindling",
+    default: "Hybrid Tutors — A-Level STEM Tutoring, Grounded in Every Session",
+    template: "%s · Hybrid Tutors",
   },
   description:
     "UK A-Level Maths, Further Maths, Physics, Chemistry, Biology and Computing tutoring. Live sessions, automatic topic mapping, and an AI revision assistant grounded in your own tutor's words.",

@@ -9,7 +9,7 @@ import { api } from "./api.js";
 export function AuthShell({ title, subtitle, children, footer }: { title: string; subtitle?: string; children: ReactNode; footer?: ReactNode }) {
   return <div className="grid min-h-screen bg-background text-foreground lg:grid-cols-2">
     <div className="flex flex-col px-6 py-6 sm:px-10">
-      <header><Link to="/" aria-label="Kindling home" className="inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><Wordmark/></Link></header>
+      <header><Link to="/" aria-label="Hybrid Tutors home" className="inline-flex rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring/50"><Wordmark/></Link></header>
       <main className="mx-auto flex w-full max-w-[400px] flex-1 flex-col justify-center py-10">
         <h1 className="text-[1.75rem] font-semibold leading-tight tracking-[-0.02em] sm:text-[2rem]">{title}</h1>
         {subtitle && <p className="mt-2 text-[0.9375rem] leading-relaxed text-muted-foreground">{subtitle}</p>}
@@ -96,7 +96,7 @@ export function GoogleButton({ label }: { label: "Continue with Google" | "Sign 
 /** Google sign-in can create an account, so both pages carry the agreement line. */
 export function LegalNote() {
   const link = "underline underline-offset-4 hover:text-foreground";
-  return <p className="text-center text-xs leading-relaxed text-muted-foreground">By continuing, you agree to Kindling’s <Link to="/terms" target="_blank" rel="noopener" className={link}>Terms of service</Link> and acknowledge our <Link to="/privacy" target="_blank" rel="noopener" className={link}>Privacy policy</Link>.</p>;
+  return <p className="text-center text-xs leading-relaxed text-muted-foreground">By continuing, you agree to the Hybrid Tutors <Link to="/terms" target="_blank" rel="noopener" className={link}>Terms of service</Link> and acknowledge our <Link to="/privacy" target="_blank" rel="noopener" className={link}>Privacy policy</Link>.</p>;
 }
 
 export function Divider({ children = "or" }: { children?: ReactNode }) {
@@ -139,7 +139,7 @@ export function PasswordField({ label = "Password", hint, action, ...props }: { 
 
 /** Student or tutor, as two large targets rather than a dropdown. Radios keep it a normal form field. */
 export function RoleChoice() {
-  const options = [{ value: "student", title: "Student", note: "Learn with a tutor" }, { value: "tutor", title: "Tutor", note: "Teach on Kindling" }];
+  const options = [{ value: "student", title: "Student", note: "Learn with a tutor" }, { value: "tutor", title: "Tutor", note: "Teach on Hybrid Tutors" }];
   return <fieldset className="space-y-1.5">
     <legend className="text-sm font-medium">I am a</legend>
     <div className="grid grid-cols-2 gap-3">
