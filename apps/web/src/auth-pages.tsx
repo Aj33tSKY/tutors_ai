@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { GraduationCap, Loader2, UserRound } from "lucide-react";
 import { Button } from "../../../src/components/ui/button.js";
 import { api } from "./api.js";
-import { Alert, AuthShell, Divider, Field, GoogleButton, PasswordField, RoleChoice } from "./auth-ui.js";
+import { Alert, AuthShell, Divider, Field, GoogleButton, LegalNote, PasswordField, RoleChoice } from "./auth-ui.js";
 
 export { GoogleButton };
 
@@ -36,6 +36,7 @@ export function SignInPage() {
       {error && <Alert tone="error">{error}</Alert>}
       <Button className={submitClass} disabled={pending}>{pending ? <><Loader2 className="size-4 animate-spin" aria-hidden="true"/>Signing in…</> : "Sign in"}</Button>
     </form>
+    <LegalNote/>
   </AuthShell>;
 }
 
@@ -75,6 +76,7 @@ export function AccountForm({ mode }: { mode: Mode }) {
       {error && <Alert tone="error">{error}</Alert>}
       <Button className={submitClass} disabled={pending}>{pending ? <><Loader2 className="size-4 animate-spin" aria-hidden="true"/>{text.pending}</> : text.submit}</Button>
     </form>
+    {mode === "signup" && <LegalNote/>}
   </AuthShell>;
 }
 

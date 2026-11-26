@@ -7,9 +7,9 @@ const POINTS = [
     body: "Only tutors approved by our team appear in public search. We review their identity and relevant safeguarding evidence before approving a profile.",
   },
   {
-    id: "parents",
-    title: "Parent linkage for under-18 students",
-    body: "Linked parent accounts can see their children's lesson schedule and completed session reviews. Private student conversations and revision chats remain private.",
+    id: "private",
+    title: "Private by design",
+    body: "Student messages, lesson recordings, transcripts and revision chats are visible only to the people involved in them and to the administrators who run the service.",
   },
   {
     id: "privacy",

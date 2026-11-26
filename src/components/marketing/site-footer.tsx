@@ -26,6 +26,8 @@ const COLUMNS = [
       { href: "/about", label: "Safeguarding & DBS" },
       { href: "/about#privacy", label: "GDPR & data retention" },
       { href: "/about#compliance", label: "Compliance" },
+      { href: "/terms", label: "Terms of service" },
+      { href: "/privacy", label: "Privacy policy" },
     ],
   },
 ];
@@ -66,7 +68,7 @@ export function SiteFooter() {
           <p className="eyebrow">
             © {new Date().getFullYear()} Kindling Education Ltd
           </p>
-          <p className="eyebrow">Tutor approval · Parent visibility · UK A-Level focus</p>
+          <p className="eyebrow">Tutor approval · Private by design · UK A-Level focus</p>
         </div>
       </div>
     </footer>

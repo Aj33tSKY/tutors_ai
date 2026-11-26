@@ -26,6 +26,7 @@
     "@aws-sdk/s3-request-presigner": "^3.1165.0",
     "@fontsource-variable/geist": "^5.3.0",
     "@fontsource-variable/roboto-mono": "^5.3.0",
+    "@fontsource/google-sans": "^5.3.2",
     "@hookform/resolvers": "^7.0.5",
     "@livekit/components-react": "^2.9.25",
     "@livekit/components-styles": "^1.2.0",

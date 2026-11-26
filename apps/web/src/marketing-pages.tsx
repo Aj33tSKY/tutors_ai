@@ -9,6 +9,8 @@ import { CtaSection } from "../../../src/components/marketing/cta-section.js";
 import PricingContent, { metadata as pricing } from "../../../src/app/(marketing)/pricing/page.js";
 import HowItWorksContent, { metadata as howItWorks } from "../../../src/app/(marketing)/how-it-works/page.js";
 import AboutContent, { metadata as about } from "../../../src/app/(marketing)/about/page.js";
+import TermsContent, { metadata as terms } from "../../../src/app/(marketing)/terms/page.js";
+import PrivacyContent, { metadata as privacy } from "../../../src/app/(marketing)/privacy/page.js";
 import "../../../src/components/marketing/landing-page.css";
 import { api } from "./api.js";
 
@@ -23,4 +25,6 @@ export function LandingPage() {
 }
 export function PricingPage() { useTitle(titleOf(pricing, "Pricing")); return <PricingContent/>; }
 export function HowItWorksPage() { useTitle(titleOf(howItWorks, "How it works")); return <HowItWorksContent/>; }
+export function TermsPage() { useTitle(titleOf(terms, "Terms of service")); return <TermsContent/>; }
+export function PrivacyPage() { useTitle(titleOf(privacy, "Privacy policy")); return <PrivacyContent/>; }
 export function AboutPage() { useTitle(titleOf(about, "About")); return <AboutContent/>; }

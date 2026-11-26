@@ -48,6 +48,13 @@ export async function checkBrowser(input: { url: string; anonKey: string; studen
       if (text) await expect(page.getByRole("heading", { name: new RegExp(text) })).toBeVisible();
     }
     assert.deepEqual(pageErrors, [], "public pages raise no script errors");
+    for (const [path, heading] of [["/terms", "Terms of service"], ["/privacy", "Privacy policy"]] as const) {
+      await page.goto(`${origin}${path}`);
+      await expect(page.getByRole("heading", { name: heading, exact: true, level: 1 })).toBeVisible();
+    }
+    await page.goto(`${origin}/sign-up`);
+    await expect(page.getByRole("link", { name: "Terms of service" })).toHaveAttribute("href", "/terms");
+    await expect(page.getByRole("link", { name: "Privacy policy" })).toHaveAttribute("href", "/privacy");
     await page.goto(`${origin}/sign-in`);
     await expect(page.locator("html")).toHaveClass(/dark/);
     await page.getByLabel("Email", { exact: true }).fill(input.studentEmail);

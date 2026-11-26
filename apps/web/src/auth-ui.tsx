@@ -93,6 +93,12 @@ export function GoogleButton({ label }: { label: "Continue with Google" | "Sign 
   </div>;
 }
 
+/** Google sign-in can create an account, so both pages carry the agreement line. */
+export function LegalNote() {
+  const link = "underline underline-offset-4 hover:text-foreground";
+  return <p className="text-center text-xs leading-relaxed text-muted-foreground">By continuing, you agree to Kindling’s <Link to="/terms" target="_blank" rel="noopener" className={link}>Terms of service</Link> and acknowledge our <Link to="/privacy" target="_blank" rel="noopener" className={link}>Privacy policy</Link>.</p>;
+}
+
 export function Divider({ children = "or" }: { children?: ReactNode }) {
   return <div className="flex items-center gap-3 text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground" role="separator"><span className="h-px flex-1 bg-border"/>{children}<span className="h-px flex-1 bg-border"/></div>;
 }
