@@ -9,6 +9,8 @@ export const configSchema = z.object({
   webOrigin: origin,
   supabaseUrl: z.url(),
   supabaseAnonKey: z.string().min(1),
+  // Optional. A Supabase secret key (sb_secret_...) used ONLY on Auth calls, so Auth can rate-limit by the visitor's IP.
+  supabaseAuthSecretKey: z.string().min(1).optional(),
   secureCookies: z.boolean(),
   commit: z.string().min(1).max(100),
 });
@@ -18,6 +20,7 @@ export function readConfig(): ApiConfig {
     webOrigin: process.env.APP_WEB_ORIGIN,
     supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    supabaseAuthSecretKey: process.env.SUPABASE_AUTH_SECRET_KEY || undefined,
     secureCookies: process.env.NODE_ENV === "production",
     commit: process.env.APP_COMMIT_SHA ?? "local",
   });
