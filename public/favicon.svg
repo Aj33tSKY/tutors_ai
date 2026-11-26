@@ -1,7 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <defs><clipPath id="stems"><path d="M9 4h8a10 10 0 0 1 10 10v38h-8A10 10 0 0 1 9 42z"/><path d="M37 12h8a10 10 0 0 1 10 10v38h-8a10 10 0 0 1-10-10z"/></clipPath></defs>
-  <path d="M9 4h8a10 10 0 0 1 10 10v38h-8A10 10 0 0 1 9 42z" fill="#58CC02"/>
-  <path d="M37 12h8a10 10 0 0 1 10 10v38h-8a10 10 0 0 1-10-10z" fill="#3FA700"/>
-  <g transform="rotate(-10 32 34)"><rect x="3" y="28" width="58" height="12" rx="6" fill="#3DD6B0" fill-opacity=".93"/></g>
-  <g clip-path="url(#stems)"><g transform="rotate(-10 32 34)"><rect x="3" y="28" width="58" height="12" rx="6" fill="#0F5132"/></g></g>
+  <defs><clipPath id="stemsAll"><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" transform="translate(11.9 4.0)"/><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" transform="translate(36.1 10.6)"/></clipPath><clipPath id="lens"><path d="M11.90 23.00H27.90A16.0 22.56 0 0 1 11.90 45.56Z"/><path d="M36.10 17.64H52.10A16.0 22.56 0 0 1 36.10 40.20Z"/></clipPath></defs>
+  <clipPath id="s0"><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" transform="translate(11.9 4.0)"/></clipPath><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" transform="translate(11.9 4.0)" fill="#58CC02"/><g clip-path="url(#s0)"><path d="M10.90 36.28L28.90 32.29V70H10.90Z" fill="#34B857"/></g>
+  <clipPath id="s1"><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" transform="translate(36.1 10.6)"/></clipPath><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" transform="translate(36.1 10.6)" fill="#58CC02"/><g clip-path="url(#s1)"><path d="M35.10 30.91L53.10 26.92V70H35.10Z" fill="#34B857"/></g>
+  <g transform="translate(32.0 31.60) rotate(77.5) scale(1.16) translate(-8.0 -24.3)"><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" fill="#62DEC6"/></g>
+  <g clip-path="url(#stemsAll)"><g clip-path="url(#lens)"><g transform="translate(32.0 31.60) rotate(77.5) scale(1.16) translate(-8.0 -24.3)"><path d="M0 0L10.00 2.10Q16.0 3.36 16.0 11.36V48.6L6.00 46.50Q0 45.24 0 37.24Z" fill="#0D4A30"/></g></g></g>
 </svg>
